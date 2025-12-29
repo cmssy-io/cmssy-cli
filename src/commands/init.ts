@@ -122,7 +122,7 @@ export async function initCommand(name?: string, options?: InitOptions) {
       version: "1.0.0",
       type: "module",
       scripts: {
-        dev: "cmssy-forge dev",
+        dev: "cmssy-forge dev -p 3000",
         build: "cmssy-forge build",
       },
       dependencies: {},
@@ -235,22 +235,25 @@ Cmssy Forge project for building reusable UI blocks and templates.
 # Install dependencies
 npm install
 
-# Start development server with hot reload
-cmssy-forge dev -p 3000
+# Start development server with hot reload (http://localhost:3000)
+npm run dev
+
+# Or specify a custom port
+npm run dev -- -p 3002
 
 # Create a new block
 cmssy-forge create block my-block
 
 # Build for production
-cmssy-forge build
+npm run build
 \`\`\`
 
 ## Available Commands
 
 ### Development
 \`\`\`bash
-# Start dev server with preview UI
-cmssy-forge dev -p 3000
+# Start dev server with preview UI (uses npm script)
+npm run dev
 
 # Create a new block
 cmssy-forge create block <name>
@@ -258,8 +261,8 @@ cmssy-forge create block <name>
 # Create a new page template
 cmssy-forge create template <name>
 
-# Build all blocks and templates
-cmssy-forge build
+# Build all blocks and templates (uses npm script)
+npm run build
 \`\`\`
 
 ### Publishing to Cmssy Marketplace
