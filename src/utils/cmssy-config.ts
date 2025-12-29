@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 
-export interface BlockForgeConfig {
+export interface CmssyConfig {
   framework: string;
   projectName?: string;
   author?: {
@@ -18,12 +18,12 @@ export interface BlockForgeConfig {
   };
 }
 
-export async function loadConfig(): Promise<BlockForgeConfig> {
-  const configPath = path.join(process.cwd(), "blockforge.config.js");
+export async function loadConfig(): Promise<CmssyConfig> {
+  const configPath = path.join(process.cwd(), "cmssy.config.js");
 
   if (!fs.existsSync(configPath)) {
     throw new Error(
-      "blockforge.config.js not found. Are you in a blockforge project?"
+      "cmssy.config.js not found. Are you in a cmssy-forge project?"
     );
   }
 

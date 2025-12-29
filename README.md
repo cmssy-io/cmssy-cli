@@ -174,7 +174,7 @@ cmssy-forge sync @vendor/blocks.hero --workspace abc123
 
 ```
 my-blocks/
-├── blockforge.config.js   # Project configuration
+├── cmssy.config.js        # Project configuration
 ├── blocks/                # Your blocks
 │   └── hero/
 │       ├── package.json   # Block metadata

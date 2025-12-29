@@ -32,11 +32,11 @@ export async function deployCommand(options: DeployOptions) {
 
   const config = loadConfig();
 
-  // Find blockforge.config.js
-  const configPath = path.join(process.cwd(), "blockforge.config.js");
+  // Find cmssy.config.js
+  const configPath = path.join(process.cwd(), "cmssy.config.js");
   if (!fs.existsSync(configPath)) {
     console.error(
-      chalk.red("✖ Not a blockforge project (missing blockforge.config.js)\n")
+      chalk.red("✖ Not a cmssy-forge project (missing cmssy.config.js)\n")
     );
     process.exit(1);
   }

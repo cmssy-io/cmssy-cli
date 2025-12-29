@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import fs from "fs-extra";
 import ora from "ora";
 import path from "path";
-import { getPackageJson, loadConfig } from "../utils/blockforge-config.js";
+import { getPackageJson, loadConfig } from "../utils/cmssy-config.js";
 
 interface BuildOptions {
   framework?: string;

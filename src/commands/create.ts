@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import inquirer from "inquirer";
 import ora from "ora";
 import path from "path";
-import { loadConfig } from "../utils/blockforge-config.js";
+import { loadConfig } from "../utils/cmssy-config.js";
 
 async function createBlock(name: string) {
   const spinner = ora("Creating block...").start();

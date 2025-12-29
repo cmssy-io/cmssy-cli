@@ -94,7 +94,7 @@ export async function initCommand(name?: string, options?: InitOptions) {
       fs.mkdirSync(path.join(projectPath, dir), { recursive: true });
     });
 
-    // Create blockforge.config.js
+    // Create cmssy.config.js
     const config = {
       framework: answers.framework,
       author: {
@@ -112,7 +112,7 @@ export async function initCommand(name?: string, options?: InitOptions) {
     };
 
     fs.writeFileSync(
-      path.join(projectPath, "blockforge.config.js"),
+      path.join(projectPath, "cmssy.config.js"),
       `export default ${JSON.stringify(config, null, 2)};\n`
     );
 
@@ -306,14 +306,14 @@ ${answers.projectName}/
 │       └── preview.json
 ├── templates/           # Your page templates
 ├── public/              # Build output
-├── blockforge.config.js # Project configuration
+├── cmssy.config.js      # Project configuration
 ├── .env                 # API credentials (created by configure)
 └── .env.example         # API credentials template
 \`\`\`
 
 ## Configuration
 
-Edit \`blockforge.config.js\` to customize:
+Edit \`cmssy.config.js\` to customize:
 - Framework (${answers.framework})
 - Author information
 - Build settings

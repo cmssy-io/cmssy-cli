@@ -6,7 +6,7 @@ import express from "express";
 import fs from "fs-extra";
 import ora from "ora";
 import path from "path";
-import { getPackageJson, loadConfig } from "../utils/blockforge-config.js";
+import { getPackageJson, loadConfig } from "../utils/cmssy-config.js";
 
 interface DevOptions {
   port: string;
