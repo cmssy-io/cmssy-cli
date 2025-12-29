@@ -4,13 +4,56 @@ import { Command } from 'commander';
 import { configureCommand } from './commands/configure.js';
 import { deployCommand } from './commands/deploy.js';
 import { syncCommand } from './commands/sync.js';
+import { initCommand } from './commands/init.js';
+import { createCommand } from './commands/create.js';
+import { buildCommand } from './commands/build.js';
+import { devCommand } from './commands/dev.js';
 
 const program = new Command();
 
 program
   .name('cmssy-forge')
-  .description('Cmssy adapter for BlockForge - publish to marketplace')
-  .version('0.1.0');
+  .description('Unified CLI for building and publishing blocks to Cmssy marketplace')
+  .version('0.2.0');
+
+// cmssy-forge init
+program
+  .command('init')
+  .description('Initialize a new BlockForge project')
+  .argument('[name]', 'Project name')
+  .option('-f, --framework <framework>', 'Framework (react, vue, angular, vanilla)', 'react')
+  .action(initCommand);
+
+// cmssy-forge create
+const create = program
+  .command('create')
+  .description('Create a new block or template');
+
+create
+  .command('block')
+  .description('Create a new block')
+  .argument('<name>', 'Block name')
+  .action(createCommand.block);
+
+create
+  .command('template')
+  .description('Create a new page template')
+  .argument('<name>', 'Template name')
+  .action(createCommand.page);
+
+// cmssy-forge build
+program
+  .command('build')
+  .description('Build all blocks and templates')
+  .option('--framework <framework>', 'Framework to use')
+  .action(buildCommand);
+
+// cmssy-forge dev
+program
+  .command('dev')
+  .description('Start development server with preview')
+  .option('-p, --port <port>', 'Port number', '3000')
+  .action(devCommand);
 
 // cmssy-forge configure
 program

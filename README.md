@@ -1,6 +1,6 @@
 # cmssy-forge
 
-CLI tool for publishing BlockForge blocks and templates to Cmssy Marketplace.
+Unified CLI for building reusable UI blocks and publishing them to Cmssy Marketplace.
 
 ## Installation
 
@@ -8,10 +8,113 @@ CLI tool for publishing BlockForge blocks and templates to Cmssy Marketplace.
 npm install -g cmssy-forge
 ```
 
-## Usage
+## Quick Start
 
-### Configure API credentials
+```bash
+# 1. Create a new project
+npx cmssy-forge init my-blocks
 
+# 2. Navigate to project
+cd my-blocks
+
+# 3. Install dependencies
+npm install
+
+# 4. Start development server
+npm run dev
+
+# 5. Create a new block
+npx cmssy-forge create block my-block
+
+# 6. Build for production
+npm run build
+
+# 7. Configure Cmssy API (for publishing)
+npx cmssy-forge configure
+
+# 8. Deploy to marketplace
+npx cmssy-forge deploy --all
+```
+
+## Commands
+
+### Initialize Project
+
+```bash
+cmssy-forge init [name] [options]
+```
+
+Create a new BlockForge project with example blocks.
+
+**Options:**
+- `-f, --framework <framework>` - Framework (react, vue, angular, vanilla). Default: react
+
+**Example:**
+```bash
+cmssy-forge init my-blocks --framework react
+```
+
+### Create Block or Template
+
+```bash
+cmssy-forge create block <name>
+cmssy-forge create template <name>
+```
+
+Create a new block or page template in your project.
+
+**Example:**
+```bash
+cmssy-forge create block hero
+cmssy-forge create template landing-page
+```
+
+### Build
+
+```bash
+cmssy-forge build [options]
+```
+
+Build all blocks and templates for production.
+
+**Options:**
+- `--framework <framework>` - Override framework from config
+
+**Example:**
+```bash
+cmssy-forge build
+```
+
+**Output:** Built files are generated in `public/@vendor/package-name/version/` directory.
+
+### Development Server
+
+```bash
+cmssy-forge dev [options]
+```
+
+Start development server with hot reload and preview.
+
+**Options:**
+- `-p, --port <port>` - Port number. Default: 3000
+
+**Example:**
+```bash
+cmssy-forge dev --port 4000
+```
+
+### Configure API
+
+```bash
+cmssy-forge configure [options]
+```
+
+Configure Cmssy API credentials for publishing.
+
+**Options:**
+- `--api-url <url>` - Cmssy API URL. Default: https://api.cmssy.io/graphql
+
+**Example:**
 ```bash
 cmssy-forge configure
 ```
@@ -22,10 +125,23 @@ You'll be prompted for:
 
 Create an API token with `marketplace:publish` scope.
 
-### Deploy blocks to marketplace
+### Deploy to Marketplace
 
 ```bash
-# Deploy all blocks
+cmssy-forge deploy [options]
+```
+
+Publish blocks/templates to Cmssy marketplace.
+
+**Options:**
+- `--all` - Deploy all blocks and templates
+- `--blocks <names...>` - Deploy specific blocks
+- `--templates <names...>` - Deploy specific templates
+- `--dry-run` - Preview without publishing
+
+**Example:**
+```bash
+# Deploy all
 cmssy-forge deploy --all
 
 # Deploy specific blocks
@@ -34,54 +150,85 @@ cmssy-forge deploy --blocks hero pricing
 # Deploy specific templates
 cmssy-forge deploy --templates landing-page
 
-# Dry run (preview without publishing)
+# Dry run
 cmssy-forge deploy --all --dry-run
+```
+
+### Sync from Marketplace
+
+```bash
+cmssy-forge sync [package] [options]
+```
+
+Pull blocks from Cmssy marketplace to local project.
+
+**Options:**
+- `--workspace <id>` - Workspace ID to sync from
+
+**Example:**
+```bash
+cmssy-forge sync @vendor/blocks.hero --workspace abc123
+```
+
+## Project Structure
+
+```
+my-blocks/
+├── blockforge.config.js   # Project configuration
+├── blocks/                # Your blocks
+│   └── hero/
+│       ├── package.json   # Block metadata
+│       ├── preview.json   # Preview data for dev server
+│       └── src/
+│           ├── index.tsx  # Block component
+│           └── index.css  # Block styles
+├── templates/             # Your page templates
+├── public/                # Build output
+│   └── @vendor/package-name/version/
+│       ├── index.js
+│       ├── index.css
+│       └── package.json
+├── package.json
+└── .env                   # API credentials
+```
+
+## Block Metadata
+
+Each block requires a `blockforge` section in its `package.json`:
+
+```json
+{
+  "name": "@vendor/blocks.hero",
+  "version": "1.0.0",
+  "description": "Hero section block",
+  "blockforge": {
+    "packageType": "block",
+    "displayName": "Hero Section",
+    "category": "marketing",
+    "tags": ["hero", "landing", "cta"],
+    "pricing": {
+      "licenseType": "free"
+    },
+    "schemaFields": [...],
+    "defaultContent": {...}
+  }
+}
 ```
 
 ## Requirements
 
 - Node.js 18+
-- BlockForge project with built files in `public/` directory
-- Cmssy API token with `marketplace:publish` scope
 
-## Project Structure
+## Complete Workflow
 
-Your BlockForge project should have:
-
-```
-your-project/
-├── blockforge.config.js
-├── blocks/
-│   └── hero/
-│       ├── package.json    # with "blockforge" metadata
-│       └── src/
-├── public/                 # Build output (from blockforge build)
-│   └── @vendor/package-name/version/
-│       ├── index.js
-│       ├── index.css
-│       └── package.json
-└── .env                    # Created by cmssy-forge configure
-```
-
-## Workflow
-
-1. Build your blocks with BlockForge:
-   ```bash
-   blockforge build
-   ```
-
-2. Configure cmssy-forge (one-time):
-   ```bash
-   cmssy-forge configure
-   ```
-
-3. Deploy to marketplace:
-   ```bash
-   cmssy-forge deploy --all
-   ```
-
-4. Your packages are submitted for Cmssy review
-5. Once approved, they'll be available in the marketplace
+1. **Initialize**: `cmssy-forge init my-blocks`
+2. **Develop**: `cmssy-forge dev` (hot reload + preview)
+3. **Create**: `cmssy-forge create block my-block`
+4. **Build**: `cmssy-forge build`
+5. **Configure**: `cmssy-forge configure` (one-time)
+6. **Deploy**: `cmssy-forge deploy --all`
+7. **Review**: Your packages are submitted for Cmssy review
+8. **Publish**: Once approved, they're available in the marketplace
 
 ## License
 
