@@ -6,7 +6,7 @@ export function createClient(): GraphQLClient {
 
   if (!config.apiToken) {
     throw new Error(
-      "CMSSY_API_TOKEN not configured. Run: cmssy-forge configure"
+      "CMSSY_API_TOKEN not configured. Run: cmssy configure"
     );
   }
 

@@ -218,7 +218,7 @@ public/
 # Cmssy GraphQL API URL
 CMSSY_API_URL=https://api.cmssy.io/graphql
 
-# Cmssy API Token (get from Workspace Settings → API Tokens)
+# Cmssy API Token (get from Dashboard → API Tokens)
 # Required scopes: marketplace:publish
 CMSSY_API_TOKEN=
 `;
