@@ -1,13 +1,15 @@
 import chalk from "chalk";
 import chokidar from "chokidar";
 import { build } from "esbuild";
-import { execSync } from "child_process";
+import { exec, execSync } from "child_process";
 import express from "express";
 import fs from "fs-extra";
 import ora from "ora";
 import path from "path";
 import { fileURLToPath } from "url";
+import { GraphQLClient } from "graphql-request";
 import { getPackageJson, loadConfig } from "../utils/cmssy-config.js";
+import { loadConfig as loadEnvConfig } from "../utils/config.js";
 import {
   loadBlockConfig,
   validateSchema,
@@ -102,6 +104,48 @@ export async function devCommand(options: DevOptions) {
         packageName: r.packageJson?.name || `@local/${r.type}s.${r.name}`,
       }));
       res.json(blockList);
+    });
+
+    // API: Get user's workspaces
+    app.get("/api/workspaces", async (_req, res) => {
+      try {
+        const config = loadEnvConfig();
+
+        if (!config.apiToken) {
+          res.status(401).json({
+            error: "API token not configured",
+            message: "Run 'cmssy configure' to set up your API credentials"
+          });
+          return;
+        }
+
+        const client = new GraphQLClient(config.apiUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiToken}`,
+          },
+        });
+
+        const query = `
+          query MyWorkspaces {
+            myWorkspaces {
+              id
+              slug
+              name
+              myRole
+            }
+          }
+        `;
+
+        const data: any = await client.request(query);
+        res.json(data.myWorkspaces || []);
+      } catch (error: any) {
+        console.error("Failed to fetch workspaces:", error);
+        res.status(500).json({
+          error: "Failed to fetch workspaces",
+          message: error.message || "Unknown error"
+        });
+      }
     });
 
     // API: Get preview data for a block
@@ -856,7 +900,6 @@ async function executePublish(
 
     // Execute command
     await new Promise<void>((resolve, reject) => {
-      const { exec } = require("child_process");
       exec(command, {
         cwd: process.cwd(),
         maxBuffer: 1024 * 1024 * 10, // 10MB buffer

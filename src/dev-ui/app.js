@@ -507,8 +507,57 @@ function escapeHtml(text) {
 // Publish functionality
 let publishTaskId = null;
 let publishEventSource = null;
+let workspacesCache = null;
 
-window.openPublishModal = function() {
+async function loadWorkspaces() {
+  const select = document.getElementById('publish-workspace-id');
+  const errorDiv = document.getElementById('workspace-error');
+
+  try {
+    // Use cached workspaces if available
+    if (workspacesCache) {
+      populateWorkspaceSelect(workspacesCache);
+      return;
+    }
+
+    const response = await fetch('/api/workspaces');
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to load workspaces');
+    }
+
+    const workspaces = await response.json();
+    workspacesCache = workspaces;
+
+    populateWorkspaceSelect(workspaces);
+    errorDiv.style.display = 'none';
+  } catch (error) {
+    console.error('Failed to load workspaces:', error);
+    select.innerHTML = '<option value="">Failed to load workspaces</option>';
+    errorDiv.textContent = error.message || 'Failed to load workspaces. Check your API token configuration.';
+    errorDiv.style.display = 'block';
+  }
+}
+
+function populateWorkspaceSelect(workspaces) {
+  const select = document.getElementById('publish-workspace-id');
+
+  if (workspaces.length === 0) {
+    select.innerHTML = '<option value="">No workspaces found</option>';
+    return;
+  }
+
+  select.innerHTML = '<option value="">Select a workspace</option>';
+  workspaces.forEach(ws => {
+    const option = document.createElement('option');
+    option.value = ws.id;
+    option.textContent = `${ws.name} (${ws.myRole})`;
+    select.appendChild(option);
+  });
+}
+
+window.openPublishModal = async function() {
   if (!currentBlock) return;
 
   const modal = document.getElementById('publish-modal');
@@ -522,6 +571,9 @@ window.openPublishModal = function() {
   document.getElementById('publish-target-marketplace').checked = true;
   document.getElementById('publish-workspace-id').value = '';
   document.getElementById('publish-version-bump').value = '';
+
+  // Load workspaces (will be shown when workspace target is selected)
+  await loadWorkspaces();
 
   // Show/hide workspace input
   toggleWorkspaceInput();
@@ -554,7 +606,7 @@ window.startPublish = async function() {
 
   // Validate workspace ID if needed
   if (target === 'workspace' && !workspaceId) {
-    alert('Workspace ID is required for workspace publish');
+    alert('Please select a workspace from the dropdown');
     return;
   }
 

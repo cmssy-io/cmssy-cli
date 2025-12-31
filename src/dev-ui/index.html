@@ -784,10 +784,15 @@
             </div>
           </div>
 
-          <!-- Workspace ID (conditional) -->
+          <!-- Workspace Select (conditional) -->
           <div class="form-group" id="workspace-id-group" style="display: none;">
-            <label class="form-label" for="publish-workspace-id">Workspace ID</label>
-            <input type="text" class="input-field" id="publish-workspace-id" placeholder="ws_abc123">
+            <label class="form-label" for="publish-workspace-id">Select Workspace</label>
+            <select class="select-field" id="publish-workspace-id">
+              <option value="">Loading workspaces...</option>
+            </select>
+            <div id="workspace-error" style="display: none; color: #e53e3e; font-size: 12px; margin-top: 4px;">
+              Failed to load workspaces. Check your API token configuration.
+            </div>
           </div>
 
           <!-- Version Bump -->
