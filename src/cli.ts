@@ -9,6 +9,8 @@ import { initCommand } from "./commands/init.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
+import { packageCommand } from "./commands/package.js";
+import { uploadCommand } from "./commands/upload.js";
 
 const program = new Command();
 
@@ -17,7 +19,7 @@ program
   .description(
     "Unified CLI for building and publishing blocks to Cmssy marketplace"
   )
-  .version("0.8.0");
+  .version("0.9.0");
 
 // cmssy init
 program
@@ -95,5 +97,21 @@ program
   .command("migrate [block-name]")
   .description("Migrate from package.json cmssy section to block.config.ts")
   .action(migrateCommand);
+
+// cmssy package
+program
+  .command("package [packages...]")
+  .description("Package blocks/templates into ZIP files")
+  .option("--all", "Package all blocks and templates")
+  .option("-o, --output <dir>", "Output directory", "packages")
+  .action(packageCommand);
+
+// cmssy upload
+program
+  .command("upload [files...]")
+  .description("Upload packaged ZIP files to workspace")
+  .option("-w, --workspace <id>", "Workspace ID to upload to")
+  .option("--all", "Upload all packages from packages directory")
+  .action(uploadCommand);
 
 program.parse();
