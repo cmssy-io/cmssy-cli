@@ -208,7 +208,33 @@ export async function publishCommand(
       successCount++;
     } catch (error: any) {
       spinner.fail(chalk.red(`${pkg.packageJson.name} failed`));
-      console.error(chalk.red(`  Error: ${error.message}\n`));
+
+      // Extract detailed error information from GraphQL errors
+      let errorMessage = error.message || "Unknown error";
+
+      // graphql-request wraps errors in response.errors array
+      if (error.response?.errors && error.response.errors.length > 0) {
+        const graphqlError = error.response.errors[0];
+        errorMessage = graphqlError.message;
+
+        // Show error code if available (e.g., PLAN_LIMIT_EXCEEDED, VALIDATION_ERROR)
+        if (graphqlError.extensions?.code) {
+          errorMessage += chalk.gray(` [${graphqlError.extensions.code}]`);
+        }
+
+        // Show additional details for plan limit errors
+        if (graphqlError.extensions?.resource) {
+          console.error(chalk.yellow(`  Resource: ${graphqlError.extensions.resource}`));
+          if (graphqlError.extensions.current !== undefined) {
+            console.error(chalk.yellow(`  Current: ${graphqlError.extensions.current}/${graphqlError.extensions.limit}`));
+          }
+          if (graphqlError.extensions.plan) {
+            console.error(chalk.yellow(`  Plan: ${graphqlError.extensions.plan}`));
+          }
+        }
+      }
+
+      console.error(chalk.red(`  ${errorMessage}\n`));
       errorCount++;
     }
   }
