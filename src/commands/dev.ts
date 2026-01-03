@@ -7,13 +7,12 @@ import { GraphQLClient } from "graphql-request";
 import ora from "ora";
 import path from "path";
 import { fileURLToPath } from "url";
-import { scanResources, ScannedResource } from "../utils/scanner.js";
+import { loadBlockConfig } from "../utils/block-config.js";
 import { buildResource } from "../utils/builder.js";
-import { loadBlockConfig, validateSchema } from "../utils/block-config.js";
 import { loadConfig } from "../utils/cmssy-config.js";
 import { loadConfig as loadEnvConfig } from "../utils/config.js";
+import { ScannedResource, scanResources } from "../utils/scanner.js";
 import { generateTypes } from "../utils/type-generator.js";
-import { ResourceConfig } from "../types/block-config.js";
 
 interface DevOptions {
   port: string;
@@ -362,7 +361,9 @@ export async function devCommand(options: DevOptions) {
         blocks.forEach((block) => {
           const url = `/preview/block/${block.name}`;
           console.log(
-            chalk.white(`   ● ${(block.displayName || block.name).padEnd(20)} ${url}`)
+            chalk.white(
+              `   ● ${(block.displayName || block.name).padEnd(20)} ${url}`
+            )
           );
         });
         console.log("");
@@ -373,7 +374,11 @@ export async function devCommand(options: DevOptions) {
         templates.forEach((template) => {
           const url = `/preview/template/${template.name}`;
           console.log(
-            chalk.white(`   ● ${(template.displayName || template.name).padEnd(20)} ${url}`)
+            chalk.white(
+              `   ● ${(template.displayName || template.name).padEnd(
+                20
+              )} ${url}`
+            )
           );
         });
         console.log("");
