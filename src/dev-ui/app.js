@@ -584,10 +584,14 @@ window.openPublishModal = async function() {
 
   const modal = document.getElementById('publish-modal');
   const blockName = document.getElementById('publish-block-name');
-  const version = document.getElementById('publish-version');
+  const localVersion = document.getElementById('publish-local-version');
+  const publishedVersionRow = document.getElementById('publish-published-version-row');
 
   blockName.textContent = currentBlock.displayName || currentBlock.name;
-  version.textContent = `v${currentBlock.version || '1.0.0'}`;
+  localVersion.textContent = `v${currentBlock.version || '1.0.0'}`;
+
+  // Hide published version initially
+  publishedVersionRow.style.display = 'none';
 
   // Reset form
   document.getElementById('publish-target-marketplace').checked = true;
@@ -630,14 +634,91 @@ function resetPublishModal() {
   publishTaskId = null;
 }
 
+// Simple semver increment helper
+function incrementVersion(version, type) {
+  const parts = version.split('.').map(Number);
+  if (parts.length !== 3) return version;
+
+  const [major, minor, patch] = parts;
+
+  switch (type) {
+    case 'patch':
+      return `${major}.${minor}.${patch + 1}`;
+    case 'minor':
+      return `${major}.${minor + 1}.0`;
+    case 'major':
+      return `${major + 1}.0.0`;
+    default:
+      return version;
+  }
+}
+
+async function fetchPublishedVersion(workspaceId) {
+  if (!currentBlock || !workspaceId) return;
+
+  const publishedVersionRow = document.getElementById('publish-published-version-row');
+  const publishedVersionSpan = document.getElementById('publish-published-version');
+  const versionBumpSelect = document.getElementById('publish-version-bump');
+
+  try {
+    const response = await fetch(`/api/blocks/${currentBlock.name}/published-version?workspaceId=${workspaceId}`);
+    const data = await response.json();
+
+    if (data.published && data.version) {
+      publishedVersionSpan.textContent = `v${data.version}`;
+      publishedVersionRow.style.display = 'block';
+
+      // Update version bump options with calculated versions
+      const currentVer = data.version;
+      const patchVer = incrementVersion(currentVer, 'patch');
+      const minorVer = incrementVersion(currentVer, 'minor');
+      const majorVer = incrementVersion(currentVer, 'major');
+
+      versionBumpSelect.innerHTML = `
+        <option value="">No change</option>
+        <option value="patch">Patch (${currentVer} → ${patchVer})</option>
+        <option value="minor">Minor (${currentVer} → ${minorVer})</option>
+        <option value="major">Major (${currentVer} → ${majorVer})</option>
+      `;
+    } else {
+      publishedVersionSpan.textContent = 'Not published yet';
+      publishedVersionRow.style.display = 'block';
+
+      // Use local version for initial publish
+      const localVer = currentBlock.version || '1.0.0';
+      versionBumpSelect.innerHTML = `
+        <option value="">Use current version (${localVer})</option>
+        <option value="patch">Patch (${localVer} → ${incrementVersion(localVer, 'patch')})</option>
+        <option value="minor">Minor (${localVer} → ${incrementVersion(localVer, 'minor')})</option>
+        <option value="major">Major (${localVer} → ${incrementVersion(localVer, 'major')})</option>
+      `;
+    }
+  } catch (error) {
+    console.error('Failed to fetch published version:', error);
+    publishedVersionRow.style.display = 'none';
+  }
+}
+
+window.handleWorkspaceChange = function() {
+  const workspaceId = document.getElementById('publish-workspace-id').value;
+  if (workspaceId) {
+    fetchPublishedVersion(workspaceId);
+  } else {
+    // Hide published version when no workspace selected
+    document.getElementById('publish-published-version-row').style.display = 'none';
+  }
+};
+
 window.toggleWorkspaceInput = function() {
   const target = document.querySelector('input[name="publish-target"]:checked').value;
   const workspaceGroup = document.getElementById('workspace-id-group');
+  const publishedVersionRow = document.getElementById('publish-published-version-row');
 
   if (target === 'workspace') {
     workspaceGroup.style.display = 'block';
   } else {
     workspaceGroup.style.display = 'none';
+    publishedVersionRow.style.display = 'none';
   }
 };
 

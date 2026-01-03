@@ -186,6 +186,62 @@ export async function devCommand(options: DevOptions) {
     // Publish task tracking
     const publishTasks = new Map<string, any>();
 
+    // API: Get published version from backend
+    app.get("/api/blocks/:name/published-version", async (req, res) => {
+      const { name } = req.params;
+      const { workspaceId } = req.query;
+
+      const resource = resources.find((r) => r.name === name);
+
+      if (!resource) {
+        res.status(404).json({ error: "Block not found" });
+        return;
+      }
+
+      if (!workspaceId) {
+        res.status(400).json({ error: "workspaceId is required" });
+        return;
+      }
+
+      try {
+        const envConfig = await loadEnvConfig();
+        if (!envConfig.apiToken) {
+          res.json({ version: null, published: false });
+          return;
+        }
+
+        const client = new GraphQLClient(envConfig.apiUrl, {
+          headers: {
+            Authorization: `Bearer ${envConfig.apiToken}`,
+            "x-workspace-id": workspaceId as string,
+          },
+        });
+
+        // Get blockType from package.json name (e.g., "@local/blocks.hero" -> "hero")
+        const packageName = resource.packageJson?.name || "";
+        const blockType = packageName.split(".").pop() || name;
+
+        const query = `
+          query GetPublishedVersion($blockType: String!) {
+            workspaceBlockByType(blockType: $blockType) {
+              version
+            }
+          }
+        `;
+
+        const data: any = await client.request(query, { blockType });
+        const publishedVersion = data.workspaceBlockByType?.version || null;
+
+        res.json({
+          version: publishedVersion,
+          published: publishedVersion !== null,
+        });
+      } catch (error: any) {
+        console.error("Failed to fetch published version:", error);
+        res.json({ version: null, published: false, error: error.message });
+      }
+    });
+
     // API: Get block publish status
     app.get("/api/blocks/:name/status", (req, res) => {
       const { name } = req.params;
@@ -435,6 +491,7 @@ function setupWatcher(resources: Resource[], config: any, sseClients: any[]) {
     ignoreInitial: true,
     ignored: [
       "**/preview.json", // Ignore preview.json changes (handled via postMessage)
+      "**/block.d.ts", // Ignore auto-generated types (causes double rebuild)
       "**/.cmssy/**",
       "**/node_modules/**",
       "**/.git/**",

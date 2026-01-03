@@ -973,7 +973,10 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3>Publish <span id="publish-block-name"></span></h3>
-          <p>Current version: <span id="publish-version"></span></p>
+          <p style="margin: 0;">Local version: <span id="publish-local-version"></span></p>
+          <p id="publish-published-version-row" style="margin: 0; color: #666; font-size: 13px; display: none;">
+            Published: <span id="publish-published-version"></span>
+          </p>
         </div>
 
         <!-- Publish Form -->
@@ -1028,7 +1031,7 @@
               <label class="form-label" for="publish-workspace-id"
                 >Select Workspace</label
               >
-              <select class="select-field" id="publish-workspace-id">
+              <select class="select-field" id="publish-workspace-id" onchange="handleWorkspaceChange()">
                 <option value="">Loading workspaces...</option>
               </select>
               <div
