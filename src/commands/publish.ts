@@ -112,14 +112,61 @@ export async function publishCommand(
     return;
   }
 
-  // Version bumping
+  // Show current versions
+  console.log(chalk.cyan("Current versions:\n"));
+  packages.forEach((pkg) => {
+    console.log(
+      chalk.white(`  ${pkg.packageJson.name}: ${chalk.bold(pkg.packageJson.version)}`)
+    );
+  });
+  console.log("");
+
+  // Version bumping - interactive or from flags
+  let bumpType: "patch" | "minor" | "major" | null = null;
+
   if (options.patch || options.minor || options.major) {
-    const bumpType = options.patch
-      ? "patch"
-      : options.minor
-      ? "minor"
-      : "major";
-    console.log(chalk.cyan(`Version bump: ${bumpType}\n`));
+    // Use flag-based bump
+    bumpType = options.patch ? "patch" : options.minor ? "minor" : "major";
+  } else {
+    // Interactive prompt - show calculated versions for first package as example
+    const examplePkg = packages[0];
+    const currentVersion = examplePkg.packageJson.version;
+    const patchVersion = semver.inc(currentVersion, "patch");
+    const minorVersion = semver.inc(currentVersion, "minor");
+    const majorVersion = semver.inc(currentVersion, "major");
+
+    const answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "bumpType",
+        message: "Select version bump:",
+        choices: [
+          {
+            name: `Patch (${currentVersion} → ${patchVersion}) - Bug fixes`,
+            value: "patch",
+          },
+          {
+            name: `Minor (${currentVersion} → ${minorVersion}) - New features, backward compatible`,
+            value: "minor",
+          },
+          {
+            name: `Major (${currentVersion} → ${majorVersion}) - Breaking changes`,
+            value: "major",
+          },
+          {
+            name: "No version bump - publish current version",
+            value: null,
+          },
+        ],
+      },
+    ]);
+
+    bumpType = answer.bumpType;
+  }
+
+  // Apply version bump if selected
+  if (bumpType) {
+    console.log(chalk.cyan(`\nVersion bump: ${bumpType}\n`));
 
     for (const pkg of packages) {
       const oldVersion = pkg.packageJson.version;
@@ -146,11 +193,11 @@ export async function publishCommand(
   }
 
   console.log(
-    chalk.cyan(`Found ${packages.length} package(s) to publish:\n`)
+    chalk.cyan(`Publishing ${packages.length} package(s):\n`)
   );
   packages.forEach((pkg) => {
     console.log(
-      chalk.white(`  • ${pkg.packageJson.name} v${pkg.packageJson.version}`)
+      chalk.white(`  • ${pkg.packageJson.name} ${chalk.bold("v" + pkg.packageJson.version)}`)
     );
   });
   console.log("");
@@ -631,6 +678,12 @@ function convertSchemaToFields(schema: Record<string, any>): any[] {
       required: field.required || false,
     };
 
+    // Add defaultValue if present
+    if (field.defaultValue !== undefined) {
+      baseField.defaultValue = field.defaultValue;
+    }
+
+    // Add placeholder if present
     if (field.placeholder) {
       baseField.placeholder = field.placeholder;
     }
