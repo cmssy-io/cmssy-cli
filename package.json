@@ -12,7 +12,7 @@
     "./config": "./config.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/dev-ui dist/",
+    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && cp -r src/dev-ui dist/",
     "dev": "tsc --watch",
     "prepare": "npm run build"
   },
@@ -34,6 +34,7 @@
   },
   "files": [
     "dist",
+    "config.js",
     "README.md",
     "LICENSE"
   ],
