@@ -239,6 +239,12 @@ function convertSchemaToLegacyFormat(
       required: field.required || false,
     };
 
+    // Add defaultValue if present
+    if (field.defaultValue !== undefined) {
+      baseField.defaultValue = field.defaultValue;
+    }
+
+    // Add placeholder if present
     if (field.placeholder) {
       baseField.placeholder = field.placeholder;
     }
