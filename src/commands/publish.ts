@@ -404,6 +404,8 @@ async function scanPackages(
 }
 
 // Bundle source code with esbuild (combines all local imports into single file)
+// Bundle source code with esbuild (combines all local imports into single file)
+// UPDATED: Use CommonJS format to avoid ES module export statements
 async function bundleSourceCode(packagePath: string): Promise<string> {
   const { build } = await import("esbuild");
 
@@ -426,11 +428,11 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
     entryPoints: [entryPoint],
     bundle: true,
     write: false,
-    format: "esm",
-    platform: "browser",
-    jsx: "preserve",
-    loader: { ".tsx": "tsx", ".ts": "ts" },
-    external: ["react", "react-dom", "react-dom/client", "*.css"],
+    format: "cjs", // CommonJS format (module.exports) - compatible with SSR VM
+    platform: "node", // Node platform for CommonJS
+    jsx: "transform", // Transform JSX to React.createElement
+    loader: { ".tsx": "tsx", ".ts": "ts", ".css": "empty" },
+    external: [], // Bundle everything (React will be provided by SSR sandbox)
   });
 
   return result.outputFiles[0].text;
