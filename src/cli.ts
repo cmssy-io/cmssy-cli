@@ -12,6 +12,13 @@ import { publishCommand } from "./commands/publish.js";
 import { packageCommand } from "./commands/package.js";
 import { uploadCommand } from "./commands/upload.js";
 import { workspacesCommand } from "./commands/workspaces.js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
 
 const program = new Command();
 
@@ -20,7 +27,7 @@ program
   .description(
     "Unified CLI for building and publishing blocks to Cmssy marketplace"
   )
-  .version("0.14.1");
+  .version(packageJson.version);
 
 // cmssy init
 program
