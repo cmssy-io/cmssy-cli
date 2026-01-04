@@ -432,7 +432,7 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
     platform: "browser", // Browser platform to avoid Node.js globals like 'process'
     jsx: "transform", // Transform JSX to React.createElement
     loader: { ".tsx": "tsx", ".ts": "ts", ".css": "empty" },
-    external: [], // Bundle everything (React will be provided by SSR sandbox)
+    external: ['react', 'react-dom'], // Don't bundle React - provided by sandbox
     define: {
       // Replace process.env references with static values
       'process.env.NODE_ENV': '"production"',
