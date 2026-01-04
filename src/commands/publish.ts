@@ -656,13 +656,37 @@ async function publishToWorkspace(
     },
   });
 
-  // Send mutation
-  const result = await client.request(IMPORT_BLOCK_MUTATION, {
-    input,
-  });
+  // Send mutation with timeout using AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes
 
-  if (!result.importBlock) {
-    throw new Error("Failed to import block to workspace");
+  try {
+    const result = await client.request(
+      IMPORT_BLOCK_MUTATION,
+      { input },
+      { signal: controller.signal as any }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!result.importBlock) {
+      throw new Error("Failed to import block to workspace");
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    // Handle timeout/abort errors specifically
+    if (error.name === "AbortError" || error.message?.includes("aborted")) {
+      throw new Error(
+        "Block upload timed out after 3 minutes. This may be due to:\n" +
+        "  - Large file size (try reducing bundle size)\n" +
+        "  - Slow network connection\n" +
+        "  - Backend processing issues\n" +
+        "Check backend logs for more details."
+      );
+    }
+    // Re-throw other errors
+    throw error;
   }
 }
 
