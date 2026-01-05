@@ -746,9 +746,22 @@ async function executePublish(
           });
         }
 
-        if (error) {
+        // Combine outputs for success detection
+        const combinedOutput = `${stdout}\n${stderr}`;
+        const hasSuccessIndicator =
+          combinedOutput.includes("published successfully") ||
+          combinedOutput.includes("published to workspace") ||
+          combinedOutput.includes("submitted for review");
+
+        if (error && !hasSuccessIndicator) {
+          // Real error - no success indicators found
           console.error("[DEV] Publish command failed:", error.message);
           reject(new Error(stderr || error.message));
+        } else if (error && hasSuccessIndicator) {
+          // Exit code was non-zero but output indicates success
+          // This can happen because ora spinner writes to stderr
+          console.log("[DEV] Publish command completed (ignoring non-zero exit due to success indicators)");
+          resolve();
         } else {
           console.log("[DEV] Publish command completed successfully");
           resolve();
