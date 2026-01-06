@@ -45,9 +45,9 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     supportsValidation: true,
   },
   {
-    type: "toggle",
-    label: "Toggle",
-    description: "True/false toggle",
+    type: "boolean",
+    label: "Boolean",
+    description: "True/false boolean",
     allowsDefaultValue: true,
     supportsValidation: false,
   },

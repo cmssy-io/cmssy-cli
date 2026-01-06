@@ -10,7 +10,7 @@ export type FieldType =
   | "link"
   | "select"
   | "multiselect"
-  | "toggle"
+  | "boolean"
   | "color"
   | "slider"
   | "repeater";

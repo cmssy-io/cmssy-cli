@@ -56,7 +56,7 @@ function mapFieldTypeToTypeScript(field: FieldConfig): string {
     case "slider":
       return "number";
 
-    case "toggle":
+    case "boolean":
       return "boolean";
 
     case "date":
