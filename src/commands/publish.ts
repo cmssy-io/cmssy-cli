@@ -779,8 +779,9 @@ async function publishToWorkspace(
   // Send mutation with timeout using Promise.race
   const TIMEOUT_MS = 180000; // 3 minutes
 
+  let timeoutId: NodeJS.Timeout;
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       reject(new Error(
         "Block upload timed out after 3 minutes. This may be due to:\n" +
         "  - Large file size (try reducing bundle size)\n" +
@@ -792,10 +793,17 @@ async function publishToWorkspace(
   });
 
   const requestPromise = client.request(IMPORT_BLOCK_MUTATION, { input });
-  const result = await Promise.race([requestPromise, timeoutPromise]);
 
-  if (!result.importBlock) {
-    throw new Error("Failed to import block to workspace");
+  try {
+    const result = await Promise.race([requestPromise, timeoutPromise]);
+    clearTimeout(timeoutId!); // Clear timeout so Node can exit immediately
+
+    if (!result.importBlock) {
+      throw new Error("Failed to import block to workspace");
+    }
+  } catch (error) {
+    clearTimeout(timeoutId!); // Clear timeout on error too
+    throw error;
   }
 }
 

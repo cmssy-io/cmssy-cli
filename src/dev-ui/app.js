@@ -576,31 +576,7 @@ function escapeHtml(text) {
 }
 
 // Publish functionality
-let publishTaskId = null;
-let publishEventSource = null;
 let workspacesCache = null;
-
-// Store original progress HTML template
-const PROGRESS_TEMPLATE = `
-  <div class="publish-progress-container">
-    <div class="progress-bar-container">
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="publish-progress-bar" style="width: 0%"></div>
-      </div>
-      <div class="progress-text" id="publish-progress-text">0%</div>
-    </div>
-
-    <div class="progress-steps" id="publish-steps">
-      <!-- Steps will be dynamically added here -->
-    </div>
-
-    <div style="text-align: center; margin-top: 24px;">
-      <button class="btn btn-primary" onclick="closePublishModal()" id="publish-close-btn" style="display: none;">
-        Done
-      </button>
-    </div>
-  </div>
-`;
 
 async function loadWorkspaces() {
   const select = document.getElementById('publish-workspace-id');
@@ -682,28 +658,10 @@ window.closePublishModal = function() {
   const modal = document.getElementById('publish-modal');
   modal.classList.remove('active');
 
-  // Reset modal state
-  resetPublishModal();
-};
-
-function resetPublishModal() {
-  // Close EventSource if active
-  if (publishEventSource) {
-    publishEventSource.close();
-    publishEventSource = null;
-  }
-
-  // Reset to form view (hide progress)
+  // Reset to form view
   document.getElementById('publish-form').style.display = 'block';
-  const progressDiv = document.getElementById('publish-progress');
-  progressDiv.style.display = 'none';
-
-  // Restore original progress HTML (in case showPublishError changed it)
-  progressDiv.innerHTML = PROGRESS_TEMPLATE;
-
-  // Reset task ID
-  publishTaskId = null;
-}
+  document.getElementById('publish-progress').style.display = 'none';
+};
 
 // Simple semver increment helper
 function incrementVersion(version, type) {
@@ -806,111 +764,56 @@ window.startPublish = async function() {
     return;
   }
 
-  // Show progress UI, hide form
+  // Show loading state
   document.getElementById('publish-form').style.display = 'none';
-  document.getElementById('publish-progress').style.display = 'block';
+  const progressDiv = document.getElementById('publish-progress');
+  progressDiv.style.display = 'block';
+  progressDiv.innerHTML = `
+    <div style="text-align: center; padding: 40px;">
+      <div class="spinner" style="margin: 0 auto 16px;"></div>
+      <div style="color: #666;">Publishing...</div>
+    </div>
+  `;
 
   try {
-    // Start publish
     const response = await fetch(`/api/blocks/${currentBlock.name}/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, workspaceId, versionBump })
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to start publish');
+    const result = await response.json();
+
+    if (result.success) {
+      // Update local block version
+      currentBlock.version = result.version;
+      renderBlocksList();
+
+      progressDiv.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+          <div style="font-size: 18px; font-weight: 600; color: #22c55e; margin-bottom: 8px;">
+            ${escapeHtml(result.message)}
+          </div>
+          ${result.version ? `<div style="color: #666;">Version: ${result.version}</div>` : ''}
+          <button class="btn btn-primary" onclick="closePublishModal()" style="margin-top: 24px;">Done</button>
+        </div>
+      `;
+    } else {
+      throw new Error(result.error || 'Publish failed');
     }
-
-    const { taskId } = await response.json();
-    publishTaskId = taskId;
-
-    // Stream progress
-    streamPublishProgress(taskId);
-
   } catch (error) {
     console.error('Publish failed:', error);
-    showPublishError(error.message);
+    progressDiv.innerHTML = `
+      <div style="text-align: center; padding: 40px;">
+        <div style="font-size: 48px; margin-bottom: 16px; color: #ef4444;">✗</div>
+        <div style="font-size: 18px; font-weight: 600; color: #ef4444; margin-bottom: 8px;">Publish Failed</div>
+        <div style="color: #666; margin-bottom: 24px;">${escapeHtml(error.message)}</div>
+        <button class="btn btn-secondary" onclick="closePublishModal()">Close</button>
+      </div>
+    `;
   }
 };
-
-function streamPublishProgress(taskId) {
-  // Close existing connection
-  if (publishEventSource) {
-    publishEventSource.close();
-    publishEventSource = null;
-  }
-
-  publishEventSource = new EventSource(`/api/publish/progress/${taskId}`);
-
-  publishEventSource.onmessage = (event) => {
-    try {
-      const task = JSON.parse(event.data);
-      updatePublishProgress(task);
-
-      // Close connection when done - do this BEFORE any other processing
-      if (task.status === 'completed' || task.status === 'failed') {
-        console.log('[Publish] Task finished with status:', task.status);
-        if (publishEventSource) {
-          publishEventSource.close();
-          publishEventSource = null;
-        }
-      }
-    } catch (err) {
-      console.error('[Publish] Failed to parse SSE message:', err);
-    }
-  };
-
-  publishEventSource.onerror = (err) => {
-    // Only log if we haven't already closed the connection
-    if (publishEventSource) {
-      console.error('[Publish] SSE connection error');
-      publishEventSource.close();
-      publishEventSource = null;
-    }
-  };
-}
-
-function updatePublishProgress(task) {
-  const progressBar = document.getElementById('publish-progress-bar');
-  const progressText = document.getElementById('publish-progress-text');
-  const stepsContainer = document.getElementById('publish-steps');
-
-  // Update progress bar
-  progressBar.style.width = `${task.progress}%`;
-  progressText.textContent = `${task.progress}%`;
-
-  // Update steps
-  stepsContainer.innerHTML = task.steps.map(step => `
-    <div class="progress-step ${step.status}">
-      <span class="step-icon">
-        ${step.status === 'completed' ? '✓' : step.status === 'failed' ? '✗' : '⏳'}
-      </span>
-      <span class="step-message">${step.message}</span>
-    </div>
-  `).join('');
-
-  // Handle completion
-  if (task.status === 'completed') {
-    document.getElementById('publish-close-btn').style.display = 'block';
-    document.getElementById('publish-close-btn').textContent = 'Done';
-  } else if (task.status === 'failed') {
-    document.getElementById('publish-close-btn').style.display = 'block';
-    document.getElementById('publish-close-btn').textContent = 'Close';
-  }
-}
-
-function showPublishError(message) {
-  const progressDiv = document.getElementById('publish-progress');
-  progressDiv.innerHTML = `
-    <div class="publish-error">
-      <div class="error-icon">✗</div>
-      <div class="error-message">${escapeHtml(message)}</div>
-      <button class="btn btn-secondary" onclick="closePublishModal()">Close</button>
-    </div>
-  `;
-}
 
 // Panel Toggle Functionality - Collapsed Sidebar
 let leftPanelCollapsed = false;

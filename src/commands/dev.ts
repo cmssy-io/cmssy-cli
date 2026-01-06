@@ -183,8 +183,6 @@ export async function devCommand(options: DevOptions) {
       }
     });
 
-    // Publish task tracking
-    const publishTasks = new Map<string, any>();
 
     // API: Get published version from backend
     app.get("/api/blocks/:name/published-version", async (req, res) => {
@@ -263,7 +261,7 @@ export async function devCommand(options: DevOptions) {
       });
     });
 
-    // API: Trigger publish
+    // API: Publish block (simple sync request)
     app.post("/api/blocks/:name/publish", async (req, res) => {
       const { name } = req.params;
       const { target, workspaceId, versionBump } = req.body;
@@ -284,116 +282,67 @@ export async function devCommand(options: DevOptions) {
       }
 
       if (target === "workspace" && !workspaceId) {
-        res
-          .status(400)
-          .json({ error: "Workspace ID required for workspace publish" });
+        res.status(400).json({ error: "Workspace ID required for workspace publish" });
         return;
       }
 
-      // Create task ID
-      const taskId = `publish-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+      // Build command args
+      const args = ["publish", resource.name, `--${target}`];
 
-      // Store task
-      publishTasks.set(taskId, {
-        id: taskId,
-        blockName: name,
-        status: "pending",
-        progress: 0,
-        steps: [],
-        error: null,
-      });
-
-      // Start async publish
-      executePublish(
-        taskId,
-        resource,
-        target,
-        workspaceId,
-        versionBump,
-        publishTasks
-      );
-
-      res.json({ taskId, status: "started" });
-    });
-
-    // API: Get publish progress (SSE)
-    app.get("/api/publish/progress/:taskId", (req, res) => {
-      const { taskId } = req.params;
-      let isClosed = false;
-
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-
-      const safeWrite = (data: string) => {
-        if (isClosed) return false;
-        try {
-          res.write(data);
-          return true;
-        } catch (err) {
-          console.error("[SSE] Write error:", err);
-          isClosed = true;
-          return false;
-        }
-      };
-
-      const closeConnection = (interval: NodeJS.Timeout) => {
-        if (isClosed) return;
-        isClosed = true;
-        clearInterval(interval);
-        try {
-          res.end();
-        } catch (err) {
-          // Connection already closed, ignore
-        }
-      };
-
-      // Send initial state
-      const task = publishTasks.get(taskId);
-      if (task) {
-        safeWrite(`data: ${JSON.stringify(task)}\n\n`);
-        // Check if already done
-        if (task.status === "completed" || task.status === "failed") {
-          console.log(`[SSE] Task ${taskId} already finished, sending final state`);
-          try { res.end(); } catch (e) { /* ignore */ }
-          return;
-        }
+      if (target === "workspace" && workspaceId) {
+        args.push(workspaceId);
       }
 
-      // Poll for updates every 500ms
-      const interval = setInterval(() => {
-        if (isClosed) {
-          clearInterval(interval);
-          return;
+      if (versionBump && versionBump !== "none") {
+        args.push(`--${versionBump}`);
+      } else {
+        args.push("--no-bump");
+      }
+
+      const command = `cmssy ${args.join(" ")}`;
+      console.log("[PUBLISH] Executing:", command);
+
+      // Execute synchronously and return result
+      exec(command, {
+        cwd: process.cwd(),
+        timeout: 60000, // 1 minute timeout
+        maxBuffer: 10 * 1024 * 1024,
+        env: {
+          ...process.env,
+          CI: "true",
+          FORCE_COLOR: "0",
+          NO_COLOR: "1",
+        },
+      }, (error, stdout, stderr) => {
+        const output = `${stdout}\n${stderr}`;
+
+        // Check for success indicators
+        const success =
+          output.includes("published successfully") ||
+          output.includes("published to workspace") ||
+          output.includes("submitted for review");
+
+        if (success) {
+          // Reload package.json to get new version
+          const pkgPath = path.join(resource.path, "package.json");
+          if (fs.existsSync(pkgPath)) {
+            resource.packageJson = fs.readJsonSync(pkgPath);
+          }
+
+          res.json({
+            success: true,
+            message: target === "marketplace"
+              ? "Submitted for review"
+              : "Published to workspace",
+            version: resource.packageJson?.version,
+          });
+        } else {
+          console.error("[PUBLISH] Failed:", error?.message || stderr);
+          res.status(500).json({
+            success: false,
+            error: stderr || error?.message || "Publish failed",
+          });
         }
-
-        const task = publishTasks.get(taskId);
-        if (!task) {
-          console.log(`[SSE] Task ${taskId} not found, closing connection`);
-          closeConnection(interval);
-          return;
-        }
-
-        console.log(`[SSE] Sending status: ${task.status} for task ${taskId}`);
-
-        if (!safeWrite(`data: ${JSON.stringify(task)}\n\n`)) {
-          closeConnection(interval);
-          return;
-        }
-
-        // Close when done
-        if (task.status === "completed" || task.status === "failed") {
-          console.log(`[SSE] Task ${taskId} finished with status: ${task.status}`);
-          closeConnection(interval);
-        }
-      }, 500);
-
-      req.on("close", () => {
-        console.log(`[SSE] Client closed connection for task ${taskId}`);
-        isClosed = true;
-        clearInterval(interval);
       });
     });
 
@@ -708,144 +657,6 @@ function setupWatcher(resources: Resource[], config: any, sseClients: any[]) {
   });
 
   return watcher;
-}
-
-// Execute publish command asynchronously
-async function executePublish(
-  taskId: string,
-  resource: Resource,
-  target: string,
-  workspaceId: string | undefined,
-  versionBump: string | undefined,
-  publishTasks: Map<string, any>
-) {
-  const task = publishTasks.get(taskId);
-  if (!task) {
-    console.error("[DEV] Task not found:", taskId);
-    return;
-  }
-
-  console.log("[DEV] Starting executePublish for task:", taskId);
-
-  try {
-    // Update: Building
-    task.status = "building";
-    task.progress = 10;
-    task.steps.push({
-      step: "building",
-      status: "in_progress",
-      message: "Building block...",
-    });
-
-    // Build command args
-    const args = ["publish", resource.name, `--${target}`];
-
-    if (target === "workspace" && workspaceId) {
-      args.push(workspaceId);
-    }
-
-    if (versionBump && versionBump !== "none") {
-      // User selected patch, minor, or major
-      args.push(`--${versionBump}`);
-    } else {
-      // No version bump - publish current version
-      args.push("--no-bump");
-    }
-
-    task.steps[task.steps.length - 1].status = "completed";
-    task.steps.push({
-      step: "validating",
-      status: "in_progress",
-      message: "Validating configuration...",
-    });
-    task.progress = 30;
-
-    task.steps[task.steps.length - 1].status = "completed";
-    task.steps.push({
-      step: "publishing",
-      status: "in_progress",
-      message: `Publishing to ${target}...`,
-    });
-    task.progress = 50;
-
-    // Execute command with timeout using exec (more reliable than spawn for CLI commands)
-    const PUBLISH_TIMEOUT_MS = 180000; // 3 minutes
-    const command = `cmssy ${args.join(" ")}`;
-
-    console.log("[DEV] Executing publish command:", command);
-
-    const execPromise = new Promise<void>((resolve, reject) => {
-      exec(command, {
-        cwd: process.cwd(),
-        timeout: PUBLISH_TIMEOUT_MS,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large outputs
-      }, (error, stdout, stderr) => {
-        // Log output for debugging
-        if (stdout) {
-          stdout.split("\n").forEach((line) => {
-            if (line.trim()) console.log("[PUBLISH]", line);
-          });
-        }
-        if (stderr) {
-          stderr.split("\n").forEach((line) => {
-            if (line.trim()) console.log("[PUBLISH]", line);
-          });
-        }
-
-        // Combine outputs for success detection
-        const combinedOutput = `${stdout}\n${stderr}`;
-        const hasSuccessIndicator =
-          combinedOutput.includes("published successfully") ||
-          combinedOutput.includes("published to workspace") ||
-          combinedOutput.includes("submitted for review");
-
-        if (error && !hasSuccessIndicator) {
-          // Real error - no success indicators found
-          console.error("[DEV] Publish command failed:", error.message);
-          reject(new Error(stderr || error.message));
-        } else if (error && hasSuccessIndicator) {
-          // Exit code was non-zero but output indicates success
-          // This can happen because ora spinner writes to stderr
-          console.log("[DEV] Publish command completed (ignoring non-zero exit due to success indicators)");
-          resolve();
-        } else {
-          console.log("[DEV] Publish command completed successfully");
-          resolve();
-        }
-      });
-    });
-
-    await execPromise;
-
-    console.log("[DEV] Updating task status to completed");
-
-    task.steps[task.steps.length - 1].status = "completed";
-    task.progress = 100;
-    task.status = "completed";
-    task.steps.push({
-      step: "completed",
-      status: "completed",
-      message:
-        target === "marketplace"
-          ? "Submitted for review. You'll be notified when approved."
-          : "Published to workspace successfully!",
-    });
-
-    console.log("[DEV] Task completed:", JSON.stringify(task));
-  } catch (error: any) {
-    console.error("[DEV] executePublish error:", error);
-    task.status = "failed";
-    task.error = error.message;
-    if (task.steps.length > 0) {
-      task.steps[task.steps.length - 1].status = "failed";
-    }
-    task.steps.push({
-      step: "error",
-      status: "failed",
-      message: `Error: ${error.message}`,
-    });
-    console.log("[DEV] Task failed:", JSON.stringify(task));
-  }
 }
 
 function generatePreviewHTML(resource: Resource, config: any): string {
