@@ -561,6 +561,11 @@ function setupSSE() {
         iframe.src = iframe.src; // Force reload
       }
     }
+
+    if (data.type === 'newBlock') {
+      console.log('New block detected:', data.block);
+      await loadBlocks();
+    }
   };
 
   eventSource.onerror = () => {

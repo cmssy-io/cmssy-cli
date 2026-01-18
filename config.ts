@@ -8,4 +8,12 @@ export type {
   BaseFieldConfig,
   SelectFieldConfig,
   RepeaterFieldConfig,
+  BlockRequires,
+  LayoutSlotType,
+  FieldGroupConfig,
+  ShowWhenCondition,
+  FieldValidation,
+  ValidationPattern,
+  WorkspaceModule,
+  FeatureFlag,
 } from "./dist/types/block-config.js";

@@ -499,9 +499,71 @@ function setupWatcher(resources: Resource[], config: any, sseClients: any[]) {
     },
   });
 
-  // Debug: log all watcher events
-  watcher.on("add", (filepath) => {
-    console.log(chalk.gray(`File added: ${filepath}`));
+  // Handle new block/template creation
+  watcher.on("add", async (filepath) => {
+    // Detect new block by package.json creation
+    if (filepath.endsWith("package.json")) {
+      const pathParts = filepath.split(path.sep);
+      const blockOrTemplateIndex =
+        pathParts.indexOf("blocks") !== -1
+          ? pathParts.indexOf("blocks")
+          : pathParts.indexOf("templates");
+
+      if (blockOrTemplateIndex === -1) return;
+
+      const resourceName = pathParts[blockOrTemplateIndex + 1];
+      const resourceType = pathParts[blockOrTemplateIndex] === "blocks" ? "block" : "template";
+
+      // Check if already in resources
+      if (resources.find((r) => r.name === resourceName)) {
+        return;
+      }
+
+      console.log(chalk.green(`\n✨ New ${resourceType} detected: ${resourceName}`));
+
+      // Wait a bit for all files to be written
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Scan new resource
+      const { scanResources } = await import("../utils/scanner.js");
+      const newResources = await scanResources({
+        strict: false,
+        loadConfig: true,
+        validateSchema: true,
+        loadPreview: true,
+        requirePackageJson: true,
+      });
+
+      const newResource = newResources.find((r) => r.name === resourceName);
+      if (newResource) {
+        resources.push(newResource);
+
+        // Build the new resource
+        console.log(chalk.blue(`   ♻  Building ${resourceName}...`));
+        await buildResource(newResource, devDir, {
+          framework: config.framework,
+          minify: false,
+          sourcemap: true,
+          outputMode: "flat",
+          generatePackageJson: false,
+          generateTypes: false,
+          strict: false,
+        });
+        console.log(chalk.green(`   ✓ ${resourceName} ready\n`));
+
+        // Notify SSE clients to refresh blocks list
+        sseClients.forEach((client) => {
+          try {
+            client.write(`data: ${JSON.stringify({
+              type: "newBlock",
+              block: resourceName
+            })}\n\n`);
+          } catch (error) {
+            // Client disconnected
+          }
+        });
+      }
+    }
   });
 
   watcher.on("change", async (filepath) => {
