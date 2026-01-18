@@ -39,6 +39,7 @@ export const IMPORT_BLOCK_MUTATION = `
       description
       icon
       category
+      layoutSlot
       schemaFields {
         key
         type
