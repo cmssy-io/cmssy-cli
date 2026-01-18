@@ -39,6 +39,7 @@ export const IMPORT_BLOCK_MUTATION = `
       description
       icon
       category
+      layoutSlot
       schemaFields {
         key
         type
@@ -50,8 +51,33 @@ export const IMPORT_BLOCK_MUTATION = `
         options
         minValue
         maxValue
+        group
+        showWhen {
+          field
+          equals
+          notEquals
+          notEmpty
+          isEmpty
+        }
+        validation {
+          minLength
+          maxLength
+          min
+          max
+          pattern
+          message
+        }
       }
       defaultContent
+      groups
+      requires {
+        auth
+        language
+        workspace
+        modules
+        permissions
+        features
+      }
       version
       createdAt
     }

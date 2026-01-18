@@ -751,7 +751,7 @@ async function publishToWorkspace(
 
   // Build input with inline sourceCode and cssCode
   // Backend will handle uploading to Blob Storage
-  const input = {
+  const input: Record<string, any> = {
     blockType,
     name: metadata.displayName || metadata.name || packageJson.name,
     description: packageJson.description || metadata.description || "",
@@ -766,6 +766,21 @@ async function publishToWorkspace(
     sourceItem: packageJson.name,
     version: packageJson.version || "1.0.0",
   };
+
+  // Add layoutSlot if defined (for header/footer blocks)
+  if (blockConfig?.layoutSlot) {
+    input.layoutSlot = blockConfig.layoutSlot;
+  }
+
+  // Add groups if defined
+  if (blockConfig?.groups) {
+    input.groups = blockConfig.groups;
+  }
+
+  // Add requires if defined
+  if (blockConfig?.requires) {
+    input.requires = blockConfig.requires;
+  }
 
   // Create client with workspace header
   const client = new GraphQLClient(apiUrl, {
@@ -832,6 +847,21 @@ function convertSchemaToFields(schema: Record<string, any>): any[] {
     // Add helpText if present
     if (field.helpText) {
       baseField.helperText = field.helpText;
+    }
+
+    // Add group if present
+    if (field.group) {
+      baseField.group = field.group;
+    }
+
+    // Add showWhen conditional visibility
+    if (field.showWhen) {
+      baseField.showWhen = field.showWhen;
+    }
+
+    // Add validation rules
+    if (field.validation) {
+      baseField.validation = field.validation;
     }
 
     if (field.type === "select" && field.options) {
