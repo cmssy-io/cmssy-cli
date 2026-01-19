@@ -83,31 +83,6 @@ export interface ShowWhenCondition {
 }
 
 // =============================================================================
-// FIELD GROUPS
-// =============================================================================
-
-/**
- * Configuration for a field group.
- * Groups organize related fields into collapsible sections in the editor.
- *
- * @example
- * groups: {
- *   logo: { label: "Logo", icon: "Image" },
- *   cta: { label: "Call to Action", icon: "MousePointer", collapsed: true },
- * }
- */
-export interface FieldGroupConfig {
-  /** Display label for the group */
-  label: string;
-  /** Lucide icon name (e.g., "Image", "MousePointer", "Palette") */
-  icon?: string;
-  /** Whether the group is collapsed by default */
-  collapsed?: boolean;
-  /** Optional description shown below the group header */
-  description?: string;
-}
-
-// =============================================================================
 // FIELD CONFIGURATIONS
 // =============================================================================
 
@@ -121,10 +96,10 @@ export interface BaseFieldConfig {
 
   /**
    * Assign this field to a group.
-   * The group must be defined in the block's `groups` configuration.
+   * Fields with the same group value will be organized together in a collapsible section.
    *
    * @example
-   * group: "logo"  // Field appears in the "logo" group
+   * group: "Logo"  // Field appears in the "Logo" group
    */
   group?: string;
 
@@ -261,21 +236,8 @@ export interface BlockConfig {
   tags?: string[];
 
   /**
-   * Field group definitions for organizing the schema.
-   * Groups create collapsible sections in the properties panel.
-   *
-   * @example
-   * groups: {
-   *   logo: { label: "Logo", icon: "Image" },
-   *   cta: { label: "Call to Action", collapsed: true },
-   *   style: { label: "Styling", icon: "Palette", collapsed: true },
-   * }
-   */
-  groups?: Record<string, FieldGroupConfig>;
-
-  /**
    * Schema defining the block's editable fields.
-   * Use the `group` property on fields to organize them into groups.
+   * Use the `group` property on individual fields to organize them into collapsible sections.
    */
   schema: Record<string, FieldConfig>;
 

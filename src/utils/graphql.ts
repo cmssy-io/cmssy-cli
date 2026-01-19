@@ -69,7 +69,6 @@ export const IMPORT_BLOCK_MUTATION = `
         }
       }
       defaultContent
-      groups
       requires {
         auth
         language

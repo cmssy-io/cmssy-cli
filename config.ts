@@ -10,7 +10,6 @@ export type {
   RepeaterFieldConfig,
   BlockRequires,
   LayoutSlotType,
-  FieldGroupConfig,
   ShowWhenCondition,
   FieldValidation,
   ValidationPattern,

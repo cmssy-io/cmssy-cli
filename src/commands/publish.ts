@@ -772,11 +772,6 @@ async function publishToWorkspace(
     input.layoutSlot = blockConfig.layoutSlot;
   }
 
-  // Add groups if defined
-  if (blockConfig?.groups) {
-    input.groups = blockConfig.groups;
-  }
-
   // Add requires if defined
   if (blockConfig?.requires) {
     input.requires = blockConfig.requires;
