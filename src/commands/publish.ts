@@ -876,6 +876,7 @@ async function publishToWorkspace(
     sourceRegistry: "local",
     sourceItem: packageJson.name,
     version: packageJson.version || "1.0.0",
+    packageType, // "block" or "template"
   };
 
   // Add layoutSlot if defined (for header/footer blocks)
