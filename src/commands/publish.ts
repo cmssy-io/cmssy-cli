@@ -950,6 +950,10 @@ async function publishToWorkspace(
     input.pages = pages;
     input.layoutSlots = layoutSlots;
 
+    // Remove packageType - ImportTemplateInput doesn't have this field
+    // (backend sets package_type="template" automatically for templates)
+    delete input.packageType;
+
     const requestPromise = client.request(IMPORT_TEMPLATE_MUTATION, { input });
 
     try {
