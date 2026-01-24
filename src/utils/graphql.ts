@@ -82,3 +82,22 @@ export const IMPORT_BLOCK_MUTATION = `
     }
   }
 `;
+
+export const IMPORT_TEMPLATE_MUTATION = `
+  mutation ImportTemplate($input: ImportTemplateInput!) {
+    importTemplate(input: $input) {
+      success
+      block {
+        id
+        blockType
+        name
+        version
+      }
+      pagesCreated
+      pagesUpdated
+      layoutSlotsCreated
+      layoutSlotsUpdated
+      message
+    }
+  }
+`;

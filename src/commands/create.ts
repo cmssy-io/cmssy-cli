@@ -6,7 +6,25 @@ import path from "path";
 import { loadConfig } from "../utils/cmssy-config.js";
 import { generateTypes } from "../utils/type-generator.js";
 
-async function createBlock(name: string) {
+/**
+ * Convert kebab-case or snake_case to PascalCase.
+ * Examples: "marketing-site" → "MarketingSite", "my_block" → "MyBlock"
+ */
+function toPascalCase(str: string): string {
+  return str
+    .split(/[-_\s]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
+}
+
+interface CreateBlockOptions {
+  yes?: boolean;
+  description?: string;
+  category?: string;
+  tags?: string;
+}
+
+async function createBlock(name: string, options: CreateBlockOptions = {}) {
   const spinner = ora("Creating block...").start();
 
   try {
@@ -20,59 +38,81 @@ async function createBlock(name: string) {
       process.exit(1);
     }
 
-    // Stop spinner before prompting (ora can interfere with inquirer stdin)
-    spinner.stop();
+    let answers: {
+      displayName: string;
+      description: string;
+      category: string;
+      tags: string[];
+    };
 
-    // Prompt for block details
-    const answers = await inquirer.prompt([
-      {
-        type: "input",
-        name: "displayName",
-        message: "Display name:",
-        default: name.charAt(0).toUpperCase() + name.slice(1),
-      },
-      {
-        type: "input",
-        name: "description",
-        message: "Description:",
-        default: "",
-      },
-      {
-        type: "list",
-        name: "category",
-        message: "Category:",
-        choices: [
-          "marketing",
-          "typography",
-          "media",
-          "layout",
-          "forms",
-          "navigation",
-          "other",
-        ],
-        default: "marketing",
-      },
-      {
-        type: "input",
-        name: "tags",
-        message: "Tags (comma-separated):",
-        default: "",
-        filter: (input) =>
-          input
-            .split(",")
-            .map((tag: string) => tag.trim())
-            .filter(Boolean),
-      },
-    ]);
+    if (options.yes) {
+      // Use defaults or provided options
+      const defaultDisplayName = toPascalCase(name);
+      answers = {
+        displayName: defaultDisplayName,
+        description: options.description || "",
+        category: options.category || "marketing",
+        tags: options.tags
+          ? options.tags.split(",").map((t) => t.trim()).filter(Boolean)
+          : [],
+      };
+      spinner.text = "Creating block files...";
+    } else {
+      // Stop spinner before prompting (ora can interfere with inquirer stdin)
+      spinner.stop();
 
-    // Restart spinner for file creation
-    spinner.start("Creating block files...");
+      // Prompt for block details
+      answers = await inquirer.prompt([
+        {
+          type: "input",
+          name: "displayName",
+          message: "Display name:",
+          default: toPascalCase(name),
+        },
+        {
+          type: "input",
+          name: "description",
+          message: "Description:",
+          default: options.description || "",
+        },
+        {
+          type: "list",
+          name: "category",
+          message: "Category:",
+          choices: [
+            "marketing",
+            "typography",
+            "media",
+            "layout",
+            "forms",
+            "navigation",
+            "other",
+          ],
+          default: options.category || "marketing",
+        },
+        {
+          type: "input",
+          name: "tags",
+          message: "Tags (comma-separated):",
+          default: options.tags || "",
+          filter: (input) =>
+            input
+              .split(",")
+              .map((tag: string) => tag.trim())
+              .filter(Boolean),
+        },
+      ]);
+
+      // Restart spinner for file creation
+      spinner.start("Creating block files...");
+    }
 
     // Create directory structure
     fs.mkdirSync(path.join(blockPath, "src"), { recursive: true });
 
     // Create component file based on framework
     if (config.framework === "react") {
+      // Strip spaces from displayName (already PascalCase from toPascalCase or user input)
       const componentName = answers.displayName.replace(/\s+/g, "");
       const componentFile = `import { BlockContent } from './block';
 
@@ -232,7 +272,12 @@ export default defineBlock({
   }
 }
 
-async function createPage(name: string) {
+interface CreateTemplateOptions {
+  yes?: boolean;
+  description?: string;
+}
+
+async function createPage(name: string, options: CreateTemplateOptions = {}) {
   const spinner = ora("Creating page template...").start();
 
   try {
@@ -244,30 +289,46 @@ async function createPage(name: string) {
       process.exit(1);
     }
 
-    // Stop spinner before prompting (ora can interfere with inquirer stdin)
-    spinner.stop();
+    let answers: {
+      displayName: string;
+      description: string;
+    };
 
-    const answers = await inquirer.prompt([
-      {
-        type: "input",
-        name: "displayName",
-        message: "Display name:",
-        default: name.charAt(0).toUpperCase() + name.slice(1),
-      },
-      {
-        type: "input",
-        name: "description",
-        message: "Description:",
-        default: "",
-      },
-    ]);
+    if (options.yes) {
+      // Use defaults or provided options
+      const defaultDisplayName = toPascalCase(name);
+      answers = {
+        displayName: defaultDisplayName,
+        description: options.description || "",
+      };
+      spinner.text = "Creating page files...";
+    } else {
+      // Stop spinner before prompting (ora can interfere with inquirer stdin)
+      spinner.stop();
 
-    // Restart spinner for file creation
-    spinner.start("Creating page files...");
+      answers = await inquirer.prompt([
+        {
+          type: "input",
+          name: "displayName",
+          message: "Display name:",
+          default: toPascalCase(name),
+        },
+        {
+          type: "input",
+          name: "description",
+          message: "Description:",
+          default: options.description || "",
+        },
+      ]);
+
+      // Restart spinner for file creation
+      spinner.start("Creating page files...");
+    }
 
     fs.mkdirSync(path.join(pagePath, "src"), { recursive: true });
 
     if (config.framework === "react") {
+      // Strip spaces from displayName (already PascalCase from toPascalCase or user input)
       const componentName = answers.displayName.replace(/\s+/g, "");
       const componentFile = `import { BlockContent } from './block';
 

@@ -4,6 +4,18 @@ let blocks = [];
 let previewData = {};
 let eventSource = null;
 
+// Filters state
+let filters = {
+  search: '',
+  type: 'all',
+  category: '',
+  tags: []
+};
+
+// Available categories and tags (populated from blocks)
+let availableCategories = [];
+let availableTags = [];
+
 // Initialize app
 async function init() {
   await loadBlocks();
@@ -15,6 +27,7 @@ async function loadBlocks() {
   try {
     const response = await fetch('/api/blocks');
     blocks = await response.json();
+    populateFilters();
     renderBlocksList();
   } catch (error) {
     console.error('Failed to load blocks:', error);
@@ -24,6 +37,170 @@ async function loadBlocks() {
       </div>
     `;
   }
+}
+
+// Populate filter options from loaded blocks
+function populateFilters() {
+  // Extract unique categories
+  const categoriesSet = new Set();
+  const tagsSet = new Set();
+
+  blocks.forEach(block => {
+    if (block.category) {
+      categoriesSet.add(block.category);
+    }
+    if (block.tags && Array.isArray(block.tags)) {
+      block.tags.forEach(tag => tagsSet.add(tag));
+    }
+  });
+
+  availableCategories = Array.from(categoriesSet).sort();
+  availableTags = Array.from(tagsSet).sort();
+
+  // Populate category dropdown
+  const categorySelect = document.getElementById('category-filter');
+  if (categorySelect) {
+    categorySelect.innerHTML = '<option value="">All Categories</option>';
+    availableCategories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat;
+      option.textContent = cat;
+      categorySelect.appendChild(option);
+    });
+  }
+
+  // Populate tags filter
+  const tagsContainer = document.getElementById('tags-filter');
+  if (tagsContainer) {
+    if (availableTags.length === 0) {
+      tagsContainer.style.display = 'none';
+    } else {
+      tagsContainer.style.display = 'flex';
+      tagsContainer.innerHTML = availableTags.map(tag => `
+        <button
+          type="button"
+          class="tag-chip ${filters.tags.includes(tag) ? 'active' : ''}"
+          data-tag="${escapeHtml(tag)}"
+          onclick="toggleTagFilter('${escapeHtml(tag)}')"
+        >${escapeHtml(tag)}</button>
+      `).join('');
+
+      // Add clear button if any filters active
+      if (hasActiveFilters()) {
+        tagsContainer.innerHTML += `
+          <button type="button" class="clear-filters" onclick="clearAllFilters()">
+            Clear all
+          </button>
+        `;
+      }
+    }
+  }
+}
+
+// Check if any filters are active
+function hasActiveFilters() {
+  return filters.search !== '' ||
+         filters.type !== 'all' ||
+         filters.category !== '' ||
+         filters.tags.length > 0;
+}
+
+// Filter handlers
+window.handleSearchInput = function(event) {
+  filters.search = event.target.value.toLowerCase();
+  renderBlocksList();
+};
+
+window.setTypeFilter = function(type) {
+  filters.type = type;
+
+  // Update tab UI
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.type === type);
+  });
+
+  renderBlocksList();
+};
+
+window.setCategoryFilter = function(category) {
+  filters.category = category;
+  renderBlocksList();
+};
+
+window.toggleTagFilter = function(tag) {
+  const index = filters.tags.indexOf(tag);
+  if (index === -1) {
+    filters.tags.push(tag);
+  } else {
+    filters.tags.splice(index, 1);
+  }
+
+  // Update tag chip UI
+  document.querySelectorAll('.tag-chip').forEach(chip => {
+    if (chip.dataset.tag === tag) {
+      chip.classList.toggle('active');
+    }
+  });
+
+  // Re-render to update clear button
+  populateFilters();
+  renderBlocksList();
+};
+
+window.clearAllFilters = function() {
+  filters = {
+    search: '',
+    type: 'all',
+    category: '',
+    tags: []
+  };
+
+  // Reset UI
+  document.getElementById('search-input').value = '';
+  document.getElementById('category-filter').value = '';
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.type === 'all');
+  });
+
+  populateFilters();
+  renderBlocksList();
+};
+
+// Get filtered blocks based on current filters
+function getFilteredBlocks() {
+  return blocks.filter(block => {
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const matchesSearch =
+        (block.displayName || block.name).toLowerCase().includes(searchLower) ||
+        (block.description || '').toLowerCase().includes(searchLower) ||
+        (block.name || '').toLowerCase().includes(searchLower);
+      if (!matchesSearch) return false;
+    }
+
+    // Type filter
+    if (filters.type !== 'all') {
+      const blockType = block.type || 'block';
+      if (blockType !== filters.type) {
+        return false;
+      }
+    }
+
+    // Category filter
+    if (filters.category && block.category !== filters.category) {
+      return false;
+    }
+
+    // Tags filter (match ANY selected tag)
+    if (filters.tags.length > 0) {
+      const blockTags = block.tags || [];
+      const hasAnyTag = filters.tags.some(tag => blockTags.includes(tag));
+      if (!hasAnyTag) return false;
+    }
+
+    return true;
+  });
 }
 
 // Render blocks list
@@ -37,24 +214,85 @@ function renderBlocksList() {
     return;
   }
 
-  countEl.textContent = `${blocks.length} ${blocks.length === 1 ? 'block' : 'blocks'}`;
+  // Get filtered blocks
+  const filteredBlocks = getFilteredBlocks();
 
-  listEl.innerHTML = blocks.map(block => `
+  // Update count with filter info
+  if (hasActiveFilters()) {
+    countEl.textContent = `${filteredBlocks.length} of ${blocks.length} items`;
+  } else {
+    countEl.textContent = `${blocks.length} ${blocks.length === 1 ? 'item' : 'items'}`;
+  }
+
+  // Handle empty filtered results
+  if (filteredBlocks.length === 0) {
+    listEl.innerHTML = `
+      <div class="no-results">
+        <div class="no-results-icon">🔍</div>
+        <div>No items match your filters</div>
+        <button
+          type="button"
+          style="margin-top: 12px; padding: 6px 16px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;"
+          onclick="clearAllFilters()"
+        >Clear filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Group blocks by category
+  const grouped = {};
+  filteredBlocks.forEach(block => {
+    const cat = block.category || 'Uncategorized';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(block);
+  });
+
+  // Sort categories alphabetically (but put Uncategorized last)
+  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
+
+  // Render grouped blocks
+  listEl.innerHTML = sortedCategories.map(category => `
+    <div class="block-category">
+      <div class="category-header">
+        ${escapeHtml(category)}
+        <span class="category-count">${grouped[category].length}</span>
+      </div>
+      ${grouped[category].map(block => renderBlockItem(block)).join('')}
+    </div>
+  `).join('');
+}
+
+// Render a single block item
+function renderBlockItem(block) {
+  const isTemplate = block.type === 'template';
+  const typeBadge = isTemplate
+    ? '<span class="type-badge template">Template</span>'
+    : '';
+
+  return `
     <div
       class="block-item ${currentBlock?.name === block.name ? 'active' : ''}"
-      data-block="${block.name}"
-      onclick="selectBlock('${block.name}')"
+      data-block="${escapeHtml(block.name)}"
+      onclick="selectBlock('${escapeHtml(block.name)}')"
     >
       <div class="block-item-header">
-        <div class="block-item-name">${block.displayName || block.name}</div>
+        <div class="block-item-name">
+          ${escapeHtml(block.displayName || block.name)}
+          ${typeBadge}
+        </div>
         <span class="version-badge">v${block.version || '1.0.0'}</span>
       </div>
       <div class="block-item-footer">
-        <span class="block-item-type">${block.type}</span>
+        <span class="block-item-type">${escapeHtml(block.category || 'Block')}</span>
         <span class="status-badge status-local">Local</span>
       </div>
     </div>
-  `).join('');
+  `;
 }
 
 // Select a block

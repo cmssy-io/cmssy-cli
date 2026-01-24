@@ -9,6 +9,7 @@ import { hasConfig, loadConfig } from "../utils/config.js";
 import {
   PUBLISH_PACKAGE_MUTATION,
   IMPORT_BLOCK_MUTATION,
+  IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
 import {
   loadBlockConfig,
@@ -102,7 +103,54 @@ export async function publishCommand(
   }
 
   // Scan for packages to publish
-  const packages = await scanPackages(packageNames, options);
+  let packages = await scanPackages(packageNames, options);
+
+  // Auto-detect and add template dependencies (blocks used in pages.json)
+  // Only for workspace publish, not marketplace
+  if (options.workspace) {
+    const templatesToProcess = packages.filter((p) => p.type === "template");
+
+    for (const template of templatesToProcess) {
+      const pagesJsonPath = path.join(template.path, "pages.json");
+      const requiredBlockTypes = extractBlockTypesFromPagesJson(pagesJsonPath);
+
+      if (requiredBlockTypes.length > 0) {
+        // Find which blocks exist in the project
+        const availableBlocks = findProjectBlocks(requiredBlockTypes);
+
+        // Check which blocks are not already in the packages list
+        const existingBlockNames = packages
+          .filter((p) => p.type === "block")
+          .map((p) => p.name);
+
+        const missingBlocks = availableBlocks.filter(
+          (b) => !existingBlockNames.includes(b)
+        );
+
+        if (missingBlocks.length > 0) {
+          console.log(
+            chalk.cyan(`\n📦 Auto-detected dependencies for ${template.name}:\n`)
+          );
+          missingBlocks.forEach((b) => console.log(chalk.gray(`  • ${b}`)));
+          console.log("");
+
+          // Scan and add missing blocks
+          const dependencyPackages = await scanPackages(missingBlocks, {
+            ...options,
+            all: false,
+          });
+
+          // Insert dependencies BEFORE the template
+          const templateIndex = packages.findIndex((p) => p.name === template.name);
+          packages = [
+            ...packages.slice(0, templateIndex),
+            ...dependencyPackages,
+            ...packages.slice(templateIndex),
+          ];
+        }
+      }
+    }
+  }
 
   if (packages.length === 0) {
     console.log(chalk.yellow("⚠ No packages found to publish\n"));
@@ -318,6 +366,69 @@ export async function publishCommand(
       chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`)
     );
   }
+}
+
+/**
+ * Extract block type names from pages.json (pages + layoutSlots)
+ * @example "@cmssy-marketing/blocks.hero" -> "hero"
+ */
+function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
+  if (!fs.existsSync(pagesJsonPath)) {
+    return [];
+  }
+
+  const pagesData = fs.readJsonSync(pagesJsonPath);
+  const blockTypes = new Set<string>();
+
+  // Extract from pages
+  for (const page of pagesData.pages || []) {
+    for (const block of page.blocks || []) {
+      if (block.type) {
+        // Convert full name to simple type: "@scope/blocks.hero" -> "hero"
+        let blockType = block.type;
+        if (blockType.includes("/")) {
+          blockType = blockType.split("/").pop()!;
+        }
+        if (blockType.startsWith("blocks.")) {
+          blockType = blockType.substring(7);
+        }
+        blockTypes.add(blockType);
+      }
+    }
+  }
+
+  // Extract from layoutSlots
+  for (const [_slot, data] of Object.entries(pagesData.layoutSlots || {}) as [string, any][]) {
+    if (data.type) {
+      let blockType = data.type;
+      if (blockType.includes("/")) {
+        blockType = blockType.split("/").pop()!;
+      }
+      if (blockType.startsWith("blocks.")) {
+        blockType = blockType.substring(7);
+      }
+      blockTypes.add(blockType);
+    }
+  }
+
+  return Array.from(blockTypes);
+}
+
+/**
+ * Find which blocks from a list exist in the project's blocks/ directory
+ */
+function findProjectBlocks(blockTypes: string[]): string[] {
+  const blocksDir = path.join(process.cwd(), "blocks");
+  if (!fs.existsSync(blocksDir)) {
+    return [];
+  }
+
+  const existingBlocks = fs
+    .readdirSync(blocksDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
+  return blockTypes.filter((bt) => existingBlocks.includes(bt));
 }
 
 async function scanPackages(
@@ -724,7 +835,7 @@ async function publishToWorkspace(
   apiToken: string,
   apiUrl: string
 ): Promise<void> {
-  const { packageJson, path: packagePath, blockConfig } = pkg;
+  const { packageJson, path: packagePath, blockConfig, type: packageType } = pkg;
 
   // Use blockConfig if available, fallback to package.json cmssy
   const metadata = blockConfig || packageJson.cmssy || {};
@@ -777,6 +888,11 @@ async function publishToWorkspace(
     input.requires = blockConfig.requires;
   }
 
+  // Check if this is a template with pages.json
+  const isTemplate = packageType === "template";
+  const pagesJsonPath = path.join(packagePath, "pages.json");
+  const hasPagesJson = isTemplate && fs.existsSync(pagesJsonPath);
+
   // Create client with workspace header
   const client = new GraphQLClient(apiUrl, {
     headers: {
@@ -802,18 +918,72 @@ async function publishToWorkspace(
     }, TIMEOUT_MS);
   });
 
-  const requestPromise = client.request(IMPORT_BLOCK_MUTATION, { input });
+  // Use different mutation for templates with pages
+  if (hasPagesJson) {
+    // Load pages.json for template
+    const pagesData = fs.readJsonSync(pagesJsonPath);
 
-  try {
-    const result = await Promise.race([requestPromise, timeoutPromise]);
-    clearTimeout(timeoutId!); // Clear timeout so Node can exit immediately
+    // Convert pages.json format to mutation input format
+    const pages = (pagesData.pages || []).map((page: any) => ({
+      name: page.name,
+      slug: page.slug,
+      blocks: (page.blocks || []).map((block: any) => ({
+        type: block.type,
+        content: block.content || {},
+      })),
+    }));
 
-    if (!result.importBlock) {
-      throw new Error("Failed to import block to workspace");
+    // Convert layoutSlots to array format
+    const layoutSlots: any[] = [];
+    if (pagesData.layoutSlots) {
+      for (const [slot, data] of Object.entries(pagesData.layoutSlots as Record<string, any>)) {
+        layoutSlots.push({
+          slot,
+          type: data.type,
+          content: data.content || {},
+        });
+      }
     }
-  } catch (error) {
-    clearTimeout(timeoutId!); // Clear timeout on error too
-    throw error;
+
+    // Add pages and layout slots to input
+    input.pages = pages;
+    input.layoutSlots = layoutSlots;
+
+    const requestPromise = client.request(IMPORT_TEMPLATE_MUTATION, { input });
+
+    try {
+      const result = await Promise.race([requestPromise, timeoutPromise]);
+      clearTimeout(timeoutId!);
+
+      if (!result.importTemplate?.success) {
+        throw new Error(result.importTemplate?.message || "Failed to import template to workspace");
+      }
+
+      // Log template import summary
+      const { pagesCreated, pagesUpdated, layoutSlotsCreated, layoutSlotsUpdated } = result.importTemplate;
+      console.log(chalk.gray(
+        `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated | ` +
+        `${layoutSlotsCreated} layout slots created, ${layoutSlotsUpdated} updated`
+      ));
+    } catch (error) {
+      clearTimeout(timeoutId!);
+      throw error;
+    }
+  } else {
+    // Standard block import
+    const requestPromise = client.request(IMPORT_BLOCK_MUTATION, { input });
+
+    try {
+      const result = await Promise.race([requestPromise, timeoutPromise]);
+      clearTimeout(timeoutId!);
+
+      if (!result.importBlock) {
+        throw new Error("Failed to import block to workspace");
+      }
+    } catch (error) {
+      clearTimeout(timeoutId!);
+      throw error;
+    }
   }
 }
 

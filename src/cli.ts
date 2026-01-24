@@ -50,12 +50,18 @@ create
   .command("block")
   .description("Create a new block")
   .argument("<name>", "Block name")
+  .option("-y, --yes", "Skip prompts and use defaults")
+  .option("-d, --description <description>", "Block description")
+  .option("-c, --category <category>", "Block category (marketing, typography, media, layout, forms, navigation, other)")
+  .option("-t, --tags <tags>", "Comma-separated tags")
   .action(createCommand.block);
 
 create
   .command("template")
   .description("Create a new page template")
   .argument("<name>", "Template name")
+  .option("-y, --yes", "Skip prompts and use defaults")
+  .option("-d, --description <description>", "Template description")
   .action(createCommand.page);
 
 // cmssy build

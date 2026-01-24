@@ -1,6 +1,6 @@
 {
   "name": "cmssy-cli",
-  "version": "0.19.6",
+  "version": "0.20.0",
   "description": "Unified CLI for building and publishing blocks to Cmssy marketplace",
   "type": "module",
   "bin": {
@@ -14,6 +14,9 @@
   "scripts": {
     "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler && cp -r src/dev-ui dist/",
     "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -71,6 +74,8 @@
     "@types/node": "^22.10.2",
     "@types/node-fetch": "^2.6.13",
     "@types/semver": "^7.7.1",
-    "typescript": "^5.7.2"
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
   }
 }

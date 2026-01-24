@@ -92,6 +92,7 @@ export async function devCommand(options: DevOptions) {
         displayName: r.displayName,
         description: r.description,
         category: r.category,
+        tags: r.blockConfig?.tags || [],
         schema: r.blockConfig?.schema || {},
         version: r.packageJson?.version || "1.0.0",
         packageName: r.packageJson?.name || `@local/${r.type}s.${r.name}`,
