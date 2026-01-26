@@ -88,7 +88,13 @@ program
 // cmssy publish
 program
   .command("publish [packages...]")
-  .description("Publish blocks/templates to marketplace or workspace")
+  .description(
+    "Publish blocks/templates to marketplace or workspace\n\n" +
+    "  Packages are directory names from blocks/ or templates/ folders.\n" +
+    "  Examples:\n" +
+    "    cmssy publish hero faq --marketplace --patch\n" +
+    "    cmssy publish --all --workspace abc123"
+  )
   .option("-m, --marketplace", "Publish to public marketplace (requires review)")
   .option("-w, --workspace [id]", "Publish to workspace (private, no review)")
   .option("--all", "Publish all blocks and templates")
@@ -116,7 +122,13 @@ program
 // cmssy package
 program
   .command("package [packages...]")
-  .description("Package blocks/templates into ZIP files")
+  .description(
+    "Package blocks/templates into ZIP files\n\n" +
+    "  Packages are directory names from blocks/ or templates/ folders.\n" +
+    "  Examples:\n" +
+    "    cmssy package hero faq -o dist\n" +
+    "    cmssy package --all"
+  )
   .option("--all", "Package all blocks and templates")
   .option("-o, --output <dir>", "Output directory", "packages")
   .action(packageCommand);

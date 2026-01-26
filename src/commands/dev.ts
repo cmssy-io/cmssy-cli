@@ -126,7 +126,10 @@ export async function devCommand(options: DevOptions) {
               id
               slug
               name
-              myRole
+              myRole {
+                name
+                slug
+              }
             }
           }
         `;

@@ -864,7 +864,8 @@ function populateWorkspaceSelect(workspaces) {
   workspaces.forEach(ws => {
     const option = document.createElement('option');
     option.value = ws.id;
-    option.textContent = `${ws.name} (${ws.myRole})`;
+    const roleName = ws.myRole?.name || 'member';
+    option.textContent = `${ws.name} (${roleName})`;
     select.appendChild(option);
   });
 }

@@ -107,6 +107,27 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     allowsDefaultValue: false,
     supportsValidation: true,
   },
+  {
+    type: "form",
+    label: "Form",
+    description: "Form picker",
+    allowsDefaultValue: true,
+    supportsValidation: false,
+  },
+  {
+    type: "emailTemplate",
+    label: "Email Template",
+    description: "Email template picker",
+    allowsDefaultValue: true,
+    supportsValidation: false,
+  },
+  {
+    type: "emailConfiguration",
+    label: "Email Configuration",
+    description: "Email configuration picker",
+    allowsDefaultValue: true,
+    supportsValidation: false,
+  },
 ];
 
 export async function getFieldTypes(): Promise<FieldTypeDefinition[]> {

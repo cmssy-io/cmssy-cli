@@ -2,11 +2,16 @@ import chalk from "chalk";
 import { loadConfig } from "../utils/config.js";
 import { GraphQLClient } from "graphql-request";
 
+interface WorkspaceRole {
+  name: string;
+  slug: string;
+}
+
 interface Workspace {
   id: string;
   slug: string;
   name: string;
-  myRole: string;
+  myRole: WorkspaceRole | null;
 }
 
 const MY_WORKSPACES_QUERY = `
@@ -15,7 +20,10 @@ const MY_WORKSPACES_QUERY = `
       id
       slug
       name
-      myRole
+      myRole {
+        name
+        slug
+      }
     }
   }
 `;
@@ -56,17 +64,19 @@ export async function workspacesCommand() {
     console.log(chalk.blue(`\n📁 Your Workspaces (${workspaces.length}):\n`));
 
     for (const workspace of workspaces) {
+      const roleName = workspace.myRole?.name || "member";
+      const roleSlug = workspace.myRole?.slug || "member";
       const roleColor =
-        workspace.myRole === "owner"
+        roleSlug === "owner"
           ? chalk.green
-          : workspace.myRole === "admin"
+          : roleSlug === "admin"
           ? chalk.blue
           : chalk.gray;
 
       console.log(chalk.white.bold(workspace.name));
       console.log(chalk.gray(`  Slug: ${workspace.slug}`));
       console.log(chalk.cyan(`  ID:   ${workspace.id}`));
-      console.log(roleColor(`  Role: ${workspace.myRole}`));
+      console.log(roleColor(`  Role: ${roleName}`));
       console.log();
     }
 
