@@ -101,3 +101,27 @@ export const IMPORT_TEMPLATE_MUTATION = `
     }
   }
 `;
+
+export const ADD_BLOCK_SOURCE_CODE_MUTATION = `
+  mutation AddBlockSourceCode($input: AddBlockSourceCodeInput!) {
+    addBlockSourceCode(input: $input) {
+      id
+      blockType
+      name
+      sourceUrl
+      sourceCssUrl
+      dependenciesUrl
+    }
+  }
+`;
+
+export const GET_WORKSPACE_BLOCKS_QUERY = `
+  query GetWorkspaceBlocks {
+    workspaceBlocks {
+      id
+      blockType
+      name
+      sourceUrl
+    }
+  }
+`;

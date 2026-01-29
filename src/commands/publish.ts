@@ -536,6 +536,94 @@ async function scanPackages(
   return packages;
 }
 
+/**
+ * Read original source code for AI Block Builder (editable in Sandpack).
+ * Combines the main component file with type definitions into a single file.
+ */
+async function readOriginalSourceCode(packagePath: string): Promise<{
+  sourceCode: string | undefined;
+  sourceCss: string | undefined;
+}> {
+  const srcDir = path.join(packagePath, "src");
+
+  // Find main component file (not index.tsx, but the actual component)
+  const files = fs.readdirSync(srcDir);
+  let mainComponentFile: string | undefined;
+  let sourceCode: string | undefined;
+
+  // Look for component files (excluding index.tsx and .d.ts files)
+  for (const file of files) {
+    if (
+      (file.endsWith(".tsx") || file.endsWith(".ts")) &&
+      !file.startsWith("index") &&
+      !file.endsWith(".d.ts")
+    ) {
+      mainComponentFile = path.join(srcDir, file);
+      break;
+    }
+  }
+
+  // If no main component found, try index.tsx
+  if (!mainComponentFile) {
+    const indexPath = path.join(srcDir, "index.tsx");
+    if (fs.existsSync(indexPath)) {
+      mainComponentFile = indexPath;
+    }
+  }
+
+  if (mainComponentFile && fs.existsSync(mainComponentFile)) {
+    // Read the main component
+    let content = fs.readFileSync(mainComponentFile, "utf-8");
+
+    // Read block.d.ts if exists and inline the types
+    const blockDtsPath = path.join(srcDir, "block.d.ts");
+    if (fs.existsSync(blockDtsPath)) {
+      const blockDts = fs.readFileSync(blockDtsPath, "utf-8");
+
+      // Extract interface/type definitions from block.d.ts
+      const typeMatch = blockDts.match(
+        /(?:export\s+)?(?:interface|type)\s+BlockContent[\s\S]*?(?=(?:export\s+)?(?:interface|type)|$)/
+      );
+
+      if (typeMatch) {
+        // Remove the import from block.d.ts and add inline type
+        content = content.replace(
+          /import\s*{\s*BlockContent\s*}\s*from\s*["']\.\/block(?:\.d)?["'];?\n?/,
+          ""
+        );
+
+        // Add inline interface at the top
+        const inlineInterface = `interface BlockContent {
+  [key: string]: any;
+}\n\n`;
+
+        // Insert after imports
+        const lastImportMatch = content.match(/^(import[\s\S]*?from\s*['"][^'"]+['"];?\n)/m);
+        if (lastImportMatch) {
+          const insertPos = content.lastIndexOf(lastImportMatch[0]) + lastImportMatch[0].length;
+          content =
+            content.slice(0, insertPos) +
+            "\n" +
+            inlineInterface +
+            content.slice(insertPos);
+        } else {
+          content = inlineInterface + content;
+        }
+      }
+    }
+
+    sourceCode = content;
+  }
+
+  // Read CSS
+  const cssPath = path.join(srcDir, "index.css");
+  const sourceCss = fs.existsSync(cssPath)
+    ? fs.readFileSync(cssPath, "utf-8")
+    : undefined;
+
+  return { sourceCode, sourceCss };
+}
+
 // Bundle source code with esbuild (combines all local imports into single file)
 // Bundle source code with esbuild (combines all local imports into single file)
 // UPDATED: Use CommonJS format to avoid ES module export statements
@@ -854,6 +942,13 @@ async function publishToWorkspace(
   // Compile CSS (with Tailwind if needed)
   const compiledCss = await compileCss(packagePath, bundledSourceCode);
 
+  // Read original source code for AI Block Builder editing
+  const { sourceCode: rawSourceCode, sourceCss: rawSourceCss } =
+    await readOriginalSourceCode(packagePath);
+
+  // Read dependencies from package.json for AI Block Builder
+  const dependencies = packageJson.dependencies || {};
+
   // Convert block.config.ts schema to schemaFields if using blockConfig
   let schemaFields = metadata.schemaFields || [];
   if (blockConfig && blockConfig.schema) {
@@ -877,6 +972,10 @@ async function publishToWorkspace(
     sourceItem: packageJson.name,
     version: packageJson.version || "1.0.0",
     packageType, // "block" or "template"
+    // AI Block Builder source files (for editable blocks in Sandpack)
+    rawSourceCode,
+    rawSourceCss,
+    dependencies: Object.keys(dependencies).length > 0 ? dependencies : undefined,
   };
 
   // Add layoutSlot if defined (for header/footer blocks)

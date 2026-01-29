@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { addSourceCommand } from "./commands/add-source.js";
 import { buildCommand } from "./commands/build.js";
 import { configureCommand } from "./commands/configure.js";
 import { createCommand } from "./commands/create.js";
@@ -146,5 +147,19 @@ program
   .command("workspaces")
   .description("List your workspaces and get workspace IDs")
   .action(workspacesCommand);
+
+// cmssy add-source
+program
+  .command("add-source [blocks...]")
+  .description(
+    "Add source code to existing workspace blocks for AI Block Builder editing\n\n" +
+    "  Reads source from local blocks/ directory and uploads to workspace.\n" +
+    "  Examples:\n" +
+    "    cmssy add-source hero pricing --workspace abc123\n" +
+    "    cmssy add-source --all --workspace abc123"
+  )
+  .option("-w, --workspace <id>", "Workspace ID to update")
+  .option("--all", "Add source to all local blocks")
+  .action(addSourceCommand);
 
 program.parse();
