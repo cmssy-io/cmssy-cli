@@ -1,11 +1,10 @@
 {
-  "name": "cmssy-cli",
-  "version": "0.25.0",
+  "name": "@cmssy/cli",
+  "version": "0.2.0",
   "description": "Unified CLI for building and publishing blocks to Cmssy marketplace",
   "type": "module",
   "bin": {
-    "cmssy": "./dist/cli.js",
-    "cmssy-cli": "./dist/cli.js"
+    "cmssy": "./dist/cli.js"
   },
   "exports": {
     ".": "./dist/cli.js",
@@ -29,11 +28,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/maciekbe1/cmssy-cli.git"
+    "url": "https://github.com/cmssy-io/cmssy-cli.git"
   },
-  "homepage": "https://github.com/maciekbe1/cmssy-cli#readme",
+  "homepage": "https://github.com/cmssy-io/cmssy-cli#readme",
   "bugs": {
-    "url": "https://github.com/maciekbe1/cmssy-cli/issues"
+    "url": "https://github.com/cmssy-io/cmssy-cli/issues"
   },
   "files": [
     "dist",
@@ -45,7 +44,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
+    "@cmssy/types": "^0.1.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@vitejs/plugin-react": "^5.1.2",
     "archiver": "^7.0.1",
@@ -79,7 +82,7 @@
     "@types/node-fetch": "^2.6.13",
     "@types/postcss-import": "^14.0.3",
     "@types/semver": "^7.7.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^3.2.4",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"
   }

@@ -1,2 +1,3 @@
 export { defineBlock, defineTemplate } from "./dist/utils/block-config.js";
-export type { BlockConfig, FieldConfig, FieldType, BaseFieldConfig, SelectFieldConfig, RepeaterFieldConfig, BlockRequires, LayoutSlotType, ShowWhenCondition, FieldValidation, ValidationPattern, WorkspaceModule, FeatureFlag, TemplateConfig, TemplatePageBlueprint, TemplateBlockInstance, TemplateLayoutSlot, TemplateTheme, } from "./dist/types/block-config.js";
+export type { BlockConfig, FieldConfig, BaseFieldConfig, SelectFieldConfig, MultiselectFieldConfig, RepeaterFieldConfig, MediaFieldConfig, SliderFieldConfig, PageSelectorFieldConfig, BlockRequires, ShowWhenCondition, FieldValidation, ValidationPattern, LayoutOverride, TemplateConfig, TemplatePageBlueprint, TemplateBlockInstance, TemplateLayoutSlot, TemplateTheme, ResourceConfig, } from "@cmssy/types";
+export { FieldType, LayoutPosition, WorkspaceModule, FeatureFlag, isTemplateConfig, } from "@cmssy/types";

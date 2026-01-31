@@ -9,6 +9,51 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer, ViteDevServer, Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/postcss";
+// Custom Vite plugin to resolve @import "main.css" from styles folder
+// Inlines the imported CSS content to avoid Vite's postcss-import issues
+function cmssyStylesImportPlugin(projectRoot: string): Plugin {
+  return {
+    name: "cmssy-styles-import",
+    enforce: "pre",
+    async load(id) {
+      // Strip query params for matching
+      const cleanId = id.split("?")[0];
+
+      // Only process CSS files in blocks/templates
+      if (!cleanId.endsWith(".css")) return null;
+      if (!cleanId.includes("/blocks/") && !cleanId.includes("/templates/")) return null;
+
+      const content = await fs.readFile(cleanId, "utf-8");
+
+      // Check if it has @import "main.css" or similar simple imports
+      if (!content.includes('@import "') && !content.includes("@import '")) {
+        return null;
+      }
+
+      // Replace @import "filename.css" with the actual file content (inline it)
+      const stylesDir = path.join(projectRoot, "styles");
+      let transformed = content;
+
+      // Match @import "filename.css" or @import 'filename.css' (without path)
+      const importRegex = /@import\s+["']([^"'\/]+\.css)["']\s*;/g;
+
+      transformed = transformed.replace(importRegex, (match, filename) => {
+        const fullPath = path.join(stylesDir, filename);
+        if (fs.existsSync(fullPath)) {
+          // Inline the CSS content instead of keeping the import
+          const importedContent = fs.readFileSync(fullPath, "utf-8");
+          return `/* Inlined from ${filename} */\n${importedContent}`;
+        }
+        return match; // Keep original if file doesn't exist
+      });
+
+      if (transformed !== content) {
+        return transformed;
+      }
+      return null;
+    },
+  };
+}
 import { loadBlockConfig, validateSchema as validateBlockSchema } from "../utils/block-config.js";
 import { loadMetaCache, updateBlockInCache, BlocksMetaCache } from "../utils/blocks-meta-cache.js";
 import { isTemplateConfig, TemplateConfig, TemplatePageBlueprint } from "../types/block-config.js";
@@ -18,26 +63,6 @@ import { getFieldTypes, FieldTypeDefinition } from "../utils/field-schema.js";
 import { ScannedResource, scanResources } from "../utils/scanner.js";
 import { generateTypes } from "../utils/type-generator.js";
 
-// Custom plugin to resolve @import "main.css" to styles/main.css
-function cmssyCssImportPlugin(projectRoot: string): Plugin {
-  return {
-    name: "cmssy-css-import",
-    enforce: "pre",
-    transform(code, id) {
-      if (id.endsWith(".css")) {
-        // Replace @import "main.css" with the content path
-        if (code.includes('@import "main.css"') || code.includes("@import 'main.css'")) {
-          const mainCssPath = path.join(projectRoot, "styles", "main.css");
-          const mainCssContent = fs.readFileSync(mainCssPath, "utf-8");
-          return code
-            .replace('@import "main.css";', mainCssContent)
-            .replace("@import 'main.css';", mainCssContent);
-        }
-      }
-      return null;
-    },
-  };
-}
 
 // Merge default values from schema into preview data
 // Preview data values take precedence over defaults
@@ -160,12 +185,14 @@ export async function devCommand(options: DevOptions) {
         },
       },
       appType: "custom",
-      plugins: [cmssyCssImportPlugin(projectRoot), react()],
+      plugins: [cmssyStylesImportPlugin(projectRoot), react()],
       resolve: {
         alias: [
           // React packages must resolve from user's project, not cmssy-cli
           { find: "react", replacement: path.join(projectRoot, "node_modules/react") },
           { find: "react-dom", replacement: path.join(projectRoot, "node_modules/react-dom") },
+          // Common @ alias for project root (shadcn/ui convention)
+          { find: /^@\/(.*)/, replacement: path.join(projectRoot, "$1") },
           { find: "@blocks", replacement: path.join(projectRoot, "blocks") },
           { find: "@templates", replacement: path.join(projectRoot, "templates") },
           { find: "@styles", replacement: path.join(projectRoot, "styles") },

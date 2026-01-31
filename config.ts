@@ -1,24 +1,37 @@
 // Package exports for block.config.ts authoring
 export { defineBlock, defineTemplate } from "./dist/utils/block-config.js";
+
+// Re-export all types from @cmssy/types
 export type {
   // Block types
   BlockConfig,
   FieldConfig,
-  FieldType,
   BaseFieldConfig,
   SelectFieldConfig,
+  MultiselectFieldConfig,
   RepeaterFieldConfig,
+  MediaFieldConfig,
+  SliderFieldConfig,
+  PageSelectorFieldConfig,
   BlockRequires,
-  LayoutSlotType,
   ShowWhenCondition,
   FieldValidation,
   ValidationPattern,
-  WorkspaceModule,
-  FeatureFlag,
+  LayoutOverride,
   // Template types
   TemplateConfig,
   TemplatePageBlueprint,
   TemplateBlockInstance,
   TemplateLayoutSlot,
   TemplateTheme,
-} from "./dist/types/block-config.js";
+  ResourceConfig,
+} from "@cmssy/types";
+
+// Export const enums and functions
+export {
+  FieldType,
+  LayoutPosition,
+  WorkspaceModule,
+  FeatureFlag,
+  isTemplateConfig,
+} from "@cmssy/types";

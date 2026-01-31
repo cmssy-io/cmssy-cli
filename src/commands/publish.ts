@@ -369,7 +369,8 @@ export async function publishCommand(
 }
 
 /**
- * Extract block type names from pages.json (pages + layoutSlots)
+ * Extract block type names from pages.json (pages + layout positions)
+ * Supports all layout positions: header, footer, sidebar_left, sidebar_right, top, bottom
  * @example "@cmssy-marketing/blocks.hero" -> "hero"
  */
 function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
@@ -1002,9 +1003,9 @@ async function publishToWorkspace(
     dependencies: Object.keys(dependencies).length > 0 ? dependencies : undefined,
   };
 
-  // Add layoutSlot if defined (for header/footer blocks)
-  if (blockConfig?.layoutSlot) {
-    input.layoutSlot = blockConfig.layoutSlot;
+  // Add layoutPosition if defined (for layout blocks)
+  if (blockConfig?.layoutPosition) {
+    input.layoutPosition = blockConfig.layoutPosition;
   }
 
   // Add requires if defined
