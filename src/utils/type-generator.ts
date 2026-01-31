@@ -5,12 +5,37 @@ import {
   RepeaterFieldConfig,
   SelectFieldConfig,
 } from "../types/block-config.js";
+import { FieldTypeDefinition } from "./field-schema.js";
 
-export async function generateTypes(
-  blockPath: string,
-  schema: Record<string, FieldConfig>
-): Promise<void> {
-  const typeDefinition = generateTypeDefinition(schema);
+// Default value type mappings (used when field types are not provided)
+const DEFAULT_VALUE_TYPES: Record<string, string> = {
+  singleLine: "string",
+  multiLine: "string",
+  richText: "string",
+  numeric: "number",
+  date: "string",
+  media: "string",
+  link: "string",
+  select: "string",
+  multiselect: "string[]",
+  boolean: "boolean",
+  color: "string",
+  slider: "number",
+  repeater: "Record<string, unknown>[]",
+  form: "string",
+  emailTemplate: "string",
+  emailConfiguration: "string",
+};
+
+export interface GenerateTypesOptions {
+  blockPath: string;
+  schema: Record<string, FieldConfig>;
+  fieldTypes?: FieldTypeDefinition[];
+}
+
+export async function generateTypes(options: GenerateTypesOptions): Promise<void> {
+  const { blockPath, schema, fieldTypes } = options;
+  const typeDefinition = generateTypeDefinition({ schema, fieldTypes, indent: "  " });
   const outputPath = path.join(blockPath, "src", "block.d.ts");
 
   const fileContent = `// Auto-generated from block.config.ts
@@ -24,15 +49,19 @@ ${typeDefinition}
   await fs.writeFile(outputPath, fileContent);
 }
 
-function generateTypeDefinition(
-  schema: Record<string, FieldConfig>,
-  indent = "  "
-): string {
+interface GenerateTypeDefinitionOptions {
+  schema: Record<string, FieldConfig>;
+  fieldTypes?: FieldTypeDefinition[];
+  indent?: string;
+}
+
+function generateTypeDefinition(options: GenerateTypeDefinitionOptions): string {
+  const { schema, fieldTypes, indent = "  " } = options;
   const lines: string[] = [];
 
   Object.entries(schema).forEach(([key, field]) => {
     const optional = field.required ? "" : "?";
-    const tsType = mapFieldTypeToTypeScript(field);
+    const tsType = mapFieldTypeToTypeScript({ field, fieldTypes, indent });
 
     if (field.helpText) {
       lines.push(`${indent}/** ${field.helpText} */`);
@@ -43,55 +72,50 @@ function generateTypeDefinition(
   return lines.join("\n");
 }
 
-function mapFieldTypeToTypeScript(field: FieldConfig): string {
-  switch (field.type) {
-    case "singleLine":
-    case "multiLine":
-    case "richText":
-    case "link":
-    case "color":
-      return "string";
+interface MapFieldTypeOptions {
+  field: FieldConfig;
+  fieldTypes?: FieldTypeDefinition[];
+  indent?: string;
+}
 
-    case "numeric":
-    case "slider":
-      return "number";
+function mapFieldTypeToTypeScript(options: MapFieldTypeOptions): string {
+  const { field, fieldTypes, indent = "  " } = options;
 
-    case "boolean":
-      return "boolean";
-
-    case "date":
-      return "string";
-
-    case "media":
-      return "{ url: string; alt?: string; width?: number; height?: number }";
-
-    case "select": {
-      const selectField = field as SelectFieldConfig;
-      if (selectField.options && selectField.options.length > 0) {
-        const unionTypes = selectField.options
-          .map((opt) => `"${opt.value}"`)
-          .join(" | ");
-        return unionTypes;
-      }
-      return "string";
+  // Special handling for select (generate union type from options)
+  if (field.type === "select") {
+    const selectField = field as SelectFieldConfig;
+    if (selectField.options && selectField.options.length > 0) {
+      const unionTypes = selectField.options
+        .map((opt) => `"${opt.value}"`)
+        .join(" | ");
+      return unionTypes;
     }
-
-    case "multiselect":
-      return "string[]";
-
-    case "repeater": {
-      const repeaterField = field as RepeaterFieldConfig;
-      if (repeaterField.schema) {
-        const nestedType = `{\n${generateTypeDefinition(
-          repeaterField.schema,
-          "    "
-        )}\n  }`;
-        return `Array<${nestedType}>`;
-      }
-      return "any[]";
-    }
-
-    default:
-      return "any";
+    return "string";
   }
+
+  // Special handling for repeater (generate nested type from schema)
+  if (field.type === "repeater") {
+    const repeaterField = field as RepeaterFieldConfig;
+    if (repeaterField.schema) {
+      const nestedIndent = indent + "  ";
+      const nestedType = `{\n${generateTypeDefinition({
+        schema: repeaterField.schema,
+        fieldTypes,
+        indent: nestedIndent,
+      })}\n${indent}}`;
+      return `Array<${nestedType}>`;
+    }
+    return "any[]";
+  }
+
+  // Look up valueType from backend field types
+  if (fieldTypes) {
+    const fieldTypeDef = fieldTypes.find((ft) => ft.type === field.type);
+    if (fieldTypeDef?.valueType) {
+      return fieldTypeDef.valueType;
+    }
+  }
+
+  // Fall back to default mappings
+  return DEFAULT_VALUE_TYPES[field.type] || "any";
 }

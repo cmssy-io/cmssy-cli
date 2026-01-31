@@ -206,11 +206,11 @@ export function generatePackageJsonMetadata(
   config: ResourceConfig,
   packageType: "block" | "template"
 ): any {
-  // Convert schema to legacy schemaFields format
-  const schemaFields = convertSchemaToLegacyFormat(config.schema);
+  // Convert schema to legacy schemaFields format (if schema exists)
+  const schemaFields = config.schema ? convertSchemaToLegacyFormat(config.schema) : [];
 
   // Extract default content from schema
-  const defaultContent = extractDefaultContent(config.schema);
+  const defaultContent = config.schema ? extractDefaultContent(config.schema) : {};
 
   return {
     packageType,

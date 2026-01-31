@@ -7,6 +7,8 @@ export interface FieldTypeDefinition {
   type: string;
   label: string;
   description: string;
+  /** TypeScript type for the field value (e.g., "string", "number", "boolean") */
+  valueType: string;
   allowsDefaultValue: boolean;
   supportsValidation: boolean;
 }
@@ -20,6 +22,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "singleLine",
     label: "Single Line Text",
     description: "Short text input",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -27,6 +30,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "multiLine",
     label: "Multi-line Text",
     description: "Text area",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -34,6 +38,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "richText",
     label: "Rich Text",
     description: "WYSIWYG editor",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -41,6 +46,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "numeric",
     label: "Numeric",
     description: "Numeric input",
+    valueType: "number",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -48,6 +54,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "boolean",
     label: "Boolean",
     description: "True/false boolean",
+    valueType: "boolean",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -55,6 +62,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "date",
     label: "Date",
     description: "Date picker",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -62,13 +70,15 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "media",
     label: "Media",
     description: "Image/video upload",
-    allowsDefaultValue: false,
-    supportsValidation: true,
+    valueType: "string",
+    allowsDefaultValue: true,
+    supportsValidation: false,
   },
   {
     type: "link",
     label: "Link",
     description: "URL input",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -76,6 +86,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "select",
     label: "Select",
     description: "Dropdown selection",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -83,6 +94,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "multiselect",
     label: "Multi-select",
     description: "Multiple selection",
+    valueType: "string[]",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -90,6 +102,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "color",
     label: "Color",
     description: "Color picker",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -97,6 +110,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "slider",
     label: "Slider",
     description: "Range slider",
+    valueType: "number",
     allowsDefaultValue: true,
     supportsValidation: true,
   },
@@ -104,13 +118,15 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "repeater",
     label: "Repeater",
     description: "Repeatable nested fields",
-    allowsDefaultValue: false,
-    supportsValidation: true,
+    valueType: "Record<string, unknown>[]",
+    allowsDefaultValue: true,
+    supportsValidation: false,
   },
   {
     type: "form",
     label: "Form",
     description: "Form picker",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -118,6 +134,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "emailTemplate",
     label: "Email Template",
     description: "Email template picker",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -125,6 +142,7 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     type: "emailConfiguration",
     label: "Email Configuration",
     description: "Email configuration picker",
+    valueType: "string",
     allowsDefaultValue: true,
     supportsValidation: false,
   },
@@ -151,6 +169,7 @@ export async function getFieldTypes(): Promise<FieldTypeDefinition[]> {
             type
             label
             description
+            valueType
             allowsDefaultValue
             supportsValidation
           }

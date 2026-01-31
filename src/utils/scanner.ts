@@ -17,6 +17,8 @@ export interface ScanOptions {
   requirePackageJson?: boolean;
   /** Custom working directory (default: process.cwd()) */
   cwd?: string;
+  /** Only scan specific blocks/templates by name (case-insensitive) */
+  names?: string[];
 }
 
 export interface ScannedResource {
@@ -34,9 +36,9 @@ export interface ScannedResource {
 /**
  * Scan blocks and templates directories with configurable options.
  * Supports 3 modes:
- * - Strict mode (build): throwuje błędy, wymaga block.config.ts + walidacja
- * - Lenient mode (dev): warny, ładuje preview.json, metadata
- * - Minimal mode (package): tylko package.json, bez walidacji
+ * - Strict mode (build): throws errors, requires block.config.ts + validation
+ * - Lenient mode (dev): warns, loads preview.json, metadata
+ * - Minimal mode (package): only package.json, no validation
  */
 export async function scanResources(
   options: ScanOptions = {}
@@ -48,6 +50,7 @@ export async function scanResources(
     loadPreview = false,
     requirePackageJson = true,
     cwd = process.cwd(),
+    names,
   } = options;
 
   const resources: ScannedResource[] = [];
@@ -62,6 +65,7 @@ export async function scanResources(
     shouldValidate,
     loadPreview,
     requirePackageJson,
+    names,
   });
 
   // Scan templates
@@ -74,6 +78,7 @@ export async function scanResources(
     shouldValidate,
     loadPreview,
     requirePackageJson,
+    names,
   });
 
   return resources;
@@ -88,19 +93,26 @@ interface ScanDirectoryOptions {
   shouldValidate: boolean;
   loadPreview: boolean;
   requirePackageJson: boolean;
+  names?: string[];
 }
 
 async function scanDirectory(opts: ScanDirectoryOptions) {
-  const { type, dir, resources, strict, loadConfig, shouldValidate, loadPreview, requirePackageJson } = opts;
+  const { type, dir, resources, strict, loadConfig, shouldValidate, loadPreview, requirePackageJson, names } = opts;
 
   if (!fs.existsSync(dir)) {
     return;
   }
 
-  const itemDirs = fs
+  let itemDirs = fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name);
+
+  // Filter by names if provided (case-insensitive)
+  if (names && names.length > 0) {
+    const lowerNames = names.map((n) => n.toLowerCase());
+    itemDirs = itemDirs.filter((name) => lowerNames.includes(name.toLowerCase()));
+  }
 
   for (const itemName of itemDirs) {
     const itemPath = path.join(dir, itemName);
@@ -133,12 +145,13 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
               `Warning: Skipping ${itemName} - no block.config.ts found`
             )
           );
+          continue;
         }
-        continue;
+        // In non-strict mode, continue without config
       }
 
-      // Validate schema if requested
-      if (shouldValidate) {
+      // Validate schema if requested and config exists and has schema
+      if (shouldValidate && blockConfig && blockConfig.schema) {
         const validation = await validateSchema(blockConfig.schema, itemPath);
         if (!validation.valid) {
           const errorMessage = `\nValidation ${strict ? "errors" : "warnings"} in ${itemName}:`;
@@ -154,23 +167,21 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
             validation.errors.forEach((err) =>
               console.warn(chalk.yellow(`  - ${err}`))
             );
-            continue;
+            // Don't skip in non-strict - just warn
           }
         }
       }
     }
 
-    // Load package.json
+    // Load package.json (optional in non-strict mode)
     const pkg = getPackageJson(itemPath);
     if (requirePackageJson && (!pkg || !pkg.name || !pkg.version)) {
       const message = `${type === "block" ? "Block" : "Template"} "${itemName}" must have package.json with name and version`;
 
       if (strict) {
         throw new Error(message);
-      } else {
-        console.warn(chalk.yellow(`Warning: ${message}`));
-        continue;
       }
+      // In non-strict mode, continue without valid package.json
     }
 
     // Load preview.json if requested
@@ -188,12 +199,14 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
       name: itemName,
       path: itemPath,
       packageJson: pkg,
+      // Default displayName from directory name (PascalCase)
+      displayName: itemName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(''),
     };
 
     // Add optional fields if block.config.ts was loaded
     if (blockConfig) {
       resource.blockConfig = blockConfig;
-      resource.displayName = blockConfig.name || itemName;
+      resource.displayName = blockConfig.name || resource.displayName;
       resource.description = blockConfig.description || pkg?.description;
       resource.category = blockConfig.category;
     }

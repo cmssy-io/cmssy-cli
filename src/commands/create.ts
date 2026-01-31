@@ -4,7 +4,9 @@ import inquirer from "inquirer";
 import ora from "ora";
 import path from "path";
 import { loadConfig } from "../utils/cmssy-config.js";
+import { getFieldTypes } from "../utils/field-schema.js";
 import { generateTypes } from "../utils/type-generator.js";
+import { updateBlockInCache } from "../utils/blocks-meta-cache.js";
 
 /**
  * Convert kebab-case or snake_case to PascalCase.
@@ -259,7 +261,22 @@ export default defineBlock({
       },
     };
 
-    await generateTypes(blockPath, initialSchema);
+    const fieldTypes = await getFieldTypes();
+    await generateTypes({ blockPath, schema: initialSchema, fieldTypes });
+
+    // Add to metadata cache for instant filters
+    updateBlockInCache(
+      name,
+      "block",
+      {
+        name: answers.displayName,
+        description: answers.description,
+        category: answers.category,
+        tags: answers.tags,
+        schema: initialSchema,
+      },
+      "1.0.0"
+    );
 
     spinner.succeed(`Block "${name}" created successfully`);
     console.log(chalk.cyan("\nNext steps:\n"));
@@ -487,7 +504,22 @@ export default defineTemplate({
       },
     };
 
-    await generateTypes(pagePath, initialSchema);
+    const fieldTypesTemplate = await getFieldTypes();
+    await generateTypes({ blockPath: pagePath, schema: initialSchema, fieldTypes: fieldTypesTemplate });
+
+    // Add to metadata cache for instant filters
+    updateBlockInCache(
+      name,
+      "template",
+      {
+        name: answers.displayName,
+        description: answers.description,
+        category: "pages",
+        tags: [],
+        schema: initialSchema,
+      },
+      "1.0.0"
+    );
 
     spinner.succeed(`Page template "${name}" created successfully`);
     console.log(chalk.cyan("\nNext steps:\n"));

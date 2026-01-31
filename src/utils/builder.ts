@@ -3,7 +3,7 @@ import { build as esbuild } from "esbuild";
 import { execSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
-import { generatePackageJsonMetadata } from "./block-config.js";
+import { FieldTypeDefinition } from "./field-schema.js";
 import { generateTypes } from "./type-generator.js";
 
 export interface BuildOptions {
@@ -21,6 +21,8 @@ export interface BuildOptions {
   generateTypes?: boolean;
   /** Throw errors or warn (default: true for build, false for dev) */
   strict?: boolean;
+  /** Field type definitions from backend (for type generation) */
+  fieldTypes?: FieldTypeDefinition[];
 }
 
 export interface BuildableResource {
@@ -50,6 +52,7 @@ export async function buildResource(
     generatePackageJson = true,
     generateTypes: shouldGenerateTypes = true,
     strict = true,
+    fieldTypes,
   } = options;
 
   const srcPath = path.join(resource.path, "src");
@@ -133,16 +136,14 @@ export async function buildResource(
     await processCSS(cssPath, outCssFile, minify, resource.name, strict);
   }
 
-  // Generate package.json with cmssy metadata (production mode)
-  if (generatePackageJson && outputMode === "versioned" && resource.blockConfig) {
-    const cmssyMetadata = generatePackageJsonMetadata(
-      resource.blockConfig,
-      resource.type
-    );
-
+  // Generate minimal package.json (production mode)
+  if (generatePackageJson && outputMode === "versioned") {
+    // Only include essential fields - metadata is sent during publish, not stored in build
     const outputPackageJson = {
-      ...resource.packageJson,
-      cmssy: cmssyMetadata,
+      name: resource.packageJson?.name || "",
+      version: resource.packageJson?.version || "1.0.0",
+      description: resource.packageJson?.description || "",
+      author: resource.packageJson?.author || { name: "", email: "" },
     };
 
     fs.writeFileSync(
@@ -151,9 +152,13 @@ export async function buildResource(
     );
   }
 
-  // Generate TypeScript types
-  if (shouldGenerateTypes && resource.blockConfig) {
-    await generateTypes(resource.path, resource.blockConfig.schema);
+  // Generate TypeScript types (only for blocks with schema, not templates with pages)
+  if (shouldGenerateTypes && resource.blockConfig?.schema) {
+    await generateTypes({
+      blockPath: resource.path,
+      schema: resource.blockConfig.schema,
+      fieldTypes,
+    });
   }
 }
 
@@ -180,10 +185,9 @@ async function processCSS(
     } catch (error: any) {
       const message = `PostCSS processing failed for ${resourceName}: ${error.message}`;
       if (strict) {
-        console.warn(chalk.yellow(`Warning: ${message}`));
-      } else {
-        console.warn(chalk.yellow(`Warning: ${message}`));
+        throw new Error(message);
       }
+      console.warn(chalk.yellow(`Warning: ${message}`));
       console.log(chalk.gray("Copying CSS as-is..."));
       fs.copyFileSync(cssPath, outCssFile);
     }

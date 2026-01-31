@@ -133,10 +133,25 @@ export interface RepeaterFieldConfig extends BaseFieldConfig {
   schema: Record<string, FieldConfig>;
 }
 
+/**
+ * Media field configuration.
+ * Media field values are plain string URLs (matching backend convention).
+ */
+export interface MediaFieldConfig extends Omit<BaseFieldConfig, "defaultValue"> {
+  type: "media";
+  /** URL string */
+  defaultValue?: string;
+  /** Accepted file types (e.g., "image/*,video/*") */
+  accept?: string;
+  /** Maximum file size in bytes */
+  maxSize?: number;
+}
+
 export type FieldConfig =
   | BaseFieldConfig
   | SelectFieldConfig
-  | RepeaterFieldConfig;
+  | RepeaterFieldConfig
+  | MediaFieldConfig;
 
 // =============================================================================
 // BLOCK REQUIREMENTS
@@ -272,8 +287,109 @@ export interface BlockConfig {
   };
 }
 
-export interface TemplateConfig extends Omit<BlockConfig, "category"> {
+// =============================================================================
+// TEMPLATE CONFIG (Page Templates with multiple pages and blocks)
+// =============================================================================
+
+/**
+ * A block instance within a template page.
+ */
+export interface TemplateBlockInstance {
+  /** Block type reference (e.g., "hero", "pricing-cards", "@vendor/blocks.hero") */
+  type: string;
+  /** Block content/props */
+  content?: Record<string, unknown>;
+  /** Block settings */
+  settings?: Record<string, unknown>;
+}
+
+/**
+ * A page blueprint within a template.
+ */
+export interface TemplatePageBlueprint {
+  /** Page display name */
+  name: string;
+  /** URL-friendly slug */
+  slug: string;
+  /** Page type (optional, e.g., "home", "about", "contact") */
+  pageType?: string;
+  /** Blocks on this page */
+  blocks: TemplateBlockInstance[];
+  /** Page metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Layout slot for site-wide elements (header/footer).
+ */
+export interface TemplateLayoutSlot {
+  /** Slot type */
+  slot: "header" | "footer";
+  /** Block type to use */
+  type: string;
+  /** Block content/props */
+  content?: Record<string, unknown>;
+}
+
+/**
+ * Theme configuration for template.
+ */
+export interface TemplateTheme {
+  colors?: Record<string, string>;
+  fonts?: Record<string, string>;
+  spacing?: Record<string, string>;
+  borderRadius?: Record<string, string>;
+}
+
+/**
+ * Template configuration - defines a complete website structure.
+ */
+export interface TemplateConfig {
+  /** Template display name */
+  name: string;
+  /** Template description */
+  description?: string;
+  /** Long description for marketplace */
+  longDescription?: string;
+  /** Category (e.g., "business", "portfolio", "ecommerce") */
   category?: string;
+  /** Tags for search */
+  tags?: string[];
+
+  /**
+   * Pages in this template.
+   * Each page defines its structure and blocks.
+   */
+  pages: TemplatePageBlueprint[];
+
+  /**
+   * Layout slots (header/footer) shared across all pages.
+   */
+  layoutSlots?: TemplateLayoutSlot[];
+
+  /**
+   * Theme configuration.
+   */
+  theme?: TemplateTheme;
+
+  /**
+   * Optional schema for template-level settings.
+   * These are settings that apply to the whole template (e.g., brand colors).
+   */
+  schema?: Record<string, FieldConfig>;
+
+  /** Pricing configuration */
+  pricing?: {
+    licenseType: "free" | "paid";
+    priceCents?: number;
+  };
 }
 
 export type ResourceConfig = BlockConfig | TemplateConfig;
+
+/**
+ * Type guard to check if config is a TemplateConfig
+ */
+export function isTemplateConfig(config: ResourceConfig): config is TemplateConfig {
+  return 'pages' in config && Array.isArray((config as TemplateConfig).pages);
+}

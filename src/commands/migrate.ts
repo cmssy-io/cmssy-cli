@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import ora from "ora";
 import path from "path";
 import { getPackageJson } from "../utils/cmssy-config.js";
+import { getFieldTypes } from "../utils/field-schema.js";
 import { generateTypes } from "../utils/type-generator.js";
 import { FieldConfig } from "../types/block-config.js";
 
@@ -150,7 +151,8 @@ async function migrateBlock(blockPath: string, pkg: any): Promise<void> {
   );
 
   // Generate types
-  await generateTypes(blockPath, schema);
+  const fieldTypes = await getFieldTypes();
+  await generateTypes({ blockPath, schema, fieldTypes });
 }
 
 function convertLegacySchemaToNew(

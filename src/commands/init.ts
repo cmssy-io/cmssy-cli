@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import inquirer from "inquirer";
 import ora from "ora";
 import path from "path";
+import { getFieldTypes } from "../utils/field-schema.js";
 import { generateTypes } from "../utils/type-generator.js";
 
 interface InitAnswers {
@@ -388,7 +389,8 @@ export default defineBlock({
       ctaText: { type: "singleLine" as const, label: "CTA Text", defaultValue: "Get Started" },
       ctaUrl: { type: "link" as const, label: "CTA URL", defaultValue: "#" },
     };
-    await generateTypes(heroBlockPath, heroSchema);
+    const fieldTypes = await getFieldTypes();
+    await generateTypes({ blockPath: heroBlockPath, schema: heroSchema, fieldTypes });
 
     spinner.succeed("Example hero block created");
 
