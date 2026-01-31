@@ -822,6 +822,30 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
   return result.css;
 }
 
+/**
+ * Convert full block type name to simple type.
+ * "@cmssy-marketing/blocks.hero" -> "hero"
+ * "@vendor/blocks.pricing-table" -> "pricing-table"
+ * "hero" -> "hero" (already simple)
+ */
+function convertBlockTypeToSimple(blockType: string): string {
+  let simple = blockType;
+
+  // Remove @scope/ prefix
+  if (simple.includes("/")) {
+    simple = simple.split("/").pop()!;
+  }
+
+  // Remove blocks. or templates. prefix
+  if (simple.startsWith("blocks.")) {
+    simple = simple.substring(7);
+  } else if (simple.startsWith("templates.")) {
+    simple = simple.substring(10);
+  }
+
+  return simple;
+}
+
 async function publishToMarketplace(
   pkg: PackageInfo,
   apiToken: string,
@@ -1024,22 +1048,25 @@ async function publishToWorkspace(
     const pagesData = fs.readJsonSync(pagesJsonPath);
 
     // Convert pages.json format to mutation input format
+    // IMPORTANT: Convert full block names to simple types
+    // "@cmssy-marketing/blocks.hero" -> "hero"
     const pages = (pagesData.pages || []).map((page: any) => ({
       name: page.name,
       slug: page.slug,
       blocks: (page.blocks || []).map((block: any) => ({
-        type: block.type,
+        type: convertBlockTypeToSimple(block.type),
         content: block.content || {},
       })),
     }));
 
     // Convert layoutSlots to array format
+    // IMPORTANT: Convert full block names to simple types
     const layoutSlots: any[] = [];
     if (pagesData.layoutSlots) {
       for (const [slot, data] of Object.entries(pagesData.layoutSlots as Record<string, any>)) {
         layoutSlots.push({
           slot,
-          type: data.type,
+          type: convertBlockTypeToSimple(data.type),
           content: data.content || {},
         });
       }
@@ -1049,9 +1076,12 @@ async function publishToWorkspace(
     input.pages = pages;
     input.layoutSlots = layoutSlots;
 
-    // Remove packageType - ImportTemplateInput doesn't have this field
-    // (backend sets package_type="template" automatically for templates)
+    // Remove fields not supported by ImportTemplateInput
+    // (these are only for blocks, not templates)
     delete input.packageType;
+    delete input.rawSourceCode;
+    delete input.rawSourceCss;
+    delete input.dependencies;
 
     const requestPromise = client.request(IMPORT_TEMPLATE_MUTATION, { input });
 
