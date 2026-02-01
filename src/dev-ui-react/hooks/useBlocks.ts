@@ -33,7 +33,7 @@ export function useBlockConfig(blockName: string | null, _blockType: string | nu
     schema?: Record<string, unknown>;
     previewData?: Record<string, unknown>;
     pages?: Array<{ name: string; slug: string; blocksCount: number }>;
-    layoutSlots?: Array<{ slot: string; type: string }>;
+    layoutPositions?: Array<{ position: string; type: string }>;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function useBlockConfig(blockName: string | null, _blockType: string | nu
       setError(null);
 
       try {
-        // Load block config (includes pages/layoutSlots for templates)
+        // Load block config (includes pages/layoutPositions for templates)
         const configResponse = await fetch(`/api/blocks/${blockName}/config`);
         if (!configResponse.ok) throw new Error('Failed to load config');
         const configData = await configResponse.json();
@@ -64,7 +64,7 @@ export function useBlockConfig(blockName: string | null, _blockType: string | nu
           schema: configData.schema,
           previewData: configData.previewData,
           pages: configData.pages,
-          layoutSlots: configData.layoutSlots,
+          layoutPositions: configData.layoutPositions,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');

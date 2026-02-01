@@ -22,7 +22,7 @@ export type {
   TemplateConfig,
   TemplatePageBlueprint,
   TemplateBlockInstance,
-  TemplateLayoutSlot,
+  TemplateLayoutPosition,
   TemplateTheme,
   ResourceConfig,
 } from "@cmssy/types";

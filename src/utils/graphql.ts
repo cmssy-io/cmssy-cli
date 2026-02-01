@@ -39,7 +39,7 @@ export const IMPORT_BLOCK_MUTATION = `
       description
       icon
       category
-      layoutSlot
+      layoutPosition
       schemaFields {
         key
         type
@@ -95,8 +95,8 @@ export const IMPORT_TEMPLATE_MUTATION = `
       }
       pagesCreated
       pagesUpdated
-      layoutSlotsCreated
-      layoutSlotsUpdated
+      layoutPositionsCreated
+      layoutPositionsUpdated
       message
     }
   }

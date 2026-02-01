@@ -449,10 +449,10 @@ describe("parsePagesJson", () => {
     });
   });
 
-  it("should parse layoutSlots object to array", () => {
+  it("should parse layoutPositions object to array", () => {
     const pagesData = {
       pages: [],
-      layoutSlots: {
+      layoutPositions: {
         header: {
           type: "@cmssy/blocks.navigation",
           content: { logo: "Logo", links: [] },
@@ -466,14 +466,14 @@ describe("parsePagesJson", () => {
 
     const result = parsePagesJson(pagesData);
 
-    expect(result.layoutSlots).toHaveLength(2);
-    expect(result.layoutSlots).toContainEqual({
-      slot: "header",
+    expect(result.layoutPositions).toHaveLength(2);
+    expect(result.layoutPositions).toContainEqual({
+      position: "header",
       type: "@cmssy/blocks.navigation",
       content: { logo: "Logo", links: [] },
     });
-    expect(result.layoutSlots).toContainEqual({
-      slot: "footer",
+    expect(result.layoutPositions).toContainEqual({
+      position: "footer",
       type: "blocks.footer",
       content: { copyright: "2024" },
     });
@@ -483,7 +483,7 @@ describe("parsePagesJson", () => {
     const result = parsePagesJson({});
 
     expect(result.pages).toEqual([]);
-    expect(result.layoutSlots).toEqual([]);
+    expect(result.layoutPositions).toEqual([]);
   });
 
   it("should handle blocks without content", () => {
@@ -535,7 +535,7 @@ describe("parsePagesJson", () => {
           ],
         },
       ],
-      layoutSlots: {
+      layoutPositions: {
         header: {
           type: "@marketing/blocks.nav",
           content: { logo: "Acme Inc" },
@@ -550,14 +550,14 @@ describe("parsePagesJson", () => {
     const result = parsePagesJson(pagesData);
 
     expect(result.pages).toHaveLength(2);
-    expect(result.layoutSlots).toHaveLength(2);
+    expect(result.layoutPositions).toHaveLength(2);
 
     // Verify structure
     expect(result.pages[0].name).toBe("Homepage");
     expect(result.pages[0].slug).toBe("/");
     expect(result.pages[1].slug).toBe("/pricing");
 
-    expect(result.layoutSlots.find((s) => s.slot === "header")).toBeDefined();
-    expect(result.layoutSlots.find((s) => s.slot === "footer")).toBeDefined();
+    expect(result.layoutPositions.find((p) => p.position === "header")).toBeDefined();
+    expect(result.layoutPositions.find((p) => p.position === "footer")).toBeDefined();
   });
 });

@@ -48,7 +48,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cmssy/types": "^0.1.1",
+    "@cmssy/types": "^0.2.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@vitejs/plugin-react": "^5.1.2",
     "archiver": "^7.0.1",

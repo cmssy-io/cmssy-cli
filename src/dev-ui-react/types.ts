@@ -9,7 +9,7 @@ export interface Block {
   hasConfig?: boolean;
   schema?: Record<string, FieldConfig>;
   pages?: TemplatePage[];
-  layoutSlots?: LayoutSlot[];
+  layoutPositions?: LayoutPosition[];
 }
 
 export interface FieldConfig {
@@ -31,8 +31,8 @@ export interface TemplatePage {
   blocksCount: number;
 }
 
-export interface LayoutSlot {
-  slot: 'header' | 'footer';
+export interface LayoutPosition {
+  position: 'header' | 'footer' | 'sidebar_left' | 'sidebar_right' | 'before_content' | 'after_content';
   type: string;
   content?: Record<string, unknown>;
 }

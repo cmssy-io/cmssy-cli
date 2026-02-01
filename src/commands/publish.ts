@@ -398,8 +398,8 @@ function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
     }
   }
 
-  // Extract from layoutSlots
-  for (const [_slot, data] of Object.entries(pagesData.layoutSlots || {}) as [string, any][]) {
+  // Extract from layoutPositions
+  for (const [_position, data] of Object.entries(pagesData.layoutPositions || {}) as [string, any][]) {
     if (data.type) {
       let blockType = data.type;
       if (blockType.includes("/")) {
@@ -1060,22 +1060,22 @@ async function publishToWorkspace(
       })),
     }));
 
-    // Convert layoutSlots to array format
+    // Convert layoutPositions to array format
     // IMPORTANT: Convert full block names to simple types
-    const layoutSlots: any[] = [];
-    if (pagesData.layoutSlots) {
-      for (const [slot, data] of Object.entries(pagesData.layoutSlots as Record<string, any>)) {
-        layoutSlots.push({
-          slot,
+    const layoutPositions: any[] = [];
+    if (pagesData.layoutPositions) {
+      for (const [position, data] of Object.entries(pagesData.layoutPositions as Record<string, any>)) {
+        layoutPositions.push({
+          position,
           type: convertBlockTypeToSimple(data.type),
           content: data.content || {},
         });
       }
     }
 
-    // Add pages and layout slots to input
+    // Add pages and layout positions to input
     input.pages = pages;
-    input.layoutSlots = layoutSlots;
+    input.layoutPositions = layoutPositions;
 
     // Remove fields not supported by ImportTemplateInput
     // (these are only for blocks, not templates)
@@ -1095,10 +1095,10 @@ async function publishToWorkspace(
       }
 
       // Log template import summary
-      const { pagesCreated, pagesUpdated, layoutSlotsCreated, layoutSlotsUpdated } = result.importTemplate;
+      const { pagesCreated, pagesUpdated, layoutPositionsCreated, layoutPositionsUpdated } = result.importTemplate;
       console.log(chalk.gray(
         `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated | ` +
-        `${layoutSlotsCreated} layout slots created, ${layoutSlotsUpdated} updated`
+        `${layoutPositionsCreated} layout positions created, ${layoutPositionsUpdated} updated`
       ));
     } catch (error) {
       clearTimeout(timeoutId!);

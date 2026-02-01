@@ -149,7 +149,7 @@ export function isTemplate(packageType: "block" | "template"): boolean {
  */
 export function parsePagesJson(pagesData: any): {
   pages: any[];
-  layoutSlots: any[];
+  layoutPositions: any[];
 } {
   // Convert pages
   const pages = (pagesData.pages || []).map((page: any) => ({
@@ -161,19 +161,19 @@ export function parsePagesJson(pagesData: any): {
     })),
   }));
 
-  // Convert layoutSlots to array format
-  const layoutSlots: any[] = [];
-  if (pagesData.layoutSlots) {
-    for (const [slot, data] of Object.entries(
-      pagesData.layoutSlots as Record<string, any>
+  // Convert layoutPositions to array format
+  const layoutPositions: any[] = [];
+  if (pagesData.layoutPositions) {
+    for (const [position, data] of Object.entries(
+      pagesData.layoutPositions as Record<string, any>
     )) {
-      layoutSlots.push({
-        slot,
+      layoutPositions.push({
+        position,
         type: data.type,
         content: data.content || {},
       });
     }
   }
 
-  return { pages, layoutSlots };
+  return { pages, layoutPositions };
 }

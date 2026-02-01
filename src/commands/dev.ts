@@ -301,7 +301,7 @@ export async function devCommand(options: DevOptions) {
       // Add template-specific fields
       if (cfg && isTemplateConfig(cfg)) {
         response.pages = cfg.pages;
-        response.layoutSlots = cfg.layoutSlots || [];
+        response.layoutPositions = cfg.layoutPositions || [];
       }
 
       res.json(response);
@@ -561,13 +561,13 @@ export async function devCommand(options: DevOptions) {
           slug: p.slug,
           blocksCount: p.blocks.length,
         })),
-        layoutSlots: config.layoutSlots || [],
+        layoutPositions: config.layoutPositions || [],
       });
     });
 
     // Template page preview - renders full page with all blocks
     app.get("/preview/template/:name/:pageSlug?", async (req, res) => {
-      const { name, pageSlug } = req.params;
+      const { name, pageSlug } = req.params as { name: string; pageSlug?: string };
       const resource = resources.find((r) => r.name === name && r.type === "template");
 
       if (!resource) {
@@ -931,9 +931,9 @@ function generateTemplatePreviewHTML(
   });
 
   // Generate layout slot imports/mounts
-  const layoutSlots = templateConfig.layoutSlots || [];
-  const headerSlot = layoutSlots.find((s) => s.slot === "header");
-  const footerSlot = layoutSlots.find((s) => s.slot === "footer");
+  const layoutPositions = templateConfig.layoutPositions || [];
+  const headerSlot = layoutPositions.find((s) => s.position === "header");
+  const footerSlot = layoutPositions.find((s) => s.position === "footer");
 
   if (headerSlot) {
     const blockName = headerSlot.type.includes('.')

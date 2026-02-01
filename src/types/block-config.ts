@@ -36,7 +36,7 @@ export {
   type TemplateConfig,
   type TemplateBlockInstance,
   type TemplatePageBlueprint,
-  type TemplateLayoutSlot,
+  type TemplateLayoutPosition,
   type TemplateTheme,
   type ResourceConfig,
   isTemplateConfig,

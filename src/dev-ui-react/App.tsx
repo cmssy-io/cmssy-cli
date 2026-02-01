@@ -27,7 +27,7 @@ export function App() {
         ...selectedBlock,
         schema: config.schema as Block['schema'],
         pages: config.pages,
-        layoutSlots: config.layoutSlots,
+        layoutPositions: config.layoutPositions,
       };
       setSelectedBlock(updatedBlock);
 

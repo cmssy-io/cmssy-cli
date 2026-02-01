@@ -76,7 +76,7 @@ function TemplateEditor({
   onNavigateToPage?: (pageSlug: string) => void;
 }) {
   const pages = block.pages || [];
-  const layoutSlots = block.layoutSlots || [];
+  const layoutPositions = block.layoutPositions || [];
 
   return (
     <div className="template-editor">
@@ -108,13 +108,13 @@ function TemplateEditor({
         </div>
       </div>
 
-      {layoutSlots.length > 0 && (
+      {layoutPositions.length > 0 && (
         <div className="template-section">
-          <h4 className="template-section-title">Layout Slots</h4>
-          {layoutSlots.map((slot) => (
-            <div key={slot.slot} className="template-layout-slot">
-              <span className="slot-type">{slot.slot}</span>
-              <span className="slot-block">{slot.type}</span>
+          <h4 className="template-section-title">Layout Positions</h4>
+          {layoutPositions.map((pos) => (
+            <div key={pos.position} className="template-layout-position">
+              <span className="position-type">{pos.position}</span>
+              <span className="position-block">{pos.type}</span>
             </div>
           ))}
         </div>
