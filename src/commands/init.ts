@@ -14,39 +14,57 @@ interface InitAnswers {
   initGit: boolean;
 }
 
-export async function initCommand(name?: string) {
+interface InitOptions {
+  yes?: boolean;
+  framework?: string;
+}
+
+export async function initCommand(name?: string, options: InitOptions = {}) {
   console.log(chalk.blue.bold("\n🔨 Cmssy - Initialize Project\n"));
 
-  const answers = await inquirer.prompt<InitAnswers>([
-    {
-      type: "input",
-      name: "projectName",
-      message: "Project name:",
-      default: name || "my-blocks",
-      validate: (input) => {
-        if (/^[a-z0-9-_]+$/.test(input)) return true;
-        return "Project name must contain only lowercase letters, numbers, hyphens, and underscores";
+  let answers: InitAnswers;
+
+  if (options.yes) {
+    // Skip prompts, use defaults
+    answers = {
+      projectName: name || "my-blocks",
+      authorName: "",
+      authorEmail: "",
+      initGit: true,
+    };
+    console.log(chalk.gray(`Using defaults: ${answers.projectName}\n`));
+  } else {
+    answers = await inquirer.prompt<InitAnswers>([
+      {
+        type: "input",
+        name: "projectName",
+        message: "Project name:",
+        default: name || "my-blocks",
+        validate: (input) => {
+          if (/^[a-z0-9-_]+$/.test(input)) return true;
+          return "Project name must contain only lowercase letters, numbers, hyphens, and underscores";
+        },
       },
-    },
-    {
-      type: "input",
-      name: "authorName",
-      message: "Author name:",
-      default: "",
-    },
-    {
-      type: "input",
-      name: "authorEmail",
-      message: "Author email:",
-      default: "",
-    },
-    {
-      type: "confirm",
-      name: "initGit",
-      message: "Initialize git repository?",
-      default: true,
-    },
-  ]);
+      {
+        type: "input",
+        name: "authorName",
+        message: "Author name:",
+        default: "",
+      },
+      {
+        type: "input",
+        name: "authorEmail",
+        message: "Author email:",
+        default: "",
+      },
+      {
+        type: "confirm",
+        name: "initGit",
+        message: "Initialize git repository?",
+        default: true,
+      },
+    ]);
+  }
 
   const projectPath = path.join(process.cwd(), answers.projectName);
 
