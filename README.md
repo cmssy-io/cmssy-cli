@@ -1,6 +1,6 @@
 # cmssy-cli
 
-Unified CLI for building reusable UI blocks and publishing them to Cmssy Marketplace.
+Unified CLI for building reusable UI blocks and publishing them to Cmssy workspaces.
 
 ## Installation
 
@@ -32,8 +32,8 @@ cmssy build
 # 7. Configure Cmssy API (for publishing)
 cmssy configure
 
-# 8. Publish to marketplace or workspace
-cmssy publish --all --marketplace
+# 8. Publish to workspace
+cmssy publish --all --workspace
 ```
 
 ## Environment Configuration
@@ -52,7 +52,7 @@ CMSSY_WORKSPACE_ID=507f1f77bcf86cd799439011
 **How to get API Token:**
 1. Go to your Cmssy workspace settings
 2. Navigate to "API Tokens"
-3. Create a new token with `marketplace:publish` or `workspace:write` scope
+3. Create a new token with `blocks:write` scope
 4. Copy the token to your `.env` file
 
 **How to get Workspace ID:**
@@ -188,17 +188,16 @@ Creates/updates `.env` file with your credentials.
 
 ---
 
-### Publish to Marketplace or Workspace
+### Publish to Workspace
 
 ```bash
 cmssy publish [packages...] [options]
 ```
 
-Publish blocks/templates to public marketplace (with review) or private workspace (instant).
+Publish blocks/templates to your workspace.
 
 **Options:**
-- `-m, --marketplace` - Publish to public marketplace (requires review)
-- `-w, --workspace [id]` - Publish to workspace (private, no review)
+- `-w, --workspace [id]` - Publish to workspace
 - `--all` - Publish all blocks and templates
 - `--patch` - Bump patch version (1.0.0 → 1.0.1)
 - `--minor` - Bump minor version (1.0.0 → 1.1.0)
@@ -207,27 +206,23 @@ Publish blocks/templates to public marketplace (with review) or private workspac
 
 **Example:**
 ```bash
-# Publish to marketplace (public, requires review)
-cmssy publish hero --marketplace
-cmssy publish --all --marketplace --patch
-
-# Publish to workspace (private, instant)
+# Publish to workspace
 cmssy publish hero --workspace 507f1f77bcf86cd799439011
 cmssy publish --all --workspace
 cmssy publish pricing --workspace --minor
 
 # Specific packages
-cmssy publish hero pricing --marketplace
+cmssy publish hero pricing --workspace abc123
 
 # Dry run
-cmssy publish --all --marketplace --dry-run
+cmssy publish --all --workspace --dry-run
 ```
 
 **Notes:**
-- Must specify either `--marketplace` OR `--workspace` (not both)
+- Must specify `--workspace` flag
 - Workspace ID can be provided via flag or `CMSSY_WORKSPACE_ID` in `.env`
 - Version bumping updates `package.json` before publishing
-- Marketplace publish requires review, workspace publish is instant
+- Published instantly (no review required)
 
 ---
 
@@ -309,21 +304,21 @@ cmssy upload --all
 
 ---
 
-### Sync from Marketplace
+### Sync from Design Library
 
 ```bash
 cmssy sync [package] [options]
 ```
 
-Pull blocks from Cmssy marketplace to local project.
+Pull blocks from Cmssy design library to local project.
 
 **Options:**
 - `--workspace <id>` - Workspace ID to sync from
 
 **Example:**
 ```bash
-cmssy sync @vendor/blocks.hero
-cmssy sync @vendor/blocks.hero --workspace 507f1f77bcf86cd799439011
+cmssy sync @cmssy/blocks.hero
+cmssy sync @cmssy/blocks.hero --workspace 507f1f77bcf86cd799439011
 ```
 
 ---
@@ -425,7 +420,7 @@ Each block requires a `cmssy` section in its `package.json`:
 
 ```json
 {
-  "name": "@vendor/blocks.hero",
+  "name": "@myorg/blocks.hero",
   "version": "1.0.0",
   "description": "Hero section block",
   "cmssy": {
@@ -433,9 +428,6 @@ Each block requires a `cmssy` section in its `package.json`:
     "displayName": "Hero Section",
     "category": "marketing",
     "tags": ["hero", "landing", "cta"],
-    "pricing": {
-      "licenseType": "free"
-    },
     "schemaFields": [
       {
         "name": "title",
@@ -453,36 +445,9 @@ Each block requires a `cmssy` section in its `package.json`:
 
 ## Publishing Workflows
 
-### Marketplace Publishing (Public, Requires Review)
+### Workspace Publishing
 
-For vendors who want to share blocks publicly:
-
-```bash
-# 1. Build your blocks
-cmssy build
-
-# 2. Publish to marketplace
-cmssy publish --all --marketplace --patch
-
-# 3. Wait for Cmssy team review
-# 4. Once approved, blocks appear in public marketplace
-```
-
-**Use cases:**
-- Public blocks for all Cmssy users
-- Commercial blocks/templates
-- Open-source contributions
-
-**Requirements:**
-- API token with `marketplace:publish` scope
-- Blocks undergo review process
-- Must meet marketplace quality standards
-
----
-
-### Workspace Publishing (Private, Instant)
-
-For teams with private block libraries:
+For teams with their own block libraries:
 
 ```bash
 # 1. Build your blocks
@@ -500,9 +465,9 @@ cmssy publish --all --workspace 507f1f77bcf86cd799439011 --patch
 - Client-specific components
 
 **Requirements:**
-- API token with `workspace:write` scope
+- API token with `blocks:write` scope
 - Workspace ID
-- No review required, instant publish
+- Published instantly
 
 ---
 
@@ -544,32 +509,7 @@ cmssy upload --all --workspace 507f1f77bcf86cd799439011
 
 ## Complete Workflow Examples
 
-### Example 1: New Public Block
-
-```bash
-# Initialize project
-cmssy init my-blocks
-cd my-blocks
-
-# Create block
-cmssy create block pricing-table
-
-# Develop with hot reload
-cmssy dev
-
-# Build
-cmssy build
-
-# Configure API (one-time)
-cmssy configure
-
-# Publish to marketplace
-cmssy publish pricing-table --marketplace --minor
-```
-
----
-
-### Example 2: Private Workspace Library
+### Example 1: Workspace Block Library
 
 ```bash
 # Initialize project
@@ -598,7 +538,7 @@ cmssy publish --all --workspace
 
 ---
 
-### Example 3: ZIP Distribution
+### Example 2: ZIP Distribution
 
 ```bash
 # Package blocks
@@ -634,7 +574,7 @@ Run `cmssy configure` or manually add `CMSSY_API_TOKEN` to `.env`
 - Use `--workspace 507f1f77bcf86cd799439011` flag in commands
 
 ### "Specify publish target"
-Must use either `--marketplace` OR `--workspace` when publishing
+Must use `--workspace` flag when publishing
 
 ### "Not a Cmssy project"
 Make sure you're in a directory with `cmssy.config.js` file

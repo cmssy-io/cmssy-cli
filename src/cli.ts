@@ -26,7 +26,7 @@ const program = new Command();
 program
   .name("cmssy")
   .description(
-    "Unified CLI for building and publishing blocks to Cmssy marketplace"
+    "Unified CLI for building and publishing blocks to Cmssy design library"
   )
   .version(packageJson.version)
   .addHelpText("after", `
@@ -42,7 +42,7 @@ Workflow:
   2. create   → Add more blocks/templates
   3. dev      → Develop with live preview
   4. build    → Bundle for production
-  5. publish  → Deploy to marketplace or workspace
+  5. publish  → Deploy to workspace
 
 Documentation: https://cmssy.io/docs/cli
 `);
@@ -57,13 +57,15 @@ program
     "Framework (react, vue, angular, vanilla)",
     "react"
   )
+  .option("-y, --yes", "Skip prompts and use defaults")
   .addHelpText("after", `
 Examples:
   $ cmssy init                    Create project in current directory
   $ cmssy init my-blocks          Create project in ./my-blocks
   $ cmssy init -f vue my-blocks   Create Vue project
+  $ cmssy init -y my-blocks       Create with defaults (no prompts)
 `)
-  .action(initCommand);
+  .action((name, options) => initCommand(name, options));
 
 // cmssy create
 const create = program
@@ -121,7 +123,7 @@ Output:
   public/@vendor/blocks.<name>/<version>/
   ├── index.js      Bundled JavaScript
   ├── index.css     Styles
-  └── package.json  Metadata for marketplace
+  └── package.json  Metadata for design library
 `)
   .action(buildCommand);
 
@@ -160,14 +162,13 @@ Get your API token at: https://cmssy.io/settings/tokens
 program
   .command("publish [packages...]")
   .description(
-    "Publish blocks/templates to marketplace or workspace\n\n" +
+    "Publish blocks/templates to workspace\n\n" +
     "  Packages are directory names from blocks/ or templates/ folders.\n" +
     "  Examples:\n" +
-    "    cmssy publish hero faq --marketplace --patch\n" +
+    "    cmssy publish hero faq --workspace abc123 --patch\n" +
     "    cmssy publish --all --workspace abc123"
   )
-  .option("-m, --marketplace", "Publish to public marketplace (requires review)")
-  .option("-w, --workspace [id]", "Publish to workspace (private, no review)")
+  .option("-w, --workspace [id]", "Publish to workspace")
   .option("--all", "Publish all blocks and templates")
   .option("--patch", "Bump patch version (1.0.0 -> 1.0.1)")
   .option("--minor", "Bump minor version (1.0.0 -> 1.1.0)")
@@ -179,12 +180,12 @@ program
 // cmssy sync
 program
   .command("sync")
-  .description("Pull blocks from marketplace to local project")
-  .argument("[package]", "Package slug (e.g., @vendor/blocks.hero)")
+  .description("Pull blocks from design library to local project")
+  .argument("[package]", "Package slug (e.g., @cmssy/blocks.hero)")
   .option("--workspace <id>", "Sync from specific workspace")
   .addHelpText("after", `
 Examples:
-  $ cmssy sync @acme/blocks.hero           Sync from marketplace
+  $ cmssy sync @cmssy/blocks.hero          Sync from design library
   $ cmssy sync --workspace abc123          Sync all from workspace
 `)
   .action(syncCommand);

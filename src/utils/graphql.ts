@@ -19,17 +19,6 @@ export function createClient(): GraphQLClient {
 }
 
 // GraphQL Mutations
-export const PUBLISH_PACKAGE_MUTATION = `
-  mutation PublishPackage($token: String!, $input: PublishPackageInput!) {
-    publishPackage(token: $token, input: $input) {
-      success
-      message
-      packageId
-      status
-    }
-  }
-`;
-
 export const IMPORT_BLOCK_MUTATION = `
   mutation ImportBlock($input: ImportBlockInput!) {
     importBlock(input: $input) {

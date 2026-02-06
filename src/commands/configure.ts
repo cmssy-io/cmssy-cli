@@ -47,7 +47,7 @@ export async function configureCommand(options: ConfigureOptions) {
   console.log(chalk.green("\n✓ Configuration saved to .env\n"));
   console.log(chalk.cyan("Next steps:\n"));
   console.log(
-    chalk.white("  cmssy publish --all --marketplace   # Publish to marketplace")
+    chalk.white("  cmssy publish --all --workspace      # Publish to workspace")
   );
   console.log(
     chalk.white("  cmssy sync                          # Pull blocks from Cmssy\n")

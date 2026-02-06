@@ -232,7 +232,7 @@ async function syncPackage(pkg: any): Promise<void> {
   // Create README.md
   const readme = `# ${displayName}
 
-Synced from Cmssy marketplace.
+Synced from Cmssy design library.
 
 Package: \`${slug}\`
 Version: \`${currentVersion.version}\`

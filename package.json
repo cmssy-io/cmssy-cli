@@ -1,7 +1,7 @@
 {
   "name": "@cmssy/cli",
-  "version": "0.2.0",
-  "description": "Unified CLI for building and publishing blocks to Cmssy marketplace",
+  "version": "0.3.0",
+  "description": "Unified CLI for building and publishing blocks to Cmssy design library",
   "type": "module",
   "bin": {
     "cmssy": "./dist/cli.js"
@@ -20,7 +20,7 @@
   },
   "keywords": [
     "cmssy",
-    "marketplace",
+    "design-library",
     "cli",
     "cms"
   ],
@@ -48,7 +48,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cmssy/types": "^0.2.0",
+    "@cmssy/types": "^0.3.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@vitejs/plugin-react": "^5.1.2",
     "archiver": "^7.0.1",

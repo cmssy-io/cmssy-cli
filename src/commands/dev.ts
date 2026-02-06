@@ -465,18 +465,17 @@ export async function devCommand(options: DevOptions) {
         return;
       }
 
-      if (!target || (target !== "marketplace" && target !== "workspace")) {
-        res.status(400).json({ error: "Invalid target" });
+      if (!target || target !== "workspace") {
+        res.status(400).json({ error: "Invalid target. Only 'workspace' is supported." });
         return;
       }
 
-      if (target === "workspace" && !workspaceId) {
+      if (!workspaceId) {
         res.status(400).json({ error: "Workspace ID required" });
         return;
       }
 
-      const args = ["publish", resource.name, `--${target}`];
-      if (target === "workspace" && workspaceId) args.push(workspaceId);
+      const args = ["publish", resource.name, "--workspace", workspaceId];
       if (versionBump && versionBump !== "none") {
         args.push(`--${versionBump}`);
       } else {
@@ -494,8 +493,7 @@ export async function devCommand(options: DevOptions) {
       }, (error, stdout, stderr) => {
         const output = `${stdout}\n${stderr}`;
         const success = output.includes("published successfully") ||
-          output.includes("published to workspace") ||
-          output.includes("submitted for review");
+          output.includes("published to workspace");
 
         if (success) {
           const pkgPath = path.join(resource.path, "package.json");
@@ -504,7 +502,7 @@ export async function devCommand(options: DevOptions) {
           }
           res.json({
             success: true,
-            message: target === "marketplace" ? "Submitted for review" : "Published to workspace",
+            message: "Published to workspace",
             version: resource.packageJson?.version,
           });
         } else {

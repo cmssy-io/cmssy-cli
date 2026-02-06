@@ -7,7 +7,6 @@ import path from "path";
 import semver from "semver";
 import { hasConfig, loadConfig } from "../utils/config.js";
 import {
-  PUBLISH_PACKAGE_MUTATION,
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
@@ -17,7 +16,6 @@ import {
 } from "../utils/block-config.js";
 
 interface PublishOptions {
-  marketplace?: boolean;
   workspace?: string;
   patch?: boolean;
   minor?: boolean;
@@ -41,19 +39,12 @@ export async function publishCommand(
 ) {
   console.log(chalk.blue.bold("\n📦 Cmssy - Publish\n"));
 
-  // Validate flags: must have either --marketplace or --workspace
-  if (!options.marketplace && !options.workspace) {
+  // Validate flags: must have --workspace
+  if (!options.workspace) {
     console.error(
       chalk.red("✖ Specify publish target:\n") +
-        chalk.white("  --marketplace          Publish to public marketplace (requires review)\n") +
-        chalk.white("  --workspace <id>       Publish to private workspace (no review)\n")
-    );
-    process.exit(1);
-  }
-
-  if (options.marketplace && options.workspace) {
-    console.error(
-      chalk.red("✖ Cannot specify both --marketplace and --workspace\n")
+        chalk.white("  --workspace <id>       Publish to workspace\n") +
+        chalk.white("\nExample: cmssy publish --all --workspace abc123\n")
     );
     process.exit(1);
   }
@@ -106,7 +97,7 @@ export async function publishCommand(
   let packages = await scanPackages(packageNames, options);
 
   // Auto-detect and add template dependencies (blocks used in pages.json)
-  // Only for workspace publish, not marketplace
+  // Only for workspace publish, not library
   if (options.workspace) {
     const templatesToProcess = packages.filter((p) => p.type === "template");
 
@@ -261,50 +252,30 @@ export async function publishCommand(
   }
 
   // Show target info
-  if (options.marketplace) {
-    console.log(
-      chalk.yellow(
-        "📋 Target: Marketplace (public)\n" +
-          "   Status: Pending review\n" +
-          "   You'll be notified when approved.\n"
-      )
-    );
-  } else {
-    console.log(
-      chalk.cyan(
-        `🏢 Target: Workspace (${workspaceId})\n` +
-          "   Status: Published immediately (no review)\n"
-      )
-    );
-  }
+  console.log(
+    chalk.cyan(
+      `🏢 Target: Workspace (${workspaceId})\n` +
+        "   Status: Published directly\n"
+    )
+  );
 
   // Publish each package
   let successCount = 0;
   let errorCount = 0;
 
   for (const pkg of packages) {
-    const target = options.marketplace ? "marketplace" : "workspace";
-    const spinner = ora(`Publishing ${pkg.packageJson.name} to ${target}...`).start();
+    const spinner = ora(`Publishing ${pkg.packageJson.name} to workspace...`).start();
 
     try {
-      if (options.marketplace) {
-        await publishToMarketplace(pkg, config.apiToken!, config.apiUrl);
-        spinner.succeed(
-          chalk.green(
-            `${pkg.packageJson.name} submitted for review (pending)`
-          )
-        );
-      } else {
-        await publishToWorkspace(
-          pkg,
-          workspaceId as string,
-          config.apiToken!,
-          config.apiUrl
-        );
-        spinner.succeed(
-          chalk.green(`${pkg.packageJson.name} published to workspace`)
-        );
-      }
+      await publishToWorkspace(
+        pkg,
+        workspaceId as string,
+        config.apiToken!,
+        config.apiUrl
+      );
+      spinner.succeed(
+        chalk.green(`${pkg.packageJson.name} published to workspace`)
+      );
       successCount++;
     } catch (error: any) {
       spinner.fail(chalk.red(`✖ ${pkg.packageJson.name} failed`));
@@ -845,101 +816,6 @@ function convertBlockTypeToSimple(blockType: string): string {
   }
 
   return simple;
-}
-
-async function publishToMarketplace(
-  pkg: PackageInfo,
-  apiToken: string,
-  apiUrl: string
-): Promise<void> {
-  const { packageJson, path: packagePath, blockConfig } = pkg;
-
-  // Use blockConfig if available, fallback to package.json cmssy
-  const metadata = blockConfig || packageJson.cmssy || {};
-
-  // Validate vendor info
-  if (!metadata.vendorName && !packageJson.author) {
-    throw new Error(
-      "Vendor name required. Add 'vendorName' to block.config.ts or 'author' to package.json"
-    );
-  }
-
-  const vendorName =
-    metadata.vendorName ||
-    (typeof packageJson.author === "string"
-      ? packageJson.author
-      : packageJson.author?.name);
-
-  // Read source code from src/index.tsx or src/index.ts
-  const srcDir = path.join(packagePath, "src");
-  let sourceCode: string | undefined;
-
-  const tsxPath = path.join(srcDir, "index.tsx");
-  const tsPath = path.join(srcDir, "index.ts");
-
-  if (fs.existsSync(tsxPath)) {
-    sourceCode = fs.readFileSync(tsxPath, "utf-8");
-  } else if (fs.existsSync(tsPath)) {
-    sourceCode = fs.readFileSync(tsPath, "utf-8");
-  } else {
-    throw new Error(
-      `Source code not found. Expected ${tsxPath} or ${tsPath}`
-    );
-  }
-
-  // Read CSS if exists
-  const cssPath = path.join(srcDir, "index.css");
-  let cssCode: string | undefined;
-  if (fs.existsSync(cssPath)) {
-    cssCode = fs.readFileSync(cssPath, "utf-8");
-  }
-
-  // Convert block.config.ts schema to schemaFields if using blockConfig
-  let schemaFields = metadata.schemaFields || [];
-  if (blockConfig && blockConfig.schema) {
-    schemaFields = convertSchemaToFields(blockConfig.schema);
-  }
-
-  // Build input
-  const input = {
-    name: packageJson.name,
-    version: packageJson.version,
-    displayName: metadata.displayName || metadata.name || packageJson.name,
-    description: packageJson.description || metadata.description || "",
-    longDescription: metadata.longDescription || null,
-    packageType: pkg.type,
-    category: metadata.category || "other",
-    tags: metadata.tags || [],
-    sourceCode,
-    cssUrl: null,
-    packageJsonUrl: "",
-    schemaFields,
-    defaultContent: extractDefaultContent(blockConfig?.schema || {}),
-    vendorName,
-    vendorEmail: packageJson.author?.email || null,
-    vendorUrl: packageJson.homepage || packageJson.repository?.url || null,
-    licenseType: metadata.pricing?.licenseType || metadata.licenseType || "free",
-    priceCents: metadata.pricing?.priceCents || metadata.priceCents || 0,
-  };
-
-  // Create client
-  const client = new GraphQLClient(apiUrl, {
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  // Send mutation
-  const result = await client.request(PUBLISH_PACKAGE_MUTATION, {
-    token: apiToken,
-    input,
-  });
-
-  if (!result.publishPackage?.success) {
-    throw new Error(
-      result.publishPackage?.message || "Failed to publish package"
-    );
-  }
 }
 
 async function publishToWorkspace(
