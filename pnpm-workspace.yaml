@@ -1,0 +1,2 @@
+overrides:
+  '@cmssy/types': link:../cmssy-types
