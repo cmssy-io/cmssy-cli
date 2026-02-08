@@ -369,7 +369,7 @@ function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
     }
   }
 
-  // Extract from layoutPositions
+  // Extract from global layoutPositions
   for (const [_position, data] of Object.entries(pagesData.layoutPositions || {}) as [string, any][]) {
     if (data.type) {
       let blockType = data.type;
@@ -380,6 +380,22 @@ function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
         blockType = blockType.substring(7);
       }
       blockTypes.add(blockType);
+    }
+  }
+
+  // Extract from per-page layoutPositions
+  for (const page of pagesData.pages || []) {
+    for (const [_position, data] of Object.entries(page.layoutPositions || {}) as [string, any][]) {
+      if (data.type) {
+        let blockType = data.type;
+        if (blockType.includes("/")) {
+          blockType = blockType.split("/").pop()!;
+        }
+        if (blockType.startsWith("blocks.")) {
+          blockType = blockType.substring(7);
+        }
+        blockTypes.add(blockType);
+      }
     }
   }
 
@@ -625,7 +641,10 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
     platform: "browser", // Browser platform to avoid Node.js globals like 'process'
     jsx: "transform", // Transform JSX to React.createElement
     loader: { ".tsx": "tsx", ".ts": "ts", ".css": "empty" },
-    external: ["react", "react-dom", "react/jsx-runtime"], // React provided by SSR sandbox / BlockRenderer scope
+    external: [
+      "react", "react-dom", "react/jsx-runtime",
+      "next/image", "next/link", "next/font", "next/script",
+    ],
     minify: true, // Minify for smaller bundle size
     define: {
       // Replace process.env references with static values
@@ -635,85 +654,7 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
 
   let bundledCode = result.outputFiles[0].text;
 
-  // Post-process: Add __component for SSR if code has mount/update pattern
-  // This makes blocks work in both dev environment (mount/update) and SSR (__component)
-  bundledCode = addComponentForSSR(bundledCode);
-
   return bundledCode;
-}
-
-// Add __component to mount/update pattern for SSR compatibility
-function addComponentForSSR(code: string): string {
-  // Check if code exports mount/update pattern
-  const hasPattern = /exports\.default\s*=\s*\{[^}]*mount\s*\([^)]*\)/s.test(code) ||
-                     /module\.exports\s*=\s*\{[^}]*mount\s*\([^)]*\)/s.test(code);
-
-  if (!hasPattern) {
-    // No mount/update pattern - return as-is
-    return code;
-  }
-
-  // Find the component that's being used in mount()
-  // Pattern: export default { mount() { ... render(<Component ... /> or createElement(Component ...) } }
-  const componentMatch = code.match(/(?:render|createElement)\s*\(\s*(?:<\s*)?(\w+)/);
-  const componentName = componentMatch?.[1];
-
-  if (!componentName) {
-    console.warn('[CLI] Warning: Found mount/update pattern but could not extract component name for __component');
-    return code;
-  }
-
-  // Add __component to the exports object
-  // Replace: module.exports = { mount, update, unmount };
-  // With:    module.exports = { mount, update, unmount, __component: ComponentName };
-  const updatedCode = code.replace(
-    /((?:exports\.default|module\.exports)\s*=\s*\{[^}]*)(}\s*;)/s,
-    `$1,\n  // Auto-added by CLI for SSR compatibility\n  __component: ${componentName}\n$2`
-  );
-
-  if (updatedCode === code) {
-    console.warn('[CLI] Warning: Could not add __component to exports');
-  }
-
-  return updatedCode;
-}
-
-// Wrap bundled code with mount/update pattern for interactive blocks
-function wrapWithInteractivePattern(bundledCode: string): string {
-  return `
-// Original component code
-${bundledCode}
-
-// Auto-generated interactive wrapper by CLI
-import { createRoot } from 'react-dom/client';
-
-const OriginalComponent = exports.default || module.exports.default;
-
-if (!OriginalComponent) {
-  throw new Error('Block must export a default component');
-}
-
-// Export both mount/update pattern AND original component for SSR
-module.exports = {
-  // Mount/update pattern for browser
-  mount(element, props) {
-    const root = createRoot(element);
-    root.render(React.createElement(OriginalComponent, { content: props }));
-    return { root };
-  },
-
-  update(_element, props, ctx) {
-    ctx.root.render(React.createElement(OriginalComponent, { content: props }));
-  },
-
-  unmount(_element, ctx) {
-    ctx.root.unmount();
-  },
-
-  // Original component for SSR (server-side rendering)
-  __component: OriginalComponent
-};
-`.trim();
 }
 
 // Compile CSS with optional Tailwind support
@@ -738,24 +679,14 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
   // Check for Tailwind v4 vs v3
   const projectRoot = process.cwd();
 
-  // Load postcss-import from project's node_modules (ESM requires full path to index.js)
-  const postcssImportPath = path.join(projectRoot, "node_modules", "postcss-import", "index.js");
-  const { default: postcssImport } = await import(postcssImportPath);
   const projectPackageJson = fs.readJsonSync(path.join(projectRoot, "package.json"));
   const hasTailwindV4 = !!(
     projectPackageJson.devDependencies?.["@tailwindcss/postcss"] ||
     projectPackageJson.dependencies?.["@tailwindcss/postcss"]
   );
 
-  // Configure postcss-import to resolve from project's styles/ folder
-  const importPlugin = postcssImport({
-    path: [path.join(projectRoot, "styles")],
-  });
-
-  let tailwindPlugin: any;
-
   if (hasTailwindV4) {
-    // Tailwind v4 with @tailwindcss/postcss
+    // Tailwind v4: @tailwindcss/postcss handles @import itself, no postcss-import needed
     const tailwindV4Path = path.join(
       projectRoot,
       "node_modules",
@@ -764,9 +695,22 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
       "index.mjs"
     );
     const tailwindV4Module = await import(tailwindV4Path);
-    tailwindPlugin = tailwindV4Module.default || tailwindV4Module;
+    const tailwindPlugin = tailwindV4Module.default || tailwindV4Module;
+
+    const result = await postcss([tailwindPlugin]).process(cssContent, {
+      from: cssPath,
+    });
+
+    return result.css;
   } else {
-    // Tailwind v3 - convert @import to @tailwind directives
+    // Tailwind v3: needs postcss-import + tailwindcss
+    const postcssImportPath = path.join(projectRoot, "node_modules", "postcss-import", "index.js");
+    const { default: postcssImport } = await import(postcssImportPath);
+
+    const importPlugin = postcssImport({
+      path: [path.join(projectRoot, "styles")],
+    });
+
     cssContent = cssContent.replace(
       /@import\s+["']tailwindcss["'];?/g,
       "@tailwind base;\n@tailwind components;\n@tailwind utilities;"
@@ -781,17 +725,16 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
     );
     const tailwindcssModule = await import(tailwindcssPath);
     const tailwindcss = tailwindcssModule.default || tailwindcssModule;
-    tailwindPlugin = tailwindcss({
+    const tailwindPlugin = tailwindcss({
       content: [{ raw: bundledSourceCode, extension: "tsx" }],
     });
+
+    const result = await postcss([importPlugin, tailwindPlugin]).process(cssContent, {
+      from: cssPath,
+    });
+
+    return result.css;
   }
-
-  // Process CSS with postcss-import FIRST, then Tailwind
-  const result = await postcss([importPlugin, tailwindPlugin]).process(cssContent, {
-    from: cssPath,
-  });
-
-  return result.css;
 }
 
 /**
@@ -836,19 +779,28 @@ async function publishToWorkspace(
     .replace(/^blocks\./, "")
     .replace(/^templates\./, "");
 
-  // Bundle source code (combines all local imports)
-  // Post-processing automatically adds __component for SSR if mount/update pattern detected
-  const bundledSourceCode = await bundleSourceCode(packagePath);
+  // Templates have no source code — skip compilation
+  let bundledSourceCode: string | undefined;
+  let compiledCss: string | undefined;
+  let rawSourceCode: string | undefined;
+  let rawSourceCss: string | undefined;
+  let dependencies: Record<string, string> = {};
 
-  // Compile CSS (with Tailwind if needed)
-  const compiledCss = await compileCss(packagePath, bundledSourceCode);
+  if (packageType !== "template") {
+    // Bundle source code (combines all local imports into single CJS file)
+    bundledSourceCode = await bundleSourceCode(packagePath);
 
-  // Read original source code for AI Block Builder editing
-  const { sourceCode: rawSourceCode, sourceCss: rawSourceCss } =
-    await readOriginalSourceCode(packagePath);
+    // Compile CSS (with Tailwind if needed)
+    compiledCss = await compileCss(packagePath, bundledSourceCode);
 
-  // Read dependencies from package.json for AI Block Builder
-  const dependencies = packageJson.dependencies || {};
+    // Read original source code for AI Block Builder editing
+    const originalSource = await readOriginalSourceCode(packagePath);
+    rawSourceCode = originalSource.sourceCode;
+    rawSourceCss = originalSource.sourceCss;
+
+    // Read dependencies from package.json for AI Block Builder
+    dependencies = packageJson.dependencies || {};
+  }
 
   // Convert block.config.ts schema to schemaFields if using blockConfig
   let schemaFields = metadata.schemaFields || [];
@@ -866,7 +818,6 @@ async function publishToWorkspace(
     category: metadata.category || "Custom",
     sourceCode: bundledSourceCode,
     cssCode: compiledCss,
-    interactive: metadata.interactive || false,
     schemaFields,
     defaultContent: extractDefaultContent(blockConfig?.schema || {}),
     sourceRegistry: "local",
@@ -927,35 +878,64 @@ async function publishToWorkspace(
     // Convert pages.json format to mutation input format
     // IMPORTANT: Convert full block names to simple types
     // "@cmssy-marketing/blocks.hero" -> "hero"
-    const pages = (pagesData.pages || []).map((page: any) => ({
-      name: page.name,
-      slug: page.slug,
-      blocks: (page.blocks || []).map((block: any) => ({
-        type: convertBlockTypeToSimple(block.type),
-        content: block.content || {},
-      })),
-    }));
+    const pages = (pagesData.pages || []).map((page: any) => {
+      const result: any = {
+        name: page.name,
+        slug: page.slug,
+        blocks: (page.blocks || []).map((block: any) => ({
+          type: convertBlockTypeToSimple(block.type),
+          content: block.content || {},
+        })),
+      };
+      // Per-page layout positions (e.g. sidebar_left only on /docs)
+      if (page.layoutPositions) {
+        result.layoutPositions = Object.entries(page.layoutPositions).map(
+          ([position, data]: [string, any]) => ({
+            position,
+            type: convertBlockTypeToSimple(data.type),
+            content: data.content || {},
+          })
+        );
+      }
+      return result;
+    });
 
-    // Convert layoutPositions to array format
-    // IMPORTANT: Convert full block names to simple types
-    const layoutPositions: any[] = [];
-    if (pagesData.layoutPositions) {
-      for (const [position, data] of Object.entries(pagesData.layoutPositions as Record<string, any>)) {
-        layoutPositions.push({
-          position,
-          type: convertBlockTypeToSimple(data.type),
-          content: data.content || {},
-        });
+    // Convert layoutPositions from pages.json
+    const layoutPositions = Object.entries(pagesData.layoutPositions || {}).map(
+      ([position, data]: [string, any]) => ({
+        position,
+        type: convertBlockTypeToSimple(data.type),
+        content: data.content || {},
+      })
+    );
+
+    // Extract unique block types required by this template
+    const requiredBlockTypes = new Set<string>();
+    for (const page of pages) {
+      for (const block of page.blocks) {
+        requiredBlockTypes.add(block.type);
+      }
+      // Include per-page layout position block types
+      if (page.layoutPositions) {
+        for (const lp of page.layoutPositions) {
+          requiredBlockTypes.add(lp.type);
+        }
       }
     }
+    for (const lp of layoutPositions) {
+      requiredBlockTypes.add(lp.type);
+    }
 
-    // Add pages and layout positions to input
+    // Add pages, layoutPositions, and requiredBlocks to input
     input.pages = pages;
     input.layoutPositions = layoutPositions;
+    input.requiredBlocks = Array.from(requiredBlockTypes);
 
     // Remove fields not supported by ImportTemplateInput
     // (these are only for blocks, not templates)
     delete input.packageType;
+    delete input.sourceCode;
+    delete input.cssCode;
     delete input.rawSourceCode;
     delete input.rawSourceCss;
     delete input.dependencies;
@@ -971,10 +951,9 @@ async function publishToWorkspace(
       }
 
       // Log template import summary
-      const { pagesCreated, pagesUpdated, layoutPositionsCreated, layoutPositionsUpdated } = result.importTemplate;
+      const { pagesCreated, pagesUpdated } = result.importTemplate;
       console.log(chalk.gray(
-        `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated | ` +
-        `${layoutPositionsCreated} layout positions created, ${layoutPositionsUpdated} updated`
+        `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated`
       ));
     } catch (error) {
       clearTimeout(timeoutId!);

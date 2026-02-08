@@ -94,50 +94,6 @@ export function extractBlockType(packageName: string): string {
 }
 
 /**
- * Add __component to mount/update pattern for SSR compatibility.
- * This makes blocks work in both dev environment (mount/update) and SSR (__component).
- */
-export function addComponentForSSR(code: string): string {
-  // Check if code exports mount/update pattern
-  const hasPattern =
-    /exports\.default\s*=\s*\{[^}]*mount\s*\([^)]*\)/s.test(code) ||
-    /module\.exports\s*=\s*\{[^}]*mount\s*\([^)]*\)/s.test(code);
-
-  if (!hasPattern) {
-    // No mount/update pattern - return as-is
-    return code;
-  }
-
-  // Find the component that's being used in mount()
-  // Pattern: export default { mount() { ... render(<Component ... /> or createElement(Component ...) } }
-  const componentMatch = code.match(
-    /(?:render|createElement)\s*\(\s*(?:<\s*)?(\w+)/
-  );
-  const componentName = componentMatch?.[1];
-
-  if (!componentName) {
-    console.warn(
-      "[CLI] Warning: Found mount/update pattern but could not extract component name for __component"
-    );
-    return code;
-  }
-
-  // Add __component to the exports object
-  // Replace: module.exports = { mount, update, unmount };
-  // With:    module.exports = { mount, update, unmount, __component: ComponentName };
-  const updatedCode = code.replace(
-    /((?:exports\.default|module\.exports)\s*=\s*\{[^}]*)(}\s*;)/s,
-    `$1,\n  // Auto-added by CLI for SSR compatibility\n  __component: ${componentName}\n$2`
-  );
-
-  if (updatedCode === code) {
-    console.warn("[CLI] Warning: Could not add __component to exports");
-  }
-
-  return updatedCode;
-}
-
-/**
  * Detect if a package is a template based on type.
  */
 export function isTemplate(packageType: "block" | "template"): boolean {

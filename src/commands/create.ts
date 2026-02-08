@@ -137,32 +137,9 @@ export default function ${componentName}({ content }: { content: BlockContent })
         componentFile
       );
 
-      // Create index file with __component for SSR + mount/update/unmount for client
-      const indexFile = `import { createRoot, Root } from "react-dom/client";
-import ${componentName} from "./${componentName}";
+      // Create index file - simplified format (standard React export)
+      const indexFile = `export { default } from "./${componentName}";
 import "./index.css";
-
-interface BlockContext {
-  root: Root;
-}
-
-export default {
-  __component: ${componentName},
-
-  mount(element: HTMLElement, props: any): BlockContext {
-    const root = createRoot(element);
-    root.render(<${componentName} content={props} />);
-    return { root };
-  },
-
-  update(_element: HTMLElement, props: any, ctx: BlockContext): void {
-    ctx.root.render(<${componentName} content={props} />);
-  },
-
-  unmount(_element: HTMLElement, ctx: BlockContext): void {
-    ctx.root.unmount();
-  },
-};
 `;
       fs.writeFileSync(path.join(blockPath, "src", "index.tsx"), indexFile);
     }
@@ -170,7 +147,7 @@ export default {
     // Create CSS file (with main.css import if project uses Tailwind)
     const hasTailwind = fs.existsSync(path.join(process.cwd(), "postcss.config.js"));
     const cssFile = hasTailwind
-      ? `@import "main.css";
+      ? `@import "../../../styles/main.css";
 `
       : `.${name} {
   padding: 2rem;
@@ -376,35 +353,8 @@ export default function ${componentName}({ content }: { content: BlockContent })
         componentFile
       );
 
-      const indexFile = `import React from 'react';
-import { createRoot, Root } from 'react-dom/client';
-import ${componentName} from './${componentName}';
+      const indexFile = `export { default } from './${componentName}';
 import './index.css';
-
-interface BlockContext {
-  root: Root;
-}
-
-export default {
-  // React component for SSR (used by renderToString)
-  __component: ${componentName},
-
-  // Client-side lifecycle methods (for interactivity)
-  mount(element: HTMLElement, props: any): BlockContext {
-    const root = createRoot(element);
-    root.render(<${componentName} content={props} />);
-    return { root };
-  },
-
-  update(_element: HTMLElement, props: any, ctx: BlockContext): void {
-    // Re-render with new props (no unmount = no blink!)
-    ctx.root.render(<${componentName} content={props} />);
-  },
-
-  unmount(_element: HTMLElement, ctx: BlockContext): void {
-    ctx.root.unmount();
-  }
-};
 `;
       fs.writeFileSync(path.join(pagePath, "src", "index.tsx"), indexFile);
     }

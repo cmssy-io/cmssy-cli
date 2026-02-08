@@ -220,7 +220,6 @@ export function generatePackageJsonMetadata(
     category:
       config.category || (packageType === "template" ? "pages" : "other"),
     tags: config.tags || [],
-    interactive: (config as BlockConfig).interactive || false,
     schemaFields,
     defaultContent,
   };

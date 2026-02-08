@@ -84,8 +84,6 @@ export const IMPORT_TEMPLATE_MUTATION = `
       }
       pagesCreated
       pagesUpdated
-      layoutPositionsCreated
-      layoutPositionsUpdated
       message
     }
   }

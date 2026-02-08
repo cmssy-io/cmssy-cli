@@ -107,7 +107,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
       `export default ${JSON.stringify(config, null, 2)};\n`
     );
 
-    // Create package.json
+    // Create package.json (versions match cmssy platform)
     const packageJson = {
       name: answers.projectName,
       version: "1.0.0",
@@ -117,18 +117,17 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
         build: "cmssy build",
       },
       dependencies: {
-        react: "^19.0.0",
-        "react-dom": "^19.0.0",
+        react: "^19.2.0",
+        "react-dom": "^19.2.0",
+        next: "^16.0.10",
       },
       devDependencies: {
+        "@types/node": "^22.0.0",
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         typescript: "^5.7.2",
-        tailwindcss: "^4.0.0",
-        "@tailwindcss/postcss": "^4.0.0",
-        postcss: "^8.4.49",
-        "postcss-cli": "^11.0.0",
-        "postcss-import": "^16.1.0",
+        tailwindcss: "^4.1.18",
+        "@tailwindcss/postcss": "^4.1.18",
       },
     };
 
@@ -137,13 +136,13 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
       JSON.stringify(packageJson, null, 2) + "\n"
     );
 
-    // Create tsconfig.json
+    // Create tsconfig.json (jsx: "preserve" for Next.js compatibility)
     const tsConfig = {
       compilerOptions: {
         target: "ES2020",
         module: "ESNext",
         lib: ["ES2020", "DOM", "DOM.Iterable"],
-        jsx: "react-jsx",
+        jsx: "preserve",
         moduleResolution: "bundler",
         allowImportingTsExtensions: true,
         resolveJsonModule: true,
@@ -154,6 +153,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         forceConsistentCasingInFileNames: true,
+        plugins: [{ name: "next" }],
         paths: {
           "cmssy-cli/config": ["./node_modules/cmssy-cli/config"],
         },
@@ -173,16 +173,27 @@ public/
 .env
 .DS_Store
 *.log
-.cmssy
+.cmssy/
+.next/
 `;
     fs.writeFileSync(path.join(projectPath, ".gitignore"), gitignore);
+
+    // Create next.config.mjs (enables Next.js dev mode in cmssy dev)
+    const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Cmssy blocks are built with esbuild on publish, this config is only for dev
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: '**' }],
+  },
+};
+
+export default nextConfig;
+`;
+    fs.writeFileSync(path.join(projectPath, "next.config.mjs"), nextConfig);
 
     // Create postcss.config.js
     const postcssConfig = `export default {
   plugins: {
-    "postcss-import": {
-      path: ["styles"],
-    },
     "@tailwindcss/postcss": {},
   },
 };
@@ -191,6 +202,9 @@ public/
 
     // Create styles/main.css
     const mainCss = `@import "tailwindcss";
+@source "../blocks";
+@source "../templates";
+@source "../components";
 
 /* Set default border color (Tailwind v4 reset uses currentColor) */
 @layer base {
@@ -301,39 +315,16 @@ export default function Hero({ content }: { content: BlockContent }) {
 `;
     fs.writeFileSync(path.join(heroBlockPath, "src", "Hero.tsx"), heroComponent);
 
-    // index.tsx
-    const indexFile = `import { createRoot, Root } from "react-dom/client";
-import Hero from "./Hero";
+    // index.tsx - simplified format (standard React export)
+    const indexFile = `export { default } from "./Hero";
 import "./index.css";
-
-interface BlockContext {
-  root: Root;
-}
-
-export default {
-  __component: Hero,
-
-  mount(element: HTMLElement, props: any): BlockContext {
-    const root = createRoot(element);
-    root.render(<Hero content={props} />);
-    return { root };
-  },
-
-  update(_element: HTMLElement, props: any, ctx: BlockContext): void {
-    ctx.root.render(<Hero content={props} />);
-  },
-
-  unmount(_element: HTMLElement, ctx: BlockContext): void {
-    ctx.root.unmount();
-  },
-};
 `;
     fs.writeFileSync(path.join(heroBlockPath, "src", "index.tsx"), indexFile);
 
     // index.css
     fs.writeFileSync(
       path.join(heroBlockPath, "src", "index.css"),
-      `@import "main.css";\n`
+      `@import "../../../styles/main.css";\n`
     );
 
     // package.json

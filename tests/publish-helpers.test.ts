@@ -3,7 +3,6 @@ import {
   convertSchemaToFields,
   extractDefaultContent,
   extractBlockType,
-  addComponentForSSR,
   isTemplate,
   parsePagesJson,
 } from "../src/utils/publish-helpers.js";
@@ -327,74 +326,6 @@ describe("extractBlockType", () => {
     expect(extractBlockType("@cmssy-marketing/blocks.cta-section")).toBe(
       "cta-section"
     );
-  });
-});
-
-// =============================================================================
-// addComponentForSSR
-// =============================================================================
-
-describe("addComponentForSSR", () => {
-  it("should return code unchanged if no mount/update pattern", () => {
-    const code = `
-      const MyComponent = () => <div>Hello</div>;
-      module.exports = MyComponent;
-    `;
-
-    const result = addComponentForSSR(code);
-
-    expect(result).toBe(code);
-  });
-
-  it("should return code unchanged for complex bundled code", () => {
-    // The function's regex is designed for specific minified patterns
-    // Complex code with nested braces doesn't match the pattern
-    const code = `var HeroBlock=function(){return React.createElement("div",null,"Hero")};module.exports={mount(e,t){render(<HeroBlock content={t}/>,e)},update(e,t){render(<HeroBlock content={t}/>,e)}};`;
-
-    const result = addComponentForSSR(code);
-
-    // Pattern detection doesn't match code with nested braces in mount body
-    // Function returns unchanged - this documents current behavior
-    expect(result).toBe(code);
-  });
-
-  it("should detect pattern in simple export structure", () => {
-    // Pattern only matches if no nested braces before mount()
-    // This is a simplified test case that matches the regex
-    const code = `module.exports={mount(){}};`;
-
-    // Pattern should be detected
-    const hasPattern = /module\.exports\s*=\s*\{[^}]*mount\s*\([^)]*\)/s.test(code);
-    expect(hasPattern).toBe(true);
-  });
-
-  it("should handle code without component match gracefully", () => {
-    // Simple pattern without a component - returns unchanged
-    const code = `module.exports={mount(){}};`;
-
-    const result = addComponentForSSR(code);
-
-    // No render() or createElement() call, so no component extracted
-    // Pattern detected but can't find component name - returns unchanged
-    expect(result).toBe(code);
-  });
-
-  it("should extract component name from render call", () => {
-    // Test component name extraction regex directly
-    const code = `render(<HeroBlock content={t}/>)`;
-    const match = code.match(/(?:render|createElement)\s*\(\s*(?:<\s*)?(\w+)/);
-
-    expect(match).not.toBeNull();
-    expect(match?.[1]).toBe("HeroBlock");
-  });
-
-  it("should extract component name from createElement call", () => {
-    // Test component name extraction regex directly
-    const code = `createElement(FeatureCard, {content: t})`;
-    const match = code.match(/(?:render|createElement)\s*\(\s*(?:<\s*)?(\w+)/);
-
-    expect(match).not.toBeNull();
-    expect(match?.[1]).toBe("FeatureCard");
   });
 });
 
