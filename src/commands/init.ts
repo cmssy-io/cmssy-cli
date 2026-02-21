@@ -70,7 +70,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
 
   if (fs.existsSync(projectPath)) {
     console.error(
-      chalk.red(`\n✖ Directory "${answers.projectName}" already exists\n`)
+      chalk.red(`\n✖ Directory "${answers.projectName}" already exists\n`),
     );
     process.exit(1);
   }
@@ -104,7 +104,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
 
     fs.writeFileSync(
       path.join(projectPath, "cmssy.config.js"),
-      `export default ${JSON.stringify(config, null, 2)};\n`
+      `export default ${JSON.stringify(config, null, 2)};\n`,
     );
 
     // Create package.json (versions match cmssy platform)
@@ -133,7 +133,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
 
     fs.writeFileSync(
       path.join(projectPath, "package.json"),
-      JSON.stringify(packageJson, null, 2) + "\n"
+      JSON.stringify(packageJson, null, 2) + "\n",
     );
 
     // Create tsconfig.json (jsx: "preserve" for Next.js compatibility)
@@ -163,7 +163,7 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
     };
     fs.writeFileSync(
       path.join(projectPath, "tsconfig.json"),
-      JSON.stringify(tsConfig, null, 2) + "\n"
+      JSON.stringify(tsConfig, null, 2) + "\n",
     );
 
     // Create .gitignore
@@ -198,7 +198,10 @@ export default nextConfig;
   },
 };
 `;
-    fs.writeFileSync(path.join(projectPath, "postcss.config.js"), postcssConfig);
+    fs.writeFileSync(
+      path.join(projectPath, "postcss.config.js"),
+      postcssConfig,
+    );
 
     // Create styles/main.css
     const mainCss = `@import "tailwindcss";
@@ -313,7 +316,10 @@ export default function Hero({ content }: { content: BlockContent }) {
   );
 }
 `;
-    fs.writeFileSync(path.join(heroBlockPath, "src", "Hero.tsx"), heroComponent);
+    fs.writeFileSync(
+      path.join(heroBlockPath, "src", "Hero.tsx"),
+      heroComponent,
+    );
 
     // index.tsx - simplified format (standard React export)
     const indexFile = `export { default } from "./Hero";
@@ -324,7 +330,7 @@ import "./index.css";
     // index.css
     fs.writeFileSync(
       path.join(heroBlockPath, "src", "index.css"),
-      `@import "../../../styles/main.css";\n`
+      `@import "../../../styles/main.css";\n`,
     );
 
     // package.json
@@ -339,10 +345,10 @@ import "./index.css";
     };
     fs.writeFileSync(
       path.join(heroBlockPath, "package.json"),
-      JSON.stringify(blockPackageJson, null, 2) + "\n"
+      JSON.stringify(blockPackageJson, null, 2) + "\n",
     );
 
-    // block.config.ts
+    // config.ts
     const blockConfig = `import { defineBlock } from "cmssy-cli/config";
 
 export default defineBlock({
@@ -377,7 +383,7 @@ export default defineBlock({
   pricing: { licenseType: "free" },
 });
 `;
-    fs.writeFileSync(path.join(heroBlockPath, "block.config.ts"), blockConfig);
+    fs.writeFileSync(path.join(heroBlockPath, "config.ts"), blockConfig);
 
     // preview.json
     const previewData = {
@@ -388,18 +394,34 @@ export default defineBlock({
     };
     fs.writeFileSync(
       path.join(heroBlockPath, "preview.json"),
-      JSON.stringify(previewData, null, 2) + "\n"
+      JSON.stringify(previewData, null, 2) + "\n",
     );
 
     // Generate types
     const heroSchema = {
-      heading: { type: "singleLine" as const, label: "Heading", defaultValue: "Welcome to Cmssy" },
-      subheading: { type: "singleLine" as const, label: "Subheading", defaultValue: "Build reusable UI blocks" },
-      ctaText: { type: "singleLine" as const, label: "CTA Text", defaultValue: "Get Started" },
+      heading: {
+        type: "singleLine" as const,
+        label: "Heading",
+        defaultValue: "Welcome to Cmssy",
+      },
+      subheading: {
+        type: "singleLine" as const,
+        label: "Subheading",
+        defaultValue: "Build reusable UI blocks",
+      },
+      ctaText: {
+        type: "singleLine" as const,
+        label: "CTA Text",
+        defaultValue: "Get Started",
+      },
       ctaUrl: { type: "link" as const, label: "CTA URL", defaultValue: "#" },
     };
     const fieldTypes = await getFieldTypes();
-    await generateTypes({ blockPath: heroBlockPath, schema: heroSchema, fieldTypes });
+    await generateTypes({
+      blockPath: heroBlockPath,
+      schema: heroSchema,
+      fieldTypes,
+    });
 
     spinner.succeed("Example hero block created");
 

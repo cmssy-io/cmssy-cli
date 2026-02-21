@@ -55,7 +55,10 @@ async function createBlock(name: string, options: CreateBlockOptions = {}) {
         description: options.description || "",
         category: options.category || "marketing",
         tags: options.tags
-          ? options.tags.split(",").map((t) => t.trim()).filter(Boolean)
+          ? options.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
           : [],
       };
       spinner.text = "Creating block files...";
@@ -134,7 +137,7 @@ export default function ${componentName}({ content }: { content: BlockContent })
 `;
       fs.writeFileSync(
         path.join(blockPath, "src", `${componentName}.tsx`),
-        componentFile
+        componentFile,
       );
 
       // Create index file - simplified format (standard React export)
@@ -145,7 +148,9 @@ import "./index.css";
     }
 
     // Create CSS file (with main.css import if project uses Tailwind)
-    const hasTailwind = fs.existsSync(path.join(process.cwd(), "postcss.config.js"));
+    const hasTailwind = fs.existsSync(
+      path.join(process.cwd(), "postcss.config.js"),
+    );
     const cssFile = hasTailwind
       ? `@import "../../../styles/main.css";
 `
@@ -175,10 +180,10 @@ import "./index.css";
 
     fs.writeFileSync(
       path.join(blockPath, "package.json"),
-      JSON.stringify(packageJson, null, 2) + "\n"
+      JSON.stringify(packageJson, null, 2) + "\n",
     );
 
-    // Create block.config.ts
+    // Create config.ts
     const blockConfigContent = `import { defineBlock } from 'cmssy-cli/config';
 
 export default defineBlock({
@@ -206,10 +211,7 @@ export default defineBlock({
 });
 `;
 
-    fs.writeFileSync(
-      path.join(blockPath, "block.config.ts"),
-      blockConfigContent
-    );
+    fs.writeFileSync(path.join(blockPath, "config.ts"), blockConfigContent);
 
     // Create preview.json
     const previewData = {
@@ -219,7 +221,7 @@ export default defineBlock({
 
     fs.writeFileSync(
       path.join(blockPath, "preview.json"),
-      JSON.stringify(previewData, null, 2) + "\n"
+      JSON.stringify(previewData, null, 2) + "\n",
     );
 
     // Generate initial types
@@ -252,7 +254,7 @@ export default defineBlock({
         tags: answers.tags,
         schema: initialSchema,
       },
-      "1.0.0"
+      "1.0.0",
     );
 
     spinner.succeed(`Block "${name}" created successfully`);
@@ -350,7 +352,7 @@ export default function ${componentName}({ content }: { content: BlockContent })
 `;
       fs.writeFileSync(
         path.join(pagePath, "src", `${componentName}.tsx`),
-        componentFile
+        componentFile,
       );
 
       const indexFile = `export { default } from './${componentName}';
@@ -393,16 +395,24 @@ import './index.css';
 
     fs.writeFileSync(
       path.join(pagePath, "package.json"),
-      JSON.stringify(packageJson, null, 2) + "\n"
+      JSON.stringify(packageJson, null, 2) + "\n",
     );
 
-    // Create block.config.ts (using defineTemplate)
-    const blockConfigContent = `import { defineTemplate } from 'cmssy-cli/config';
+    // Create config.ts
+    const templateConfigContent = `import { defineTemplate } from 'cmssy-cli/config';
 
 export default defineTemplate({
   name: '${answers.displayName}',
   description: '${answers.description}',
   category: 'pages',
+
+  pages: [
+    {
+      name: 'Home',
+      slug: '/',
+      blocks: [],
+    },
+  ],
 
   schema: {
     title: {
@@ -419,15 +429,10 @@ export default defineTemplate({
       },
     },
   },
-
-  pricing: { licenseType: 'free' },
 });
 `;
 
-    fs.writeFileSync(
-      path.join(pagePath, "block.config.ts"),
-      blockConfigContent
-    );
+    fs.writeFileSync(path.join(pagePath, "config.ts"), templateConfigContent);
 
     const previewData = {
       title: "Preview Page",
@@ -436,7 +441,7 @@ export default defineTemplate({
 
     fs.writeFileSync(
       path.join(pagePath, "preview.json"),
-      JSON.stringify(previewData, null, 2) + "\n"
+      JSON.stringify(previewData, null, 2) + "\n",
     );
 
     // Generate initial types
@@ -455,7 +460,11 @@ export default defineTemplate({
     };
 
     const fieldTypesTemplate = await getFieldTypes();
-    await generateTypes({ blockPath: pagePath, schema: initialSchema, fieldTypes: fieldTypesTemplate });
+    await generateTypes({
+      blockPath: pagePath,
+      schema: initialSchema,
+      fieldTypes: fieldTypesTemplate,
+    });
 
     // Add to metadata cache for instant filters
     updateBlockInCache(
@@ -468,7 +477,7 @@ export default defineTemplate({
         tags: [],
         schema: initialSchema,
       },
-      "1.0.0"
+      "1.0.0",
     );
 
     spinner.succeed(`Page template "${name}" created successfully`);

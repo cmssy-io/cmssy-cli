@@ -1,5 +1,5 @@
 /**
- * Type definitions for block.config.ts system.
+ * Type definitions for config.ts system.
  * Re-exports from @cmssy/types - the single source of truth.
  */
 

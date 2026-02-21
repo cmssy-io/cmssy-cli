@@ -21,20 +21,29 @@ export function defineTemplate(config: TemplateConfig): TemplateConfig {
   return config;
 }
 
-// Load block.config.ts dynamically
-export async function loadBlockConfig(
-  blockPath: string
-): Promise<ResourceConfig | null> {
-  const configPath = path.join(blockPath, "block.config.ts");
+/**
+ * Resolve the config file for a block or template.
+ * Both use a unified `config.ts` file.
+ */
+export function resolveConfigPath(resourcePath: string): string | null {
+  const candidate = path.join(resourcePath, "config.ts");
+  return fs.existsSync(candidate) ? candidate : null;
+}
 
-  if (!fs.existsSync(configPath)) {
+// Load config.ts dynamically
+export async function loadBlockConfig(
+  blockPath: string,
+): Promise<ResourceConfig | null> {
+  const configPath = resolveConfigPath(blockPath);
+
+  if (!configPath) {
     return null;
   }
 
   try {
     // Find tsx binary - try multiple locations
     const cliPath = path.dirname(
-      path.dirname(new URL(import.meta.url).pathname)
+      path.dirname(new URL(import.meta.url).pathname),
     );
 
     // Possible locations for tsx binary
@@ -63,20 +72,20 @@ export async function loadBlockConfig(
     const configContent = fs.readFileSync(configPath, "utf-8");
     const modifiedConfig = configContent.replace(
       /from\s+['"](?:@cmssy\/cli\/config|cmssy-cli\/config)['"]/g,
-      `from '${mockConfigPath.replace(/\\/g, "/")}'`
+      `from '${mockConfigPath.replace(/\\/g, "/")}'`,
     );
 
     // Write modified config to temp file
     const tempConfigPath = path.join(
       cacheDir,
-      `temp-${path.basename(configPath)}`
+      `temp-${path.basename(configPath)}`,
     );
     fs.writeFileSync(tempConfigPath, modifiedConfig);
 
     // Execute with tsx - use --eval to import and output
     const evalCode = `import cfg from '${tempConfigPath.replace(
       /\\/g,
-      "/"
+      "/",
     )}'; console.log(JSON.stringify(cfg.default || cfg));`;
 
     // Build command - handle both direct binary path and npx
@@ -104,16 +113,14 @@ export async function loadBlockConfig(
     const config = JSON.parse(jsonLine);
     return config;
   } catch (error: any) {
-    throw new Error(
-      `Failed to load block.config.ts at ${configPath}: ${error.message}`
-    );
+    throw new Error(`Failed to load config at ${configPath}: ${error.message}`);
   }
 }
 
 // Validate schema against backend field types
 export async function validateSchema(
   schema: Record<string, FieldConfig>,
-  blockPath: string
+  blockPath: string,
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
   const fieldTypes = await getFieldTypes();
@@ -121,7 +128,7 @@ export async function validateSchema(
   function validateField(
     key: string,
     field: FieldConfig,
-    parentPath = ""
+    parentPath = "",
   ): void {
     const fullPath = parentPath ? `${parentPath}.${key}` : key;
 
@@ -132,7 +139,7 @@ export async function validateSchema(
           field.type
         }" for field "${fullPath}". Valid types: ${fieldTypes
           .map((ft) => ft.type)
-          .join(", ")}`
+          .join(", ")}`,
       );
     }
 
@@ -141,26 +148,26 @@ export async function validateSchema(
       const repeaterField = field as RepeaterFieldConfig;
       if (!repeaterField.schema || typeof repeaterField.schema !== "object") {
         errors.push(
-          `Repeater field "${fullPath}" must have a "schema" property`
+          `Repeater field "${fullPath}" must have a "schema" property`,
         );
       } else {
         // Recursively validate nested schema
         Object.entries(repeaterField.schema).forEach(
           ([nestedKey, nestedField]) => {
             validateField(nestedKey, nestedField as FieldConfig, fullPath);
-          }
+          },
         );
       }
 
       // Validate minItems/maxItems
       if (repeaterField.minItems !== undefined && repeaterField.minItems < 0) {
         errors.push(
-          `Repeater field "${fullPath}" has invalid minItems (must be >= 0)`
+          `Repeater field "${fullPath}" has invalid minItems (must be >= 0)`,
         );
       }
       if (repeaterField.maxItems !== undefined && repeaterField.maxItems < 1) {
         errors.push(
-          `Repeater field "${fullPath}" has invalid maxItems (must be >= 1)`
+          `Repeater field "${fullPath}" has invalid maxItems (must be >= 1)`,
         );
       }
       if (
@@ -188,8 +195,8 @@ export async function validateSchema(
     if (field.required && field.defaultValue !== undefined) {
       console.warn(
         chalk.yellow(
-          `Warning: Field "${fullPath}" is required but has a defaultValue. The defaultValue will be ignored.`
-        )
+          `Warning: Field "${fullPath}" is required but has a defaultValue. The defaultValue will be ignored.`,
+        ),
       );
     }
   }
@@ -201,16 +208,20 @@ export async function validateSchema(
   return { valid: errors.length === 0, errors };
 }
 
-// Generate package.json cmssy section from block.config.ts
+// Generate package.json cmssy section from config.ts
 export function generatePackageJsonMetadata(
   config: ResourceConfig,
-  packageType: "block" | "template"
+  packageType: "block" | "template",
 ): any {
   // Convert schema to legacy schemaFields format (if schema exists)
-  const schemaFields = config.schema ? convertSchemaToLegacyFormat(config.schema) : [];
+  const schemaFields = config.schema
+    ? convertSchemaToLegacyFormat(config.schema)
+    : [];
 
   // Extract default content from schema
-  const defaultContent = config.schema ? extractDefaultContent(config.schema) : {};
+  const defaultContent = config.schema
+    ? extractDefaultContent(config.schema)
+    : {};
 
   return {
     packageType,
@@ -226,7 +237,7 @@ export function generatePackageJsonMetadata(
 }
 
 function convertSchemaToLegacyFormat(
-  schema: Record<string, FieldConfig>
+  schema: Record<string, FieldConfig>,
 ): any[] {
   const fields: any[] = [];
 

@@ -101,7 +101,10 @@ function generateTsConfig(devRoot: string, projectRoot: string) {
       );
       const rawPaths = projectTsConfig.compilerOptions?.paths || {};
       // Re-map user paths relative to .cmssy/dev/ (project tsconfig uses baseUrl: ".")
-      for (const [alias, targets] of Object.entries(rawPaths) as [string, string[]][]) {
+      for (const [alias, targets] of Object.entries(rawPaths) as [
+        string,
+        string[],
+      ][]) {
         // Skip cmssy-cli/config — we handle it ourselves
         if (alias === "cmssy-cli/config") continue;
         userPaths[alias] = targets.map((t) => `${rel}/${t}`);
@@ -194,7 +197,7 @@ function generateGlobalsCss(devRoot: string, projectRoot: string) {
   // Check for project CSS files that contain Tailwind / theme
   const cssFiles = ["styles/main.css", "styles/globals.css", "app/globals.css"];
   const projectCssFile = cssFiles.find((f) =>
-    fs.existsSync(path.join(projectRoot, f))
+    fs.existsSync(path.join(projectRoot, f)),
   );
 
   // Import the project's main CSS (Tailwind + theme) if it exists
@@ -641,7 +644,7 @@ export async function GET() {
         category: pkg.cmssy?.category || "other",
         tags: pkg.cmssy?.tags || [],
         description: pkg.description || "",
-        hasConfig: fs.existsSync(path.join(blocksDir, dir.name, "block.config.ts")),
+        hasConfig: fs.existsSync(path.join(blocksDir, dir.name, "config.ts")),
       });
     }
   }
@@ -663,7 +666,7 @@ export async function GET() {
         category: pkg.cmssy?.category || "pages",
         tags: pkg.cmssy?.tags || [],
         description: pkg.description || "",
-        hasConfig: fs.existsSync(path.join(templatesDir, dir.name, "block.config.ts")),
+        hasConfig: fs.existsSync(path.join(templatesDir, dir.name, "config.ts")),
       });
     }
   }
@@ -687,7 +690,7 @@ import { execSync } from "child_process";
 const projectRoot = process.env.CMSSY_PROJECT_ROOT || process.cwd();
 
 function loadBlockConfig(blockPath: string): Record<string, unknown> | null {
-  const configPath = path.join(blockPath, "block.config.ts");
+  const configPath = path.join(blockPath, "config.ts");
   if (!fs.existsSync(configPath)) return null;
 
   try {
@@ -747,8 +750,10 @@ export async function GET(
 
   // Look in blocks/ first, then templates/
   let blockPath = path.join(projectRoot, "blocks", name);
+  let resourceType: "block" | "template" = "block";
   if (!fs.existsSync(blockPath)) {
     blockPath = path.join(projectRoot, "templates", name);
+    resourceType = "template";
   }
 
   if (!fs.existsSync(blockPath)) {
@@ -761,10 +766,10 @@ export async function GET(
     ? JSON.parse(fs.readFileSync(previewPath, "utf-8"))
     : {};
 
-  // Load block.config.ts schema
+  // Load config schema
   const config = loadBlockConfig(blockPath);
 
-  // Check for pages.json (templates), fall back to block.config.ts
+  // Check for pages.json (templates), fall back to config.ts
   const pagesJsonPath = path.join(blockPath, "pages.json");
   let pagesData = fs.existsSync(pagesJsonPath)
     ? JSON.parse(fs.readFileSync(pagesJsonPath, "utf-8"))
@@ -886,18 +891,20 @@ function convertBlockTypeToSimple(blockType: string): string {
 }
 
 /**
- * Load block.config.ts synchronously using tsx/esbuild.
+ * Load config.ts synchronously using tsx/esbuild.
  * Used to generate template preview pages when pages.json is missing.
  */
 function loadTemplateConfigSync(
   templateDir: string,
   projectRoot: string,
 ): Record<string, any> | null {
-  const configPath = path.join(templateDir, "block.config.ts");
+  const configPath = path.join(templateDir, "config.ts");
   if (!fs.existsSync(configPath)) return null;
 
   try {
-    const cliPath = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+    const cliPath = path.dirname(
+      path.dirname(new URL(import.meta.url).pathname),
+    );
     const possibleTsxPaths = [
       path.join(cliPath, "..", "node_modules", ".bin", "tsx"),
       path.join(cliPath, "..", "..", "node_modules", ".bin", "tsx"),
@@ -921,7 +928,10 @@ function loadTemplateConfigSync(
       `from '${mockConfigPath.replace(/\\/g, "/")}'`,
     );
 
-    const tempPath = path.join(cacheDir, `temp-template-config-${Date.now()}.ts`);
+    const tempPath = path.join(
+      cacheDir,
+      `temp-template-config-${Date.now()}.ts`,
+    );
     fs.writeFileSync(tempPath, modified);
 
     const evalCode = `import cfg from '${tempPath.replace(/\\/g, "/")}'; console.log(JSON.stringify(cfg.default || cfg));`;
@@ -935,8 +945,12 @@ function loadTemplateConfigSync(
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    try { fs.removeSync(tempPath); } catch {}
-    try { fs.removeSync(mockConfigPath); } catch {}
+    try {
+      fs.removeSync(tempPath);
+    } catch {}
+    try {
+      fs.removeSync(mockConfigPath);
+    } catch {}
 
     const lines = output.trim().split("\n");
     return JSON.parse(lines[lines.length - 1]);
@@ -946,7 +960,7 @@ function loadTemplateConfigSync(
 }
 
 /**
- * Convert template config (from block.config.ts defineTemplate) to pages.json format.
+ * Convert template config (from config.ts defineTemplate) to pages.json format.
  * - layoutPositions: array → object keyed by position
  * - page slugs: "home" → "/", others → "/{slug}"
  */
@@ -963,7 +977,10 @@ function convertConfigToPagesData(config: Record<string, any>): {
         content: lp.content || {},
       };
     }
-  } else if (config.layoutPositions && typeof config.layoutPositions === "object") {
+  } else if (
+    config.layoutPositions &&
+    typeof config.layoutPositions === "object"
+  ) {
     // Already in object format
     Object.assign(layoutPositions, config.layoutPositions);
   }
@@ -971,9 +988,12 @@ function convertConfigToPagesData(config: Record<string, any>): {
   // Convert page slugs
   const pages = (config.pages || []).map((page: any, index: number) => ({
     name: page.name,
-    slug: page.slug === "home" || page.slug === "/" || index === 0
-      ? "/"
-      : page.slug.startsWith("/") ? page.slug : `/${page.slug}`,
+    slug:
+      page.slug === "home" || page.slug === "/" || index === 0
+        ? "/"
+        : page.slug.startsWith("/")
+          ? page.slug
+          : `/${page.slug}`,
     blocks: page.blocks || [],
   }));
 
@@ -1004,8 +1024,9 @@ function generateBlockPreviewPage(
 
   const blockSrcDir = path.join(projectRoot, "blocks", resource.name, "src");
 
-  const hasIndex = fs.existsSync(path.join(blockSrcDir, "index.tsx")) ||
-                   fs.existsSync(path.join(blockSrcDir, "index.ts"));
+  const hasIndex =
+    fs.existsSync(path.join(blockSrcDir, "index.tsx")) ||
+    fs.existsSync(path.join(blockSrcDir, "index.ts"));
   const hasCss = fs.existsSync(path.join(blockSrcDir, "index.css"));
 
   if (!hasIndex) return;
@@ -1067,7 +1088,7 @@ function generateTemplatePreviewPage(
   projectRoot: string,
   resource: ScannedResource,
 ) {
-  // Read pages data from pages.json or fall back to block.config.ts
+  // Read pages data from pages.json or fall back to config.ts
   const templateDir = path.join(projectRoot, "templates", resource.name);
   const pagesJsonPath = path.join(templateDir, "pages.json");
 
@@ -1076,7 +1097,7 @@ function generateTemplatePreviewPage(
   if (fs.existsSync(pagesJsonPath)) {
     pagesData = JSON.parse(fs.readFileSync(pagesJsonPath, "utf-8"));
   } else {
-    // No pages.json — load from block.config.ts and convert format
+    // No pages.json — load from config.ts and convert format
     const config = loadTemplateConfigSync(templateDir, projectRoot);
     if (!config || (!config.pages && !config.layoutPositions)) return;
     pagesData = convertConfigToPagesData(config);
@@ -1103,14 +1124,17 @@ function generateTemplatePreviewPage(
 
   for (const blockName of Array.from(blockTypesSet)) {
     const blockSrcDir = path.join(projectRoot, "blocks", blockName, "src");
-    const hasIndex = fs.existsSync(path.join(blockSrcDir, "index.tsx")) ||
-                     fs.existsSync(path.join(blockSrcDir, "index.ts"));
+    const hasIndex =
+      fs.existsSync(path.join(blockSrcDir, "index.tsx")) ||
+      fs.existsSync(path.join(blockSrcDir, "index.ts"));
     const hasCss = fs.existsSync(path.join(blockSrcDir, "index.css"));
 
     if (!hasIndex) continue;
 
     const pascalName = toPascalCase(blockName);
-    blockImports.push(`import ${pascalName} from "@blocks/${blockName}/src/index";`);
+    blockImports.push(
+      `import ${pascalName} from "@blocks/${blockName}/src/index";`,
+    );
     if (hasCss) {
       cssImports.push(`import "@blocks/${blockName}/src/index.css";`);
     }
@@ -1118,7 +1142,12 @@ function generateTemplatePreviewPage(
   }
 
   // Generate [[...slug]] catch-all route
-  const pageDir = path.join(devRoot, "app/preview", resource.name, "[[...slug]]");
+  const pageDir = path.join(
+    devRoot,
+    "app/preview",
+    resource.name,
+    "[[...slug]]",
+  );
   fs.mkdirSync(pageDir, { recursive: true });
 
   const pageContent = `"use client";

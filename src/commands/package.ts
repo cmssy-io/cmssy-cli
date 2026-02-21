@@ -4,6 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import archiver from "archiver";
 import { loadConfig } from "../utils/cmssy-config.js";
+import { resolveConfigPath } from "../utils/block-config.js";
 import { scanResources, ScannedResource } from "../utils/scanner.js";
 
 interface PackageOptions {
@@ -20,7 +21,7 @@ interface Resource {
 
 export async function packageCommand(
   packageNames: string[] = [],
-  options: PackageOptions
+  options: PackageOptions,
 ) {
   const cwd = process.cwd();
 
@@ -29,9 +30,7 @@ export async function packageCommand(
   try {
     config = await loadConfig();
   } catch (error) {
-    console.error(
-      chalk.red("✖ Not a Cmssy project (missing cmssy.config.js)")
-    );
+    console.error(chalk.red("✖ Not a Cmssy project (missing cmssy.config.js)"));
     process.exit(1);
   }
 
@@ -78,7 +77,7 @@ export async function packageCommand(
       chalk.red("✖ Specify packages to package or use --all:\n") +
         chalk.white("  cmssy package hero\n") +
         chalk.white("  cmssy package hero pricing\n") +
-        chalk.white("  cmssy package --all")
+        chalk.white("  cmssy package --all"),
     );
     process.exit(1);
   }
@@ -96,23 +95,20 @@ export async function packageCommand(
 
   console.log(
     chalk.green(
-      `\n✓ Successfully packaged ${toPackage.length} package(s) to ${outputDir}`
-    )
+      `\n✓ Successfully packaged ${toPackage.length} package(s) to ${outputDir}`,
+    ),
   );
 }
 
 async function packageResource(resource: Resource, outputDir: string) {
   const spinner = ora(
-    `Packaging ${resource.type} ${chalk.cyan(resource.name)}`
+    `Packaging ${resource.type} ${chalk.cyan(resource.name)}`,
   ).start();
 
   try {
     // Create output filename
     const version = resource.packageJson.version || "1.0.0";
-    const outputFile = path.join(
-      outputDir,
-      `${resource.name}-${version}.zip`
-    );
+    const outputFile = path.join(outputDir, `${resource.name}-${version}.zip`);
 
     // Create write stream
     const output = fs.createWriteStream(outputFile);
@@ -124,7 +120,7 @@ async function packageResource(resource: Resource, outputDir: string) {
     output.on("close", () => {
       const size = (archive.pointer() / 1024).toFixed(2);
       spinner.succeed(
-        `Packaged ${resource.type} ${chalk.cyan(resource.name)} (${size} KB)`
+        `Packaged ${resource.type} ${chalk.cyan(resource.name)} (${size} KB)`,
       );
     });
 
@@ -148,10 +144,10 @@ async function packageResource(resource: Resource, outputDir: string) {
       archive.file(packageJsonPath, { name: "package.json" });
     }
 
-    // 3. block.config.ts (if exists)
-    const blockConfigPath = path.join(resource.dir, "block.config.ts");
-    if (await fs.pathExists(blockConfigPath)) {
-      archive.file(blockConfigPath, { name: "block.config.ts" });
+    // 3. Config file (config.ts)
+    const configFilePath = resolveConfigPath(resource.dir);
+    if (configFilePath) {
+      archive.file(configFilePath, { name: path.basename(configFilePath) });
     }
 
     // 4. preview.json (if exists)
@@ -171,7 +167,7 @@ async function packageResource(resource: Resource, outputDir: string) {
       process.cwd(),
       "public",
       resource.packageJson.name,
-      version
+      version,
     );
     if (await fs.pathExists(publicDir)) {
       archive.directory(publicDir, "dist");
@@ -188,7 +184,7 @@ async function packageResource(resource: Resource, outputDir: string) {
     spinner.fail(
       `Failed to package ${resource.type} ${chalk.cyan(resource.name)}: ${
         error.message
-      }`
+      }`,
     );
     throw error;
   }

@@ -7,7 +7,7 @@ import { getPackageJson } from "./cmssy-config.js";
 export interface ScanOptions {
   /** Throw errors instead of warnings (default: false) */
   strict?: boolean;
-  /** Load block.config.ts (default: true) */
+  /** Load config file (default: true) */
   loadConfig?: boolean;
   /** Validate schema (default: true) */
   validateSchema?: boolean;
@@ -36,12 +36,12 @@ export interface ScannedResource {
 /**
  * Scan blocks and templates directories with configurable options.
  * Supports 3 modes:
- * - Strict mode (build): throws errors, requires block.config.ts + validation
+ * - Strict mode (build): throws errors, requires config.ts + validation
  * - Lenient mode (dev): warns, loads preview.json, metadata
  * - Minimal mode (package): only package.json, no validation
  */
 export async function scanResources(
-  options: ScanOptions = {}
+  options: ScanOptions = {},
 ): Promise<ScannedResource[]> {
   const {
     strict = false,
@@ -97,7 +97,17 @@ interface ScanDirectoryOptions {
 }
 
 async function scanDirectory(opts: ScanDirectoryOptions) {
-  const { type, dir, resources, strict, loadConfig, shouldValidate, loadPreview, requirePackageJson, names } = opts;
+  const {
+    type,
+    dir,
+    resources,
+    strict,
+    loadConfig,
+    shouldValidate,
+    loadPreview,
+    requirePackageJson,
+    names,
+  } = opts;
 
   if (!fs.existsSync(dir)) {
     return;
@@ -111,13 +121,15 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
   // Filter by names if provided (case-insensitive)
   if (names && names.length > 0) {
     const lowerNames = names.map((n) => n.toLowerCase());
-    itemDirs = itemDirs.filter((name) => lowerNames.includes(name.toLowerCase()));
+    itemDirs = itemDirs.filter((name) =>
+      lowerNames.includes(name.toLowerCase()),
+    );
   }
 
   for (const itemName of itemDirs) {
     const itemPath = path.join(dir, itemName);
 
-    // Try loading block.config.ts if requested
+    // Try loading config.ts if requested
     let blockConfig = null;
     if (loadConfig) {
       blockConfig = await loadBlockConfig(itemPath);
@@ -128,7 +140,7 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
         if (pkg && pkg.cmssy) {
           const message =
             `${type === "block" ? "Block" : "Template"} "${itemName}" uses legacy package.json format.\n` +
-            `Please migrate to block.config.ts.\n` +
+            `Please migrate to config.ts.\n` +
             `Run: cmssy migrate ${itemName}\n` +
             `Or see migration guide: https://cmssy.io/docs/migration`;
 
@@ -141,9 +153,7 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
 
         if (strict) {
           console.warn(
-            chalk.yellow(
-              `Warning: Skipping ${itemName} - no block.config.ts found`
-            )
+            chalk.yellow(`Warning: Skipping ${itemName} - no config.ts found`),
           );
           continue;
         }
@@ -159,13 +169,13 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
           if (strict) {
             console.error(chalk.red(errorMessage));
             validation.errors.forEach((err) =>
-              console.error(chalk.red(`  - ${err}`))
+              console.error(chalk.red(`  - ${err}`)),
             );
             throw new Error(`Schema validation failed for ${itemName}`);
           } else {
             console.warn(chalk.yellow(errorMessage));
             validation.errors.forEach((err) =>
-              console.warn(chalk.yellow(`  - ${err}`))
+              console.warn(chalk.yellow(`  - ${err}`)),
             );
             // Don't skip in non-strict - just warn
           }
@@ -200,10 +210,13 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
       path: itemPath,
       packageJson: pkg,
       // Default displayName from directory name (PascalCase)
-      displayName: itemName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(''),
+      displayName: itemName
+        .split("-")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(""),
     };
 
-    // Add optional fields if block.config.ts was loaded
+    // Add optional fields if config.ts was loaded
     if (blockConfig) {
       resource.blockConfig = blockConfig;
       resource.displayName = blockConfig.name || resource.displayName;

@@ -10,10 +10,7 @@ import {
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
-import {
-  loadBlockConfig,
-  validateSchema,
-} from "../utils/block-config.js";
+import { loadBlockConfig, validateSchema } from "../utils/block-config.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -35,7 +32,7 @@ interface PackageInfo {
 
 export async function publishCommand(
   packageNames: string[] = [],
-  options: PublishOptions
+  options: PublishOptions,
 ) {
   console.log(chalk.blue.bold("\n📦 Cmssy - Publish\n"));
 
@@ -44,7 +41,7 @@ export async function publishCommand(
     console.error(
       chalk.red("✖ Specify publish target:\n") +
         chalk.white("  --workspace <id>       Publish to workspace\n") +
-        chalk.white("\nExample: cmssy publish --all --workspace abc123\n")
+        chalk.white("\nExample: cmssy publish --all --workspace abc123\n"),
     );
     process.exit(1);
   }
@@ -63,9 +60,7 @@ export async function publishCommand(
     // Flag provided without value, check .env
     if (config.workspaceId) {
       workspaceId = config.workspaceId;
-      console.log(
-        chalk.gray(`Using workspace ID from .env: ${workspaceId}\n`)
-      );
+      console.log(chalk.gray(`Using workspace ID from .env: ${workspaceId}\n`));
     } else {
       const answer = await inquirer.prompt([
         {
@@ -88,7 +83,7 @@ export async function publishCommand(
   const configPath = path.join(process.cwd(), "cmssy.config.js");
   if (!fs.existsSync(configPath)) {
     console.error(
-      chalk.red("✖ Not a cmssy project (missing cmssy.config.js)\n")
+      chalk.red("✖ Not a cmssy project (missing cmssy.config.js)\n"),
     );
     process.exit(1);
   }
@@ -115,12 +110,14 @@ export async function publishCommand(
           .map((p) => p.name);
 
         const missingBlocks = availableBlocks.filter(
-          (b) => !existingBlockNames.includes(b)
+          (b) => !existingBlockNames.includes(b),
         );
 
         if (missingBlocks.length > 0) {
           console.log(
-            chalk.cyan(`\n📦 Auto-detected dependencies for ${template.name}:\n`)
+            chalk.cyan(
+              `\n📦 Auto-detected dependencies for ${template.name}:\n`,
+            ),
           );
           missingBlocks.forEach((b) => console.log(chalk.gray(`  • ${b}`)));
           console.log("");
@@ -132,7 +129,9 @@ export async function publishCommand(
           });
 
           // Insert dependencies BEFORE the template
-          const templateIndex = packages.findIndex((p) => p.name === template.name);
+          const templateIndex = packages.findIndex(
+            (p) => p.name === template.name,
+          );
           packages = [
             ...packages.slice(0, templateIndex),
             ...dependencyPackages,
@@ -156,7 +155,9 @@ export async function publishCommand(
   console.log(chalk.cyan("Current versions:\n"));
   packages.forEach((pkg) => {
     console.log(
-      chalk.white(`  ${pkg.packageJson.name}: ${chalk.bold(pkg.packageJson.version)}`)
+      chalk.white(
+        `  ${pkg.packageJson.name}: ${chalk.bold(pkg.packageJson.version)}`,
+      ),
     );
   });
   console.log("");
@@ -218,7 +219,7 @@ export async function publishCommand(
 
       if (!newVersion) {
         console.error(
-          chalk.red(`✖ Invalid version for ${pkg.name}: ${oldVersion}\n`)
+          chalk.red(`✖ Invalid version for ${pkg.name}: ${oldVersion}\n`),
         );
         continue;
       }
@@ -229,19 +230,17 @@ export async function publishCommand(
       const pkgPath = path.join(pkg.path, "package.json");
       fs.writeJsonSync(pkgPath, pkg.packageJson, { spaces: 2 });
 
-      console.log(
-        chalk.gray(`  ${pkg.name}: ${oldVersion} → ${newVersion}`)
-      );
+      console.log(chalk.gray(`  ${pkg.name}: ${oldVersion} → ${newVersion}`));
     }
     console.log("");
   }
 
-  console.log(
-    chalk.cyan(`Publishing ${packages.length} package(s):\n`)
-  );
+  console.log(chalk.cyan(`Publishing ${packages.length} package(s):\n`));
   packages.forEach((pkg) => {
     console.log(
-      chalk.white(`  • ${pkg.packageJson.name} ${chalk.bold("v" + pkg.packageJson.version)}`)
+      chalk.white(
+        `  • ${pkg.packageJson.name} ${chalk.bold("v" + pkg.packageJson.version)}`,
+      ),
     );
   });
   console.log("");
@@ -255,8 +254,8 @@ export async function publishCommand(
   console.log(
     chalk.cyan(
       `🏢 Target: Workspace (${workspaceId})\n` +
-        "   Status: Published directly\n"
-    )
+        "   Status: Published directly\n",
+    ),
   );
 
   // Publish each package
@@ -264,17 +263,19 @@ export async function publishCommand(
   let errorCount = 0;
 
   for (const pkg of packages) {
-    const spinner = ora(`Publishing ${pkg.packageJson.name} to workspace...`).start();
+    const spinner = ora(
+      `Publishing ${pkg.packageJson.name} to workspace...`,
+    ).start();
 
     try {
       await publishToWorkspace(
         pkg,
         workspaceId as string,
         config.apiToken!,
-        config.apiUrl
+        config.apiUrl,
       );
       spinner.succeed(
-        chalk.green(`${pkg.packageJson.name} published to workspace`)
+        chalk.green(`${pkg.packageJson.name} published to workspace`),
       );
       successCount++;
     } catch (error: any) {
@@ -290,21 +291,32 @@ export async function publishCommand(
         const graphqlError = error.response.errors[0];
         errorMessage = graphqlError.message;
         errorCode = graphqlError.extensions?.code || null;
-        isPlanLimitError = errorCode === "PLAN_LIMIT_EXCEEDED" ||
-                           errorMessage.toLowerCase().includes("limit reached");
+        isPlanLimitError =
+          errorCode === "PLAN_LIMIT_EXCEEDED" ||
+          errorMessage.toLowerCase().includes("limit reached");
 
         // Show additional details for plan limit errors
         if (graphqlError.extensions?.resource) {
           console.error("");
           console.error(chalk.yellow.bold("  ⚠ Plan Limit Reached"));
-          console.error(chalk.yellow(`    Resource: ${graphqlError.extensions.resource}`));
+          console.error(
+            chalk.yellow(`    Resource: ${graphqlError.extensions.resource}`),
+          );
           if (graphqlError.extensions.current !== undefined) {
-            console.error(chalk.yellow(`    Usage: ${graphqlError.extensions.current}/${graphqlError.extensions.limit}`));
+            console.error(
+              chalk.yellow(
+                `    Usage: ${graphqlError.extensions.current}/${graphqlError.extensions.limit}`,
+              ),
+            );
           }
           if (graphqlError.extensions.plan) {
-            console.error(chalk.yellow(`    Plan: ${graphqlError.extensions.plan}`));
+            console.error(
+              chalk.yellow(`    Plan: ${graphqlError.extensions.plan}`),
+            );
           }
-          console.error(chalk.gray("    Upgrade your plan at: https://cmssy.com/pricing"));
+          console.error(
+            chalk.gray("    Upgrade your plan at: https://cmssy.com/pricing"),
+          );
           console.error("");
         }
       }
@@ -330,11 +342,11 @@ export async function publishCommand(
   console.log("");
   if (errorCount === 0) {
     console.log(
-      chalk.green.bold(`✓ ${successCount} package(s) published successfully\n`)
+      chalk.green.bold(`✓ ${successCount} package(s) published successfully\n`),
     );
   } else {
     console.log(
-      chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`)
+      chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`),
     );
   }
 }
@@ -370,7 +382,9 @@ function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
   }
 
   // Extract from global layoutPositions
-  for (const [_position, data] of Object.entries(pagesData.layoutPositions || {}) as [string, any][]) {
+  for (const [_position, data] of Object.entries(
+    pagesData.layoutPositions || {},
+  ) as [string, any][]) {
     if (data.type) {
       let blockType = data.type;
       if (blockType.includes("/")) {
@@ -385,7 +399,9 @@ function extractBlockTypesFromPagesJson(pagesJsonPath: string): string[] {
 
   // Extract from per-page layoutPositions
   for (const page of pagesData.pages || []) {
-    for (const [_position, data] of Object.entries(page.layoutPositions || {}) as [string, any][]) {
+    for (const [_position, data] of Object.entries(
+      page.layoutPositions || {},
+    ) as [string, any][]) {
       if (data.type) {
         let blockType = data.type;
         if (blockType.includes("/")) {
@@ -421,7 +437,7 @@ function findProjectBlocks(blockTypes: string[]): string[] {
 
 async function scanPackages(
   packageNames: string[],
-  options: PublishOptions
+  options: PublishOptions,
 ): Promise<PackageInfo[]> {
   const packages: PackageInfo[] = [];
 
@@ -444,21 +460,21 @@ async function scanPackages(
 
       if (!fs.existsSync(pkgPath)) {
         console.warn(
-          chalk.yellow(`Warning: ${blockName} has no package.json, skipping`)
+          chalk.yellow(`Warning: ${blockName} has no package.json, skipping`),
         );
         continue;
       }
 
       const packageJson = fs.readJsonSync(pkgPath);
 
-      // Try loading block.config.ts
+      // Load config.ts
       const blockConfig = await loadBlockConfig(blockPath);
 
       if (!blockConfig && !packageJson.cmssy) {
         console.warn(
           chalk.yellow(
-            `Warning: ${blockName} has no block.config.ts or package.json cmssy section, skipping`
-          )
+            `Warning: ${blockName} has no config.ts or package.json cmssy section, skipping`,
+          ),
         );
         continue;
       }
@@ -492,21 +508,23 @@ async function scanPackages(
 
       if (!fs.existsSync(pkgPath)) {
         console.warn(
-          chalk.yellow(`Warning: ${templateName} has no package.json, skipping`)
+          chalk.yellow(
+            `Warning: ${templateName} has no package.json, skipping`,
+          ),
         );
         continue;
       }
 
       const packageJson = fs.readJsonSync(pkgPath);
 
-      // Try loading block.config.ts
+      // Load config.ts
       const blockConfig = await loadBlockConfig(templatePath);
 
       if (!blockConfig && !packageJson.cmssy) {
         console.warn(
           chalk.yellow(
-            `Warning: ${templateName} has no block.config.ts or package.json cmssy section, skipping`
-          )
+            `Warning: ${templateName} has no config.ts or package.json cmssy section, skipping`,
+          ),
         );
         continue;
       }
@@ -570,14 +588,14 @@ async function readOriginalSourceCode(packagePath: string): Promise<{
 
       // Extract interface/type definitions from block.d.ts
       const typeMatch = blockDts.match(
-        /(?:export\s+)?(?:interface|type)\s+BlockContent[\s\S]*?(?=(?:export\s+)?(?:interface|type)|$)/
+        /(?:export\s+)?(?:interface|type)\s+BlockContent[\s\S]*?(?=(?:export\s+)?(?:interface|type)|$)/,
       );
 
       if (typeMatch) {
         // Remove the import from block.d.ts and add inline type
         content = content.replace(
           /import\s*{\s*BlockContent\s*}\s*from\s*["']\.\/block(?:\.d)?["'];?\n?/,
-          ""
+          "",
         );
 
         // Add inline interface at the top
@@ -586,9 +604,12 @@ async function readOriginalSourceCode(packagePath: string): Promise<{
 }\n\n`;
 
         // Insert after imports
-        const lastImportMatch = content.match(/^(import[\s\S]*?from\s*['"][^'"]+['"];?\n)/m);
+        const lastImportMatch = content.match(
+          /^(import[\s\S]*?from\s*['"][^'"]+['"];?\n)/m,
+        );
         if (lastImportMatch) {
-          const insertPos = content.lastIndexOf(lastImportMatch[0]) + lastImportMatch[0].length;
+          const insertPos =
+            content.lastIndexOf(lastImportMatch[0]) + lastImportMatch[0].length;
           content =
             content.slice(0, insertPos) +
             "\n" +
@@ -628,9 +649,7 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
   } else if (fs.existsSync(tsPath)) {
     entryPoint = tsPath;
   } else {
-    throw new Error(
-      `Source code not found. Expected ${tsxPath} or ${tsPath}`
-    );
+    throw new Error(`Source code not found. Expected ${tsxPath} or ${tsPath}`);
   }
 
   const result = await build({
@@ -642,13 +661,18 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
     jsx: "transform", // Transform JSX to React.createElement
     loader: { ".tsx": "tsx", ".ts": "ts", ".css": "empty" },
     external: [
-      "react", "react-dom", "react/jsx-runtime",
-      "next/image", "next/link", "next/font", "next/script",
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "next/image",
+      "next/link",
+      "next/font",
+      "next/script",
     ],
     minify: true, // Minify for smaller bundle size
     define: {
       // Replace process.env references with static values
-      'process.env.NODE_ENV': '"production"',
+      "process.env.NODE_ENV": '"production"',
     },
   });
 
@@ -658,7 +682,10 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
 }
 
 // Compile CSS with optional Tailwind support
-async function compileCss(packagePath: string, bundledSourceCode: string): Promise<string | undefined> {
+async function compileCss(
+  packagePath: string,
+  bundledSourceCode: string,
+): Promise<string | undefined> {
   const srcDir = path.join(packagePath, "src");
   const cssPath = path.join(srcDir, "index.css");
 
@@ -679,7 +706,9 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
   // Check for Tailwind v4 vs v3
   const projectRoot = process.cwd();
 
-  const projectPackageJson = fs.readJsonSync(path.join(projectRoot, "package.json"));
+  const projectPackageJson = fs.readJsonSync(
+    path.join(projectRoot, "package.json"),
+  );
   const hasTailwindV4 = !!(
     projectPackageJson.devDependencies?.["@tailwindcss/postcss"] ||
     projectPackageJson.dependencies?.["@tailwindcss/postcss"]
@@ -692,7 +721,7 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
       "node_modules",
       "@tailwindcss/postcss",
       "dist",
-      "index.mjs"
+      "index.mjs",
     );
     const tailwindV4Module = await import(tailwindV4Path);
     const tailwindPlugin = tailwindV4Module.default || tailwindV4Module;
@@ -704,7 +733,12 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
     return result.css;
   } else {
     // Tailwind v3: needs postcss-import + tailwindcss
-    const postcssImportPath = path.join(projectRoot, "node_modules", "postcss-import", "index.js");
+    const postcssImportPath = path.join(
+      projectRoot,
+      "node_modules",
+      "postcss-import",
+      "index.js",
+    );
     const { default: postcssImport } = await import(postcssImportPath);
 
     const importPlugin = postcssImport({
@@ -713,7 +747,7 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
 
     cssContent = cssContent.replace(
       /@import\s+["']tailwindcss["'];?/g,
-      "@tailwind base;\n@tailwind components;\n@tailwind utilities;"
+      "@tailwind base;\n@tailwind components;\n@tailwind utilities;",
     );
 
     const tailwindcssPath = path.join(
@@ -721,7 +755,7 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
       "node_modules",
       "tailwindcss",
       "lib",
-      "index.js"
+      "index.js",
     );
     const tailwindcssModule = await import(tailwindcssPath);
     const tailwindcss = tailwindcssModule.default || tailwindcssModule;
@@ -729,9 +763,12 @@ async function compileCss(packagePath: string, bundledSourceCode: string): Promi
       content: [{ raw: bundledSourceCode, extension: "tsx" }],
     });
 
-    const result = await postcss([importPlugin, tailwindPlugin]).process(cssContent, {
-      from: cssPath,
-    });
+    const result = await postcss([importPlugin, tailwindPlugin]).process(
+      cssContent,
+      {
+        from: cssPath,
+      },
+    );
 
     return result.css;
   }
@@ -765,9 +802,14 @@ async function publishToWorkspace(
   pkg: PackageInfo,
   workspaceId: string,
   apiToken: string,
-  apiUrl: string
+  apiUrl: string,
 ): Promise<void> {
-  const { packageJson, path: packagePath, blockConfig, type: packageType } = pkg;
+  const {
+    packageJson,
+    path: packagePath,
+    blockConfig,
+    type: packageType,
+  } = pkg;
 
   // Use blockConfig if available, fallback to package.json cmssy
   const metadata = blockConfig || packageJson.cmssy || {};
@@ -802,7 +844,7 @@ async function publishToWorkspace(
     dependencies = packageJson.dependencies || {};
   }
 
-  // Convert block.config.ts schema to schemaFields if using blockConfig
+  // Convert config.ts schema to schemaFields if using blockConfig
   let schemaFields = metadata.schemaFields || [];
   if (blockConfig && blockConfig.schema) {
     schemaFields = convertSchemaToFields(blockConfig.schema);
@@ -827,7 +869,8 @@ async function publishToWorkspace(
     // AI Block Builder source files (for editable blocks in Sandpack)
     rawSourceCode,
     rawSourceCss,
-    dependencies: Object.keys(dependencies).length > 0 ? dependencies : undefined,
+    dependencies:
+      Object.keys(dependencies).length > 0 ? dependencies : undefined,
   };
 
   // Add layoutPosition if defined (for layout blocks)
@@ -860,13 +903,15 @@ async function publishToWorkspace(
   let timeoutId: NodeJS.Timeout;
   const timeoutPromise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new Error(
-        "Block upload timed out after 3 minutes. This may be due to:\n" +
-        "  - Large file size (try reducing bundle size)\n" +
-        "  - Slow network connection\n" +
-        "  - Backend processing issues\n" +
-        "Check backend logs for more details."
-      ));
+      reject(
+        new Error(
+          "Block upload timed out after 3 minutes. This may be due to:\n" +
+            "  - Large file size (try reducing bundle size)\n" +
+            "  - Slow network connection\n" +
+            "  - Backend processing issues\n" +
+            "Check backend logs for more details.",
+        ),
+      );
     }, TIMEOUT_MS);
   });
 
@@ -894,7 +939,7 @@ async function publishToWorkspace(
             position,
             type: convertBlockTypeToSimple(data.type),
             content: data.content || {},
-          })
+          }),
         );
       }
       return result;
@@ -906,7 +951,7 @@ async function publishToWorkspace(
         position,
         type: convertBlockTypeToSimple(data.type),
         content: data.content || {},
-      })
+      }),
     );
 
     // Extract unique block types required by this template
@@ -947,14 +992,19 @@ async function publishToWorkspace(
       clearTimeout(timeoutId!);
 
       if (!result.importTemplate?.success) {
-        throw new Error(result.importTemplate?.message || "Failed to import template to workspace");
+        throw new Error(
+          result.importTemplate?.message ||
+            "Failed to import template to workspace",
+        );
       }
 
       // Log template import summary
       const { pagesCreated, pagesUpdated } = result.importTemplate;
-      console.log(chalk.gray(
-        `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated`
-      ));
+      console.log(
+        chalk.gray(
+          `  └─ ${pagesCreated} pages created, ${pagesUpdated} updated`,
+        ),
+      );
     } catch (error) {
       clearTimeout(timeoutId!);
       throw error;
@@ -977,7 +1027,7 @@ async function publishToWorkspace(
   }
 }
 
-// Helper: Convert block.config.ts schema to schemaFields array
+// Helper: Convert config.ts schema to schemaFields array
 function convertSchemaToFields(schema: Record<string, any>): any[] {
   const fields: any[] = [];
 

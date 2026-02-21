@@ -33,12 +33,18 @@ export interface GenerateTypesOptions {
   fieldTypes?: FieldTypeDefinition[];
 }
 
-export async function generateTypes(options: GenerateTypesOptions): Promise<void> {
+export async function generateTypes(
+  options: GenerateTypesOptions,
+): Promise<void> {
   const { blockPath, schema, fieldTypes } = options;
-  const typeDefinition = generateTypeDefinition({ schema, fieldTypes, indent: "  " });
+  const typeDefinition = generateTypeDefinition({
+    schema,
+    fieldTypes,
+    indent: "  ",
+  });
   const outputPath = path.join(blockPath, "src", "block.d.ts");
 
-  const fileContent = `// Auto-generated from block.config.ts
+  const fileContent = `// Auto-generated from config.ts
 // DO NOT EDIT - This file is automatically regenerated
 
 export interface BlockContent {
@@ -55,7 +61,9 @@ interface GenerateTypeDefinitionOptions {
   indent?: string;
 }
 
-function generateTypeDefinition(options: GenerateTypeDefinitionOptions): string {
+function generateTypeDefinition(
+  options: GenerateTypeDefinitionOptions,
+): string {
   const { schema, fieldTypes, indent = "  " } = options;
   const lines: string[] = [];
 

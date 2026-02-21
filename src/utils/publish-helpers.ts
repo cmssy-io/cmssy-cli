@@ -4,7 +4,7 @@
  */
 
 /**
- * Convert block.config.ts schema to schemaFields array for GraphQL mutation.
+ * Convert config.ts schema to schemaFields array for GraphQL mutation.
  */
 export function convertSchemaToFields(schema: Record<string, any>): any[] {
   const fields: any[] = [];
@@ -121,7 +121,7 @@ export function parsePagesJson(pagesData: any): {
   const layoutPositions: any[] = [];
   if (pagesData.layoutPositions) {
     for (const [position, data] of Object.entries(
-      pagesData.layoutPositions as Record<string, any>
+      pagesData.layoutPositions as Record<string, any>,
     )) {
       layoutPositions.push({
         position,

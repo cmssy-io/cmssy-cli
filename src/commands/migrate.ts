@@ -58,14 +58,17 @@ export async function migrateCommand(blockName?: string) {
     let errorCount = 0;
 
     spinner.stop();
-    console.log(chalk.cyan(`\nFound ${blocksToMigrate.length} block(s)/template(s)\n`));
+    console.log(
+      chalk.cyan(`\nFound ${blocksToMigrate.length} block(s)/template(s)\n`),
+    );
 
     for (const relativePath of blocksToMigrate) {
       const fullPath = path.join(process.cwd(), relativePath);
       const name = path.basename(fullPath);
 
       // Check if already migrated
-      if (fs.existsSync(path.join(fullPath, "block.config.ts"))) {
+      const expectedConfig = "config.ts";
+      if (fs.existsSync(path.join(fullPath, expectedConfig))) {
         console.log(chalk.yellow(`  ⊘ ${name} - already migrated`));
         skippedCount++;
         continue;
@@ -96,7 +99,9 @@ export async function migrateCommand(blockName?: string) {
       console.log(chalk.white(`  Migrated: ${migratedCount}`));
       console.log(chalk.white(`  Skipped: ${skippedCount}`));
       console.log(chalk.cyan("\nNext steps:"));
-      console.log(chalk.white("  1. Review generated block.config.ts files"));
+      console.log(
+        chalk.white("  1. Review generated config files (config.ts)"),
+      );
       console.log(chalk.white("  2. Run: cmssy build\n"));
     } else {
       console.log(chalk.yellow(`⚠ Migration completed with errors`));
@@ -127,7 +132,8 @@ async function migrateBlock(blockPath: string, pkg: any): Promise<void> {
     });
   }
 
-  // Generate block.config.ts
+  // Generate config file (config.ts for both blocks and templates)
+  const configFileName = "config.ts";
   const configContent = generateBlockConfigContent(
     cmssy.displayName || pkg.name,
     pkg.description || cmssy.description || "",
@@ -136,10 +142,10 @@ async function migrateBlock(blockPath: string, pkg: any): Promise<void> {
     cmssy.tags || [],
     schema,
     cmssy.pricing || { licenseType: "free" },
-    isTemplate
+    isTemplate,
   );
 
-  fs.writeFileSync(path.join(blockPath, "block.config.ts"), configContent);
+  fs.writeFileSync(path.join(blockPath, configFileName), configContent);
 
   // Update package.json - remove cmssy section
   const newPkg = { ...pkg };
@@ -147,7 +153,7 @@ async function migrateBlock(blockPath: string, pkg: any): Promise<void> {
 
   fs.writeFileSync(
     path.join(blockPath, "package.json"),
-    JSON.stringify(newPkg, null, 2) + "\n"
+    JSON.stringify(newPkg, null, 2) + "\n",
   );
 
   // Generate types
@@ -156,7 +162,7 @@ async function migrateBlock(blockPath: string, pkg: any): Promise<void> {
 }
 
 function convertLegacySchemaToNew(
-  schemaFields: any[]
+  schemaFields: any[],
 ): Record<string, FieldConfig> {
   const schema: Record<string, any> = {};
 
@@ -212,7 +218,7 @@ function generateBlockConfigContent(
   tags: string[],
   schema: Record<string, any>,
   pricing: any,
-  isTemplate: boolean
+  isTemplate: boolean,
 ): string {
   const defineFunction = isTemplate ? "defineTemplate" : "defineBlock";
 
@@ -224,7 +230,9 @@ function generateBlockConfigContent(
 export default ${defineFunction}({
   name: '${name.replace(/'/g, "\\'")}',
   description: '${description.replace(/'/g, "\\'")}',${
-    longDescription ? `\n  longDescription: '${longDescription.replace(/'/g, "\\'")}',` : ""
+    longDescription
+      ? `\n  longDescription: '${longDescription.replace(/'/g, "\\'")}',`
+      : ""
   }
   category: '${category}',
   tags: ${JSON.stringify(tags)},
@@ -236,7 +244,10 @@ export default ${defineFunction}({
 `;
 }
 
-function formatSchemaAsCode(schema: Record<string, any>, indent: number): string {
+function formatSchemaAsCode(
+  schema: Record<string, any>,
+  indent: number,
+): string {
   const indentStr = "  ".repeat(indent);
   const lines: string[] = ["{"];
 
@@ -244,26 +255,34 @@ function formatSchemaAsCode(schema: Record<string, any>, indent: number): string
     const fieldLines: string[] = [`${indentStr}${key}: {`];
 
     fieldLines.push(`${indentStr}  type: '${field.type}',`);
-    fieldLines.push(`${indentStr}  label: '${field.label.replace(/'/g, "\\'")}',`);
+    fieldLines.push(
+      `${indentStr}  label: '${field.label.replace(/'/g, "\\'")}',`,
+    );
 
     if (field.required) {
       fieldLines.push(`${indentStr}  required: true,`);
     }
     if (field.placeholder) {
-      fieldLines.push(`${indentStr}  placeholder: '${field.placeholder.replace(/'/g, "\\'")}',`);
+      fieldLines.push(
+        `${indentStr}  placeholder: '${field.placeholder.replace(/'/g, "\\'")}',`,
+      );
     }
     if (field.helpText) {
-      fieldLines.push(`${indentStr}  helpText: '${field.helpText.replace(/'/g, "\\'")}',`);
+      fieldLines.push(
+        `${indentStr}  helpText: '${field.helpText.replace(/'/g, "\\'")}',`,
+      );
     }
     if (field.defaultValue !== undefined) {
       fieldLines.push(
-        `${indentStr}  defaultValue: ${JSON.stringify(field.defaultValue)},`
+        `${indentStr}  defaultValue: ${JSON.stringify(field.defaultValue)},`,
       );
     }
 
     // Handle select options
     if (field.options) {
-      fieldLines.push(`${indentStr}  options: ${JSON.stringify(field.options)},`);
+      fieldLines.push(
+        `${indentStr}  options: ${JSON.stringify(field.options)},`,
+      );
     }
 
     // Handle repeater schema

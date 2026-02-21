@@ -19,17 +19,21 @@ import { dirname, join } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, "../package.json"), "utf-8"),
+);
 
 const program = new Command();
 
 program
   .name("cmssy")
   .description(
-    "Unified CLI for building and publishing blocks to Cmssy design library"
+    "Unified CLI for building and publishing blocks to Cmssy design library",
   )
   .version(packageJson.version)
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy init my-blocks          Create a new project
   $ cmssy create block hero       Add a new block to your project
@@ -45,7 +49,8 @@ Workflow:
   5. publish  → Deploy to workspace
 
 Documentation: https://cmssy.io/docs/cli
-`);
+`,
+  );
 
 // cmssy init
 program
@@ -55,28 +60,34 @@ program
   .option(
     "-f, --framework <framework>",
     "Framework (react, vue, angular, vanilla)",
-    "react"
+    "react",
   )
   .option("-y, --yes", "Skip prompts and use defaults")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy init                    Create project in current directory
   $ cmssy init my-blocks          Create project in ./my-blocks
   $ cmssy init -f vue my-blocks   Create Vue project
   $ cmssy init -y my-blocks       Create with defaults (no prompts)
-`)
+`,
+  )
   .action((name, options) => initCommand(name, options));
 
 // cmssy create
 const create = program
   .command("create")
   .description("Create a new block or template")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy create block hero
   $ cmssy create block pricing -c marketing -t "pricing,plans"
   $ cmssy create template landing-page
-`);
+`,
+  );
 
 create
   .command("block")
@@ -84,12 +95,17 @@ create
   .argument("<name>", "Block name (kebab-case recommended)")
   .option("-y, --yes", "Skip prompts and use defaults")
   .option("-d, --description <description>", "Block description")
-  .option("-c, --category <category>", "Category: marketing, typography, media, layout, forms, navigation, other")
+  .option(
+    "-c, --category <category>",
+    "Category: marketing, typography, media, layout, forms, navigation, other",
+  )
   .option("-t, --tags <tags>", "Comma-separated tags")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Creates:
   blocks/<name>/
-  ├── block.config.ts   Type-safe configuration
+  ├── config.ts         Type-safe configuration
   ├── package.json      Name and version
   ├── preview.json      Preview data for dev server
   └── src/
@@ -97,7 +113,8 @@ Creates:
       ├── Block.tsx     React component
       ├── block.d.ts    Auto-generated types
       └── index.css     Styles
-`)
+`,
+  )
   .action(createCommand.block);
 
 create
@@ -114,7 +131,9 @@ program
   .description("Build blocks and templates for production")
   .option("--block <names...>", "Build only specific blocks/templates")
   .option("--framework <framework>", "Override framework from config")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy build                        Build all blocks and templates
   $ cmssy build --block hero pricing   Build only hero and pricing blocks
@@ -124,7 +143,8 @@ Output:
   ├── index.js      Bundled JavaScript
   ├── index.css     Styles
   └── package.json  Metadata for design library
-`)
+`,
+  )
   .action(buildCommand);
 
 // cmssy dev
@@ -132,7 +152,9 @@ program
   .command("dev")
   .description("Start development server with hot reload")
   .option("-p, --port <port>", "Port number", "3000")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy dev                Start on default port 3000
   $ cmssy dev -p 8080        Start on port 8080
@@ -140,8 +162,9 @@ Examples:
 Features:
   • Live preview of all blocks/templates
   • Hot reload on file changes
-  • Auto-regenerates types on block.config.ts changes
-`)
+  • Auto-regenerates types on config.ts changes
+`,
+  )
   .action(devCommand);
 
 // cmssy configure
@@ -149,13 +172,16 @@ program
   .command("configure")
   .description("Configure Cmssy API credentials")
   .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Stores credentials in .env file:
   CMSSY_API_TOKEN=your-token
   CMSSY_API_URL=https://api.cmssy.io/graphql
 
 Get your API token at: https://cmssy.io/settings/tokens
-`)
+`,
+  )
   .action(configureCommand);
 
 // cmssy publish
@@ -163,10 +189,10 @@ program
   .command("publish [packages...]")
   .description(
     "Publish blocks/templates to workspace\n\n" +
-    "  Packages are directory names from blocks/ or templates/ folders.\n" +
-    "  Examples:\n" +
-    "    cmssy publish hero faq --workspace abc123 --patch\n" +
-    "    cmssy publish --all --workspace abc123"
+      "  Packages are directory names from blocks/ or templates/ folders.\n" +
+      "  Examples:\n" +
+      "    cmssy publish hero faq --workspace abc123 --patch\n" +
+      "    cmssy publish --all --workspace abc123",
   )
   .option("-w, --workspace [id]", "Publish to workspace")
   .option("--all", "Publish all blocks and templates")
@@ -183,25 +209,31 @@ program
   .description("Pull blocks from design library to local project")
   .argument("[package]", "Package slug (e.g., @cmssy/blocks.hero)")
   .option("--workspace <id>", "Sync from specific workspace")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy sync @cmssy/blocks.hero          Sync from design library
   $ cmssy sync --workspace abc123          Sync all from workspace
-`)
+`,
+  )
   .action(syncCommand);
 
 // cmssy migrate
 program
   .command("migrate [block-name]")
-  .description("Migrate legacy package.json config to block.config.ts")
-  .addHelpText("after", `
+  .description("Migrate legacy package.json config to config.ts")
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy migrate hero     Migrate specific block
   $ cmssy migrate          Migrate all blocks/templates
 
 Converts:
-  package.json { cmssy: {...} }  →  block.config.ts
-`)
+  package.json { cmssy: {...} }  →  config.ts
+`,
+  )
   .action(migrateCommand);
 
 // cmssy package
@@ -210,14 +242,17 @@ program
   .description("Package blocks/templates into ZIP files for manual upload")
   .option("--all", "Package all blocks and templates")
   .option("-o, --output <dir>", "Output directory", "packages")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy package hero faq         Package specific blocks
   $ cmssy package --all            Package everything
   $ cmssy package -o dist --all    Package to custom directory
 
 Use with 'upload' for two-step deployment.
-`)
+`,
+  )
   .action(packageCommand);
 
 // cmssy upload
@@ -226,23 +261,29 @@ program
   .description("Upload ZIP packages to workspace")
   .option("-w, --workspace <id>", "Target workspace ID")
   .option("--all", "Upload all from packages directory")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy upload hero.zip -w abc123     Upload single package
   $ cmssy upload --all -w abc123        Upload all packages
-`)
+`,
+  )
   .action(uploadCommand);
 
 // cmssy workspaces
 program
   .command("workspaces")
   .description("List your workspaces and their IDs")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Use workspace IDs with:
   $ cmssy publish --workspace <id>
   $ cmssy upload --workspace <id>
   $ cmssy sync --workspace <id>
-`)
+`,
+  )
   .action(workspacesCommand);
 
 // cmssy add-source
@@ -251,13 +292,16 @@ program
   .description("Upload source code to workspace for AI Block Builder")
   .option("-w, --workspace <id>", "Target workspace ID")
   .option("--all", "Add source for all local blocks")
-  .addHelpText("after", `
+  .addHelpText(
+    "after",
+    `
 Examples:
   $ cmssy add-source hero pricing -w abc123
   $ cmssy add-source --all -w abc123
 
 Enables AI Block Builder to edit your blocks in the Cmssy editor.
-`)
+`,
+  )
   .action(addSourceCommand);
 
 program.parse();
