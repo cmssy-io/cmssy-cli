@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import type { ScannedResource } from "./scanner.js";
@@ -709,7 +710,7 @@ function loadBlockConfig(blockPath: string): Record<string, unknown> | null {
     // Replace import path in config
     const configContent = fs.readFileSync(configPath, "utf-8");
     const modified = configContent.replace(
-      /from\\s+['"]cmssy-cli\\/config['"]/g,
+      /from\\s+['"](?:@cmssy\\/cli\\/config|cmssy-cli\\/config)['"]/g,
       \`from '\${mockConfigPath.replace(/\\\\\\\\/g, "/")}'\`
     );
 
@@ -763,11 +764,33 @@ export async function GET(
   // Load block.config.ts schema
   const config = loadBlockConfig(blockPath);
 
-  // Check for pages.json (templates)
+  // Check for pages.json (templates), fall back to block.config.ts
   const pagesJsonPath = path.join(blockPath, "pages.json");
-  const pagesData = fs.existsSync(pagesJsonPath)
+  let pagesData = fs.existsSync(pagesJsonPath)
     ? JSON.parse(fs.readFileSync(pagesJsonPath, "utf-8"))
     : null;
+
+  // If no pages.json but config has pages (template), convert on the fly
+  if (!pagesData && config && (config.pages || config.layoutPositions)) {
+    const layoutPositions: Record<string, any> = {};
+    if (Array.isArray(config.layoutPositions)) {
+      for (const lp of config.layoutPositions as any[]) {
+        layoutPositions[lp.position] = { type: lp.type, content: lp.content || {} };
+      }
+    } else if (config.layoutPositions && typeof config.layoutPositions === "object") {
+      Object.assign(layoutPositions, config.layoutPositions);
+    }
+
+    const pages = ((config.pages || []) as any[]).map((page: any, index: number) => ({
+      name: page.name,
+      slug: page.slug === "home" || page.slug === "/" || index === 0
+        ? "/"
+        : page.slug.startsWith("/") ? page.slug : "/" + page.slug,
+      blocks: page.blocks || [],
+    }));
+
+    pagesData = { layoutPositions, pages };
+  }
 
   return NextResponse.json({
     name,
@@ -862,6 +885,101 @@ function convertBlockTypeToSimple(blockType: string): string {
   return simple;
 }
 
+/**
+ * Load block.config.ts synchronously using tsx/esbuild.
+ * Used to generate template preview pages when pages.json is missing.
+ */
+function loadTemplateConfigSync(
+  templateDir: string,
+  projectRoot: string,
+): Record<string, any> | null {
+  const configPath = path.join(templateDir, "block.config.ts");
+  if (!fs.existsSync(configPath)) return null;
+
+  try {
+    const cliPath = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+    const possibleTsxPaths = [
+      path.join(cliPath, "..", "node_modules", ".bin", "tsx"),
+      path.join(cliPath, "..", "..", "node_modules", ".bin", "tsx"),
+      path.join(projectRoot, "node_modules", ".bin", "tsx"),
+    ];
+    let tsxBinary = possibleTsxPaths.find((p) => fs.existsSync(p));
+    if (!tsxBinary) tsxBinary = "npx -y tsx";
+
+    const cacheDir = path.join(projectRoot, ".cmssy", "cache");
+    fs.ensureDirSync(cacheDir);
+
+    const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
+    fs.writeFileSync(
+      mockConfigPath,
+      "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\n",
+    );
+
+    const configContent = fs.readFileSync(configPath, "utf-8");
+    const modified = configContent.replace(
+      /from\s+['"](?:@?cmssy-?(?:\/cli)?\/config|cmssy-cli\/config)['"]/g,
+      `from '${mockConfigPath.replace(/\\/g, "/")}'`,
+    );
+
+    const tempPath = path.join(cacheDir, `temp-template-config-${Date.now()}.ts`);
+    fs.writeFileSync(tempPath, modified);
+
+    const evalCode = `import cfg from '${tempPath.replace(/\\/g, "/")}'; console.log(JSON.stringify(cfg.default || cfg));`;
+    const cmd = tsxBinary.includes("npx")
+      ? `${tsxBinary} --eval "${evalCode}"`
+      : `"${tsxBinary}" --eval "${evalCode}"`;
+
+    const output = execSync(cmd, {
+      encoding: "utf-8",
+      cwd: projectRoot,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    try { fs.removeSync(tempPath); } catch {}
+    try { fs.removeSync(mockConfigPath); } catch {}
+
+    const lines = output.trim().split("\n");
+    return JSON.parse(lines[lines.length - 1]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert template config (from block.config.ts defineTemplate) to pages.json format.
+ * - layoutPositions: array → object keyed by position
+ * - page slugs: "home" → "/", others → "/{slug}"
+ */
+function convertConfigToPagesData(config: Record<string, any>): {
+  layoutPositions: Record<string, any>;
+  pages: any[];
+} {
+  // Convert layoutPositions from array to object
+  const layoutPositions: Record<string, any> = {};
+  if (Array.isArray(config.layoutPositions)) {
+    for (const lp of config.layoutPositions) {
+      layoutPositions[lp.position] = {
+        type: lp.type,
+        content: lp.content || {},
+      };
+    }
+  } else if (config.layoutPositions && typeof config.layoutPositions === "object") {
+    // Already in object format
+    Object.assign(layoutPositions, config.layoutPositions);
+  }
+
+  // Convert page slugs
+  const pages = (config.pages || []).map((page: any, index: number) => ({
+    name: page.name,
+    slug: page.slug === "home" || page.slug === "/" || index === 0
+      ? "/"
+      : page.slug.startsWith("/") ? page.slug : `/${page.slug}`,
+    blocks: page.blocks || [],
+  }));
+
+  return { layoutPositions, pages };
+}
+
 function generatePreviewPages(
   devRoot: string,
   projectRoot: string,
@@ -949,12 +1067,21 @@ function generateTemplatePreviewPage(
   projectRoot: string,
   resource: ScannedResource,
 ) {
-  // Read pages.json from template directory
+  // Read pages data from pages.json or fall back to block.config.ts
   const templateDir = path.join(projectRoot, "templates", resource.name);
   const pagesJsonPath = path.join(templateDir, "pages.json");
-  if (!fs.existsSync(pagesJsonPath)) return;
 
-  const pagesData = JSON.parse(fs.readFileSync(pagesJsonPath, "utf-8"));
+  let pagesData: { layoutPositions: Record<string, any>; pages: any[] };
+
+  if (fs.existsSync(pagesJsonPath)) {
+    pagesData = JSON.parse(fs.readFileSync(pagesJsonPath, "utf-8"));
+  } else {
+    // No pages.json — load from block.config.ts and convert format
+    const config = loadTemplateConfigSync(templateDir, projectRoot);
+    if (!config || (!config.pages && !config.layoutPositions)) return;
+    pagesData = convertConfigToPagesData(config);
+  }
+
   const pages = pagesData.pages || [];
   const layoutPositions = pagesData.layoutPositions || {};
 

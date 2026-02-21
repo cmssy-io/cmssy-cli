@@ -62,7 +62,7 @@ export async function loadBlockConfig(
     // Read original config and replace import path to point to mock
     const configContent = fs.readFileSync(configPath, "utf-8");
     const modifiedConfig = configContent.replace(
-      /from\s+['"]cmssy-cli\/config['"]/g,
+      /from\s+['"](?:@cmssy\/cli\/config|cmssy-cli\/config)['"]/g,
       `from '${mockConfigPath.replace(/\\/g, "/")}'`
     );
 
