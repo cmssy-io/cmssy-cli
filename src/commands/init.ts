@@ -247,6 +247,49 @@ CMSSY_WORKSPACE_ID=
 `;
     fs.writeFileSync(path.join(projectPath, ".env.example"), envExample);
 
+    // Create .vscode/settings.json (VS Code performance + DX)
+    fs.mkdirSync(path.join(projectPath, ".vscode"), { recursive: true });
+
+    const vscodeSettings = {
+      "files.watcherExclude": {
+        "**/public/**": true,
+        "**/.cmssy/**": true,
+        "**/node_modules/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+      },
+      "search.exclude": {
+        "**/public": true,
+        "**/.cmssy": true,
+        "**/node_modules": true,
+      },
+      "files.exclude": {
+        "**/.cmssy": true,
+        "**/public": true,
+      },
+      "eslint.enable": false,
+      "typescript.tsdk": "node_modules/typescript/lib",
+    };
+    fs.writeFileSync(
+      path.join(projectPath, ".vscode", "settings.json"),
+      JSON.stringify(vscodeSettings, null, 2) + "\n",
+    );
+
+    // Create .vscode/extensions.json (recommended extensions)
+    const vscodeExtensions = {
+      recommendations: [
+        "bradlc.vscode-tailwindcss",
+        "csstools.postcss",
+      ],
+      unwantedRecommendations: [
+        "dbaeumer.vscode-eslint",
+      ],
+    };
+    fs.writeFileSync(
+      path.join(projectPath, ".vscode", "extensions.json"),
+      JSON.stringify(vscodeExtensions, null, 2) + "\n",
+    );
+
     // Create README.md
     const readme = `# ${answers.projectName}
 
