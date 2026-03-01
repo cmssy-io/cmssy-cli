@@ -21,6 +21,7 @@ export type {
   // Template types
   TemplateConfig,
   TemplatePageBlueprint,
+  TemplateBlockContent,
   TemplateBlockInstance,
   TemplateLayoutPosition,
   TemplateTheme,
