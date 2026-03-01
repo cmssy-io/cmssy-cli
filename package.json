@@ -1,6 +1,6 @@
 {
   "name": "@cmssy/cli",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Unified CLI for building and publishing blocks to Cmssy design library",
   "type": "module",
   "bin": {
@@ -48,7 +48,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cmssy/types": "file:../cmssy-types",
+    "@cmssy/types": "^0.5.1",
     "@tailwindcss/postcss": "^4.1.18",
     "archiver": "^7.0.1",
     "chalk": "^5.3.0",
