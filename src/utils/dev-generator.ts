@@ -110,8 +110,16 @@ function generateTsConfig(devRoot: string, projectRoot: string) {
         userPaths[alias] = targets.map((t) => `${rel}/${t}`);
       }
       // Re-map user includes relative to .cmssy/dev/
+      // Convert catch-all globs (e.g. blocks/**/*) to TS-only for better perf
       const rawIncludes = projectTsConfig.include || [];
-      userIncludes = rawIncludes.map((inc: string) => `${rel}/${inc}`);
+      userIncludes = rawIncludes.flatMap((inc: string) => {
+        const remapped = `${rel}/${inc}`;
+        if (remapped.endsWith("/**/*")) {
+          const base = remapped.slice(0, -5);
+          return [`${base}/**/*.ts`, `${base}/**/*.tsx`];
+        }
+        return [remapped];
+      });
     } catch {
       // Ignore parse errors — fall back to defaults
     }

@@ -158,8 +158,16 @@ export async function initCommand(name?: string, options: InitOptions = {}) {
           "cmssy-cli/config": ["./node_modules/cmssy-cli/config"],
         },
       },
-      include: ["blocks/**/*", "templates/**/*"],
-      exclude: ["node_modules", "dist", "public"],
+      include: [
+        "blocks/**/*.ts",
+        "blocks/**/*.tsx",
+        "templates/**/*.ts",
+        "templates/**/*.tsx",
+        "components/**/*.ts",
+        "components/**/*.tsx",
+        "lib/**/*.ts",
+      ],
+      exclude: ["node_modules", "dist", "public", ".cmssy"],
     };
     fs.writeFileSync(
       path.join(projectPath, "tsconfig.json"),
@@ -257,11 +265,16 @@ CMSSY_WORKSPACE_ID=
         "**/node_modules/**": true,
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
+        "**/.next/**": true,
+        "**/dist/**": true,
       },
       "search.exclude": {
         "**/public": true,
         "**/.cmssy": true,
         "**/node_modules": true,
+        "**/.next": true,
+        "**/dist": true,
+        "**/pnpm-lock.yaml": true,
       },
       "files.exclude": {
         "**/.cmssy": true,
@@ -269,6 +282,15 @@ CMSSY_WORKSPACE_ID=
       },
       "eslint.enable": false,
       "typescript.tsdk": "node_modules/typescript/lib",
+      "typescript.tsserver.maxTsServerMemory": 2048,
+      "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+      "tailwindCSS.files.exclude": [
+        "**/node_modules/**",
+        "**/.cmssy/**",
+        "**/public/**",
+        "**/.next/**",
+        "**/dist/**",
+      ],
     };
     fs.writeFileSync(
       path.join(projectPath, ".vscode", "settings.json"),

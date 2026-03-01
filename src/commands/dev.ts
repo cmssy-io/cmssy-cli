@@ -98,6 +98,7 @@ export async function devCommand(options: DevOptions) {
       env: {
         ...process.env,
         CMSSY_PROJECT_ROOT: projectRoot,
+        NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --max-old-space-size=4096`.trim(),
       },
     });
 
