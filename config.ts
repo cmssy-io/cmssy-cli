@@ -18,6 +18,13 @@ export type {
   FieldValidation,
   ValidationPattern,
   LayoutOverride,
+  // Platform context (runtime)
+  PlatformContext,
+  BlockProps,
+  BlockAuthContext,
+  BlockI18nContext,
+  BlockMember,
+  BlockMemberProfile,
   // Template types
   TemplateConfig,
   TemplatePageBlueprint,
