@@ -205,6 +205,21 @@ program
     "--overwrite-content",
     "Overwrite existing defaultContent and schemaFields on republish",
   )
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy publish --all -w abc123              Publish all, preserve content
+  $ cmssy publish hero -w abc123 --patch       Publish hero with patch bump
+  $ cmssy publish --all -w abc123 --overwrite-content
+                                               Force overwrite content/schema
+
+Content preservation:
+  By default, republishing a block preserves existing defaultContent and
+  schemaFields in the workspace. Use --overwrite-content to reset them
+  from config.ts / preview.json.
+`,
+  )
   .action(publishCommand);
 
 // cmssy sync
