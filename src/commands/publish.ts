@@ -20,6 +20,7 @@ interface PublishOptions {
   bump?: boolean; // --no-bump sets this to false
   dryRun?: boolean;
   all?: boolean;
+  overwriteContent?: boolean;
 }
 
 interface PackageInfo {
@@ -273,6 +274,7 @@ export async function publishCommand(
         workspaceId as string,
         config.apiToken!,
         config.apiUrl,
+        !options.overwriteContent,
       );
       spinner.succeed(
         chalk.green(`${pkg.packageJson.name} published to workspace`),
@@ -803,6 +805,7 @@ async function publishToWorkspace(
   workspaceId: string,
   apiToken: string,
   apiUrl: string,
+  preserveContent: boolean,
 ): Promise<void> {
   const {
     packageJson,
@@ -866,6 +869,7 @@ async function publishToWorkspace(
     sourceItem: packageJson.name,
     version: packageJson.version || "1.0.0",
     packageType, // "block" or "template"
+    preserveContent,
     // AI Block Builder source files (for editable blocks in Sandpack)
     rawSourceCode,
     rawSourceCss,
@@ -979,6 +983,7 @@ async function publishToWorkspace(
     // Remove fields not supported by ImportTemplateInput
     // (these are only for blocks, not templates)
     delete input.packageType;
+    delete input.preserveContent;
     delete input.sourceCode;
     delete input.cssCode;
     delete input.rawSourceCode;

@@ -5,9 +5,7 @@ export function createClient(): GraphQLClient {
   const config = loadConfig();
 
   if (!config.apiToken) {
-    throw new Error(
-      "CMSSY_API_TOKEN not configured. Run: cmssy configure"
-    );
+    throw new Error("CMSSY_API_TOKEN not configured. Run: cmssy configure");
   }
 
   return new GraphQLClient(config.apiUrl, {
