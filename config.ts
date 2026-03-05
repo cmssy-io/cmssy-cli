@@ -12,6 +12,7 @@ export type {
   RepeaterFieldConfig,
   MediaFieldConfig,
   SliderFieldConfig,
+  PageRef,
   PageSelectorFieldConfig,
   BlockRequires,
   ShowWhenCondition,
