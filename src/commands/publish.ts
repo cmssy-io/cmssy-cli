@@ -11,6 +11,10 @@ import {
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
 import { loadBlockConfig, validateSchema } from "../utils/block-config.js";
+import {
+  convertConfigToPagesData,
+  loadTemplateConfig,
+} from "../utils/publish-helpers.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -99,7 +103,15 @@ export async function publishCommand(
 
     for (const template of templatesToProcess) {
       const pagesJsonPath = path.join(template.path, "pages.json");
-      const requiredBlockTypes = extractBlockTypesFromPagesJson(pagesJsonPath);
+      let requiredBlockTypes = extractBlockTypesFromPagesJson(pagesJsonPath);
+
+      // Fallback: if no pages.json, load from config.ts
+      if (requiredBlockTypes.length === 0) {
+        requiredBlockTypes = extractBlockTypesFromConfig(
+          template.path,
+          process.cwd(),
+        );
+      }
 
       if (requiredBlockTypes.length > 0) {
         // Find which blocks exist in the project
@@ -435,6 +447,43 @@ function findProjectBlocks(blockTypes: string[]): string[] {
     .map((d) => d.name);
 
   return blockTypes.filter((bt) => existingBlocks.includes(bt));
+}
+
+/**
+ * Extract block types from config.ts (fallback when pages.json is missing).
+ */
+function extractBlockTypesFromConfig(
+  templatePath: string,
+  projectRoot: string,
+): string[] {
+  const config = loadTemplateConfig(templatePath, projectRoot);
+  if (!config) return [];
+
+  const blockTypes = new Set<string>();
+
+  // Extract from pages
+  for (const page of config.pages || []) {
+    for (const block of page.blocks || []) {
+      if (block.type) {
+        blockTypes.add(convertBlockTypeToSimple(block.type));
+      }
+    }
+    // Per-page layout positions
+    if (Array.isArray(page.layoutPositions)) {
+      for (const lp of page.layoutPositions) {
+        if (lp.type) blockTypes.add(convertBlockTypeToSimple(lp.type));
+      }
+    }
+  }
+
+  // Extract from global layoutPositions (array format from defineTemplate)
+  if (Array.isArray(config.layoutPositions)) {
+    for (const lp of config.layoutPositions) {
+      if (lp.type) blockTypes.add(convertBlockTypeToSimple(lp.type));
+    }
+  }
+
+  return Array.from(blockTypes);
 }
 
 async function scanPackages(
@@ -887,10 +936,27 @@ async function publishToWorkspace(
     input.requires = blockConfig.requires;
   }
 
-  // Check if this is a template with pages.json
-  const isTemplate = packageType === "template";
+  // Check if this is a template with pages data (pages.json or config.ts)
+  const isTemplateType = packageType === "template";
   const pagesJsonPath = path.join(packagePath, "pages.json");
-  const hasPagesJson = isTemplate && fs.existsSync(pagesJsonPath);
+  const hasPagesJson = isTemplateType && fs.existsSync(pagesJsonPath);
+
+  // Fallback: load from config.ts if no pages.json
+  let hasTemplateData = hasPagesJson;
+  let configPagesData: {
+    layoutPositions: Record<string, any>;
+    pages: any[];
+  } | null = null;
+  if (isTemplateType && !hasPagesJson) {
+    const templateConfig = loadTemplateConfig(packagePath, process.cwd());
+    if (
+      templateConfig &&
+      (templateConfig.pages || templateConfig.layoutPositions)
+    ) {
+      configPagesData = convertConfigToPagesData(templateConfig);
+      hasTemplateData = true;
+    }
+  }
 
   // Create client with workspace header
   const client = new GraphQLClient(apiUrl, {
@@ -920,14 +986,16 @@ async function publishToWorkspace(
   });
 
   // Use different mutation for templates with pages
-  if (hasPagesJson) {
-    // Load pages.json for template
-    const pagesData = fs.readJsonSync(pagesJsonPath);
+  if (hasTemplateData) {
+    // Load pages data from pages.json or config.ts fallback
+    const pagesData = hasPagesJson
+      ? fs.readJsonSync(pagesJsonPath)
+      : configPagesData;
 
-    // Convert pages.json format to mutation input format
+    // Convert to mutation input format
     // IMPORTANT: Convert full block names to simple types
     // "@cmssy-marketing/blocks.hero" -> "hero"
-    const pages = (pagesData.pages || []).map((page: any) => {
+    const pages = (pagesData!.pages || []).map((page: any) => {
       const result: any = {
         name: page.name,
         slug: page.slug,
@@ -938,7 +1006,11 @@ async function publishToWorkspace(
       };
       // Per-page layout positions (e.g. sidebar_left only on /docs)
       if (page.layoutPositions) {
-        result.layoutPositions = Object.entries(page.layoutPositions).map(
+        // Support both object format (pages.json) and array format (config.ts)
+        const lpEntries = Array.isArray(page.layoutPositions)
+          ? page.layoutPositions.map((lp: any) => [lp.position, lp])
+          : Object.entries(page.layoutPositions);
+        result.layoutPositions = lpEntries.map(
           ([position, data]: [string, any]) => ({
             position,
             type: convertBlockTypeToSimple(data.type),
@@ -949,14 +1021,16 @@ async function publishToWorkspace(
       return result;
     });
 
-    // Convert layoutPositions from pages.json
-    const layoutPositions = Object.entries(pagesData.layoutPositions || {}).map(
-      ([position, data]: [string, any]) => ({
-        position,
-        type: convertBlockTypeToSimple(data.type),
-        content: data.content || {},
-      }),
-    );
+    // Convert layoutPositions — support both object (pages.json) and array (config.ts) formats
+    const rawLayoutPositions = pagesData!.layoutPositions || {};
+    const layoutEntries: [string, any][] = Array.isArray(rawLayoutPositions)
+      ? rawLayoutPositions.map((lp: any) => [lp.position, lp])
+      : Object.entries(rawLayoutPositions);
+    const layoutPositions = layoutEntries.map(([position, data]) => ({
+      position,
+      type: convertBlockTypeToSimple(data.type),
+      content: data.content || {},
+    }));
 
     // Extract unique block types required by this template
     const requiredBlockTypes = new Set<string>();
