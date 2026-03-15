@@ -1057,7 +1057,6 @@ async function publishToWorkspace(
     // Remove fields not supported by ImportTemplateInput
     // (these are only for blocks, not templates)
     delete input.packageType;
-    delete input.preserveContent;
     delete input.sourceCode;
     delete input.cssCode;
     delete input.rawSourceCode;
