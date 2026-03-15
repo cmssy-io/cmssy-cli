@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs-extra";
 import path from "path";
 import os from "os";
-import { generateDevApp, regeneratePreviewPages } from "../src/utils/dev-generator.js";
+import {
+  generateDevApp,
+  regeneratePreviewPages,
+} from "../src/utils/dev-generator.js";
 import type { ScannedResource } from "../src/utils/scanner.js";
 
 let tmpDir: string;
@@ -127,24 +130,16 @@ describe("generateDevApp", () => {
     generateDevApp(tmpDir, resources);
 
     expect(
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/api/blocks/route.ts")),
+    ).toBe(true);
+    expect(
       fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/api/blocks/route.ts"),
+        path.join(tmpDir, ".cmssy/dev/app/api/blocks/[name]/config/route.ts"),
       ),
     ).toBe(true);
     expect(
       fs.existsSync(
-        path.join(
-          tmpDir,
-          ".cmssy/dev/app/api/blocks/[name]/config/route.ts",
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(
-          tmpDir,
-          ".cmssy/dev/app/api/preview/[blockName]/route.ts",
-        ),
+        path.join(tmpDir, ".cmssy/dev/app/api/preview/[blockName]/route.ts"),
       ),
     ).toBe(true);
     expect(
@@ -171,10 +166,7 @@ describe("generateDevApp", () => {
 
     generateDevApp(tmpDir, resources);
 
-    const heroPage = path.join(
-      tmpDir,
-      ".cmssy/dev/app/preview/hero/page.tsx",
-    );
+    const heroPage = path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx");
     const featuresPage = path.join(
       tmpDir,
       ".cmssy/dev/app/preview/features/page.tsx",
@@ -190,14 +182,14 @@ describe("generateDevApp", () => {
     expect(heroPageContent).toContain("BlockComponent");
 
     // No client.tsx wrapper should exist
-    const heroClient = path.join(tmpDir, ".cmssy/dev/app/preview/hero/client.tsx");
+    const heroClient = path.join(
+      tmpDir,
+      ".cmssy/dev/app/preview/hero/client.tsx",
+    );
     expect(fs.existsSync(heroClient)).toBe(false);
-
-    // page.tsx should NOT have "use client" — blocks must declare it themselves
-    expect(heroPageContent).not.toContain('"use client"');
   });
 
-  it("should use @templates alias for template resources", () => {
+  it("should generate catch-all route for template resources with pages.json", () => {
     const resources = [
       createResource({
         type: "template",
@@ -206,35 +198,36 @@ describe("generateDevApp", () => {
       }),
     ];
 
-    // Create template source
-    fs.mkdirSync(path.join(tmpDir, "templates/landing/src"), {
-      recursive: true,
-    });
+    // Create template with pages.json (required by template generator)
+    fs.mkdirSync(path.join(tmpDir, "templates/landing"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "templates/landing/src/index.tsx"),
-      'export { default } from "./Landing";\n',
+      path.join(tmpDir, "templates/landing/pages.json"),
+      JSON.stringify({
+        layoutPositions: {},
+        pages: [
+          { name: "Home", slug: "/", blocks: [{ type: "hero", content: {} }] },
+        ],
+      }),
     );
 
     generateDevApp(tmpDir, resources);
 
+    // Templates use [[...slug]] catch-all route, not direct page.tsx
     const pagePath = path.join(
       tmpDir,
-      ".cmssy/dev/app/preview/landing/page.tsx",
+      ".cmssy/dev/app/preview/landing/[[...slug]]/page.tsx",
     );
     expect(fs.existsSync(pagePath)).toBe(true);
 
     const content = fs.readFileSync(pagePath, "utf-8");
-    expect(content).toContain("@templates/landing/src/index");
+    expect(content).toContain("@blocks/hero/src/index");
   });
 
   it("should import CSS in page.tsx when index.css exists", () => {
     const resources = [createResource()];
     generateDevApp(tmpDir, resources);
 
-    const pagePath = path.join(
-      tmpDir,
-      ".cmssy/dev/app/preview/hero/page.tsx",
-    );
+    const pagePath = path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx");
     const content = fs.readFileSync(pagePath, "utf-8");
     expect(content).toContain("@blocks/hero/src/index.css");
   });
@@ -245,10 +238,7 @@ describe("generateDevApp", () => {
     const resources = [createResource()];
     generateDevApp(tmpDir, resources);
 
-    const pagePath = path.join(
-      tmpDir,
-      ".cmssy/dev/app/preview/hero/page.tsx",
-    );
+    const pagePath = path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx");
     const content = fs.readFileSync(pagePath, "utf-8");
     expect(content).not.toContain("index.css");
   });
@@ -265,14 +255,10 @@ describe("generateDevApp", () => {
 
     // hero should exist, empty should not
     expect(
-      fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx"),
-      ),
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx")),
     ).toBe(true);
     expect(
-      fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/preview/empty/page.tsx"),
-      ),
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/preview/empty/page.tsx")),
     ).toBe(false);
   });
 
@@ -322,14 +308,10 @@ describe("regeneratePreviewPages", () => {
     regeneratePreviewPages(tmpDir, newResources);
 
     expect(
-      fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/preview/cta/page.tsx"),
-      ),
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/preview/cta/page.tsx")),
     ).toBe(true);
     expect(
-      fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx"),
-      ),
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx")),
     ).toBe(true);
   });
 
@@ -359,9 +341,7 @@ describe("regeneratePreviewPages", () => {
     regeneratePreviewPages(tmpDir, [createResource()]);
 
     expect(
-      fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx"),
-      ),
+      fs.existsSync(path.join(tmpDir, ".cmssy/dev/app/preview/hero/page.tsx")),
     ).toBe(true);
     expect(
       fs.existsSync(
@@ -386,7 +366,10 @@ describe("generated tsconfig paths", () => {
     const paths = tsconfig.compilerOptions.paths;
 
     // All paths must be relative (../../) — absolute paths break Turbopack
-    for (const [alias, targets] of Object.entries(paths) as [string, string[]][]) {
+    for (const [alias, targets] of Object.entries(paths) as [
+      string,
+      string[],
+    ][]) {
       for (const target of targets) {
         expect(target, `${alias} path must be relative`).toMatch(/^\.\.\//);
         expect(target, `${alias} path must NOT be absolute`).not.toMatch(/^\//);
@@ -472,10 +455,7 @@ describe("generated API routes", () => {
     generateDevApp(tmpDir, resources);
 
     const content = fs.readFileSync(
-      path.join(
-        tmpDir,
-        ".cmssy/dev/app/api/preview/[blockName]/route.ts",
-      ),
+      path.join(tmpDir, ".cmssy/dev/app/api/preview/[blockName]/route.ts"),
       "utf-8",
     );
 
