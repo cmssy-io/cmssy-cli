@@ -4,16 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@cmssy/types': link:../cmssy-types
-
 importers:
 
   .:
     dependencies:
       '@cmssy/types':
-        specifier: link:../cmssy-types
-        version: link:../cmssy-types
+        specifier: ^0.5.7
+        version: 0.5.7
       '@tailwindcss/postcss':
         specifier: ^4.1.18
         version: 4.1.18
@@ -145,6 +142,9 @@ packages:
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
+
+  '@cmssy/types@0.5.7':
+    resolution: {integrity: sha512-Wb0U7l34w+EN3Pwo3Xpr8Oi/x3aW4fY/DNLrkAlCqU515RRFeC/XyiP6abTPzNCDLdneEgWe0r8VhlQI1fIJnA==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -2089,6 +2089,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@bcoe/v8-coverage@1.0.2': {}
+
+  '@cmssy/types@0.5.7': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:
