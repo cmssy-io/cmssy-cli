@@ -11,7 +11,6 @@ export type {
   MultiselectFieldConfig,
   RepeaterFieldConfig,
   MediaFieldConfig,
-  SliderFieldConfig,
   PageRef,
   PageSelectorFieldConfig,
   BlockRequires,

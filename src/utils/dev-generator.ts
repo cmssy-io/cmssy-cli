@@ -417,25 +417,6 @@ export default function DevHome() {
         />
       );
     }
-    if (field.type === "slider") {
-      const min = field.min ?? 0;
-      const max = field.max ?? 100;
-      const step = field.step ?? 1;
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={value ?? min}
-            onChange={(e) => onChange(Number(e.target.value))}
-            style={{ flex: 1 }}
-          />
-          <span style={{ fontSize: "13px", fontWeight: 500, minWidth: "32px", textAlign: "right" }}>{value ?? min}</span>
-        </div>
-      );
-    }
     if (field.type === "media") {
       return (
         <div>

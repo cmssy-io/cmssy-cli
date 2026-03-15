@@ -20,7 +20,6 @@ const DEFAULT_VALUE_TYPES: Record<string, string> = {
   multiselect: "string[]",
   boolean: "boolean",
   color: "string",
-  slider: "number",
   repeater: "Record<string, unknown>[]",
   form: "string",
   emailTemplate: "string",

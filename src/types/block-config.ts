@@ -12,7 +12,6 @@ export {
   type MultiselectFieldConfig,
   type RepeaterFieldConfig,
   type MediaFieldConfig,
-  type SliderFieldConfig,
   type PageSelectorFieldConfig,
   type FieldValidation,
   type ValidationPattern,

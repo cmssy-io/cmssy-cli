@@ -38,6 +38,10 @@ export const IMPORT_BLOCK_MUTATION = `
         options
         minValue
         maxValue
+        minItems
+        maxItems
+        multiple
+        itemSchema
         group
         showWhen {
           field

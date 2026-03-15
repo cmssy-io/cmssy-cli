@@ -12,6 +12,23 @@ import path from "path";
 export function convertSchemaToFields(schema: Record<string, any>): any[] {
   const fields: any[] = [];
 
+  // All known field properties that the backend model accepts.
+  // Pass through any that are defined - no per-type gating.
+  const OPTIONAL_PROPS = [
+    "defaultValue",
+    "placeholder",
+    "helperText",
+    "options",
+    "minValue",
+    "maxValue",
+    "minItems",
+    "maxItems",
+    "multiple",
+    "group",
+    "showWhen",
+    "validation",
+  ] as const;
+
   Object.entries(schema).forEach(([key, field]: [string, any]) => {
     const baseField: any = {
       key,
@@ -20,44 +37,20 @@ export function convertSchemaToFields(schema: Record<string, any>): any[] {
       required: field.required || false,
     };
 
-    // Add defaultValue if present
-    if (field.defaultValue !== undefined) {
-      baseField.defaultValue = field.defaultValue;
+    // Map helpText alias
+    if (field.helpText && !field.helperText) {
+      field.helperText = field.helpText;
     }
 
-    // Add placeholder if present
-    if (field.placeholder) {
-      baseField.placeholder = field.placeholder;
+    // Pass through all known optional properties
+    for (const prop of OPTIONAL_PROPS) {
+      if (field[prop] !== undefined) {
+        baseField[prop] = field[prop];
+      }
     }
 
-    // Add helpText if present
-    if (field.helpText) {
-      baseField.helperText = field.helpText;
-    }
-
-    // Add group if present
-    if (field.group) {
-      baseField.group = field.group;
-    }
-
-    // Add showWhen conditional visibility
-    if (field.showWhen) {
-      baseField.showWhen = field.showWhen;
-    }
-
-    // Add validation rules
-    if (field.validation) {
-      baseField.validation = field.validation;
-    }
-
-    if (field.type === "select" && field.options) {
-      baseField.options = field.options;
-    }
-
+    // Repeater: recursively convert nested schema
     if (field.type === "repeater" && field.schema) {
-      baseField.minItems = field.minItems;
-      baseField.maxItems = field.maxItems;
-      // Backend expects itemSchema to be a flat array of field definitions
       baseField.itemSchema = convertSchemaToFields(field.schema);
     }
 

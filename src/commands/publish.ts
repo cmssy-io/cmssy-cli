@@ -1105,64 +1105,9 @@ async function publishToWorkspace(
   }
 }
 
-// Helper: Convert config.ts schema to schemaFields array
-function convertSchemaToFields(schema: Record<string, any>): any[] {
-  const fields: any[] = [];
-
-  Object.entries(schema).forEach(([key, field]: [string, any]) => {
-    const baseField: any = {
-      key,
-      type: field.type,
-      label: field.label,
-      required: field.required || false,
-    };
-
-    // Add defaultValue if present
-    if (field.defaultValue !== undefined) {
-      baseField.defaultValue = field.defaultValue;
-    }
-
-    // Add placeholder if present
-    if (field.placeholder) {
-      baseField.placeholder = field.placeholder;
-    }
-
-    // Add helpText if present
-    if (field.helpText) {
-      baseField.helperText = field.helpText;
-    }
-
-    // Add group if present
-    if (field.group) {
-      baseField.group = field.group;
-    }
-
-    // Add showWhen conditional visibility
-    if (field.showWhen) {
-      baseField.showWhen = field.showWhen;
-    }
-
-    // Add validation rules
-    if (field.validation) {
-      baseField.validation = field.validation;
-    }
-
-    if (field.type === "select" && field.options) {
-      baseField.options = field.options;
-    }
-
-    if (field.type === "repeater" && field.schema) {
-      baseField.minItems = field.minItems;
-      baseField.maxItems = field.maxItems;
-      // Backend expects itemSchema to be a flat array of field definitions
-      baseField.itemSchema = convertSchemaToFields(field.schema);
-    }
-
-    fields.push(baseField);
-  });
-
-  return fields;
-}
+// Re-export from publish-helpers (single source of truth)
+// DO NOT duplicate convertSchemaToFields here
+import { convertSchemaToFields } from "../utils/publish-helpers.js";
 
 // Helper: Extract default content from schema
 function extractDefaultContent(schema: Record<string, any>): any {

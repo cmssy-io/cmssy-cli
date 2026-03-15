@@ -107,14 +107,6 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     supportsValidation: false,
   },
   {
-    type: "slider",
-    label: "Slider",
-    description: "Range slider",
-    valueType: "number",
-    allowsDefaultValue: true,
-    supportsValidation: true,
-  },
-  {
     type: "repeater",
     label: "Repeater",
     description: "Repeatable nested fields",
@@ -206,7 +198,7 @@ async function loadCachedFieldTypes(): Promise<FieldTypeDefinition[] | null> {
 }
 
 async function cacheFieldTypes(
-  fieldTypes: FieldTypeDefinition[]
+  fieldTypes: FieldTypeDefinition[],
 ): Promise<void> {
   const cachePath = path.join(process.cwd(), CACHE_FILE);
   fs.ensureDirSync(path.dirname(cachePath));
@@ -218,7 +210,7 @@ async function cacheFieldTypes(
 
 export function isValidFieldType(
   type: string,
-  fieldTypes: FieldTypeDefinition[]
+  fieldTypes: FieldTypeDefinition[],
 ): boolean {
   return fieldTypes.some((ft) => ft.type === type);
 }
