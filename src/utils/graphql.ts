@@ -1,4 +1,5 @@
 import { GraphQLClient } from "graphql-request";
+import { blockFieldGraphQLSelection } from "@cmssy/types";
 import { loadConfig } from "./config.js";
 
 export function createClient(): GraphQLClient {
@@ -16,6 +17,8 @@ export function createClient(): GraphQLClient {
   });
 }
 
+const SCHEMA_FIELDS_FRAGMENT = blockFieldGraphQLSelection();
+
 // GraphQL Mutations
 export const IMPORT_BLOCK_MUTATION = `
   mutation ImportBlock($input: ImportBlockInput!) {
@@ -28,36 +31,7 @@ export const IMPORT_BLOCK_MUTATION = `
       category
       layoutPosition
       schemaFields {
-        key
-        type
-        label
-        defaultValue
-        placeholder
-        required
-        helperText
-        options
-        minValue
-        maxValue
-        minItems
-        maxItems
-        multiple
-        itemSchema
-        group
-        showWhen {
-          field
-          equals
-          notEquals
-          notEmpty
-          isEmpty
-        }
-        validation {
-          minLength
-          maxLength
-          min
-          max
-          pattern
-          message
-        }
+        ${SCHEMA_FIELDS_FRAGMENT}
       }
       defaultContent
       requires {
