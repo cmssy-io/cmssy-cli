@@ -1004,6 +1004,14 @@ async function publishToWorkspace(
           content: block.content || {},
         })),
       };
+      // Pass pageType if defined (e.g. "post" for blog post pages)
+      if (page.pageType) {
+        result.pageType = page.pageType;
+      }
+      // Pass explicit parentSlug if defined
+      if (page.parentSlug) {
+        result.parentSlug = page.parentSlug;
+      }
       // Per-page layout positions (e.g. sidebar_left only on /docs)
       if (page.layoutPositions) {
         // Support both object format (pages.json) and array format (config.ts)
@@ -1053,6 +1061,11 @@ async function publishToWorkspace(
     input.pages = pages;
     input.layoutPositions = layoutPositions;
     input.requiredBlocks = Array.from(requiredBlockTypes);
+
+    // Add pageTypes if defined in template config
+    if (pagesData!.pageTypes && Array.isArray(pagesData!.pageTypes)) {
+      input.pageTypes = pagesData!.pageTypes;
+    }
 
     // Remove fields not supported by ImportTemplateInput
     // (these are only for blocks, not templates)

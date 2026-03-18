@@ -207,6 +207,7 @@ export function loadTemplateConfig(
 export function convertConfigToPagesData(config: Record<string, any>): {
   layoutPositions: Record<string, any>;
   pages: any[];
+  pageTypes?: any[];
 } {
   const layoutPositions: Record<string, any> = {};
   if (Array.isArray(config.layoutPositions)) {
@@ -233,7 +234,22 @@ export function convertConfigToPagesData(config: Record<string, any>): {
           : `/${page.slug}`,
     blocks: page.blocks || [],
     layoutPositions: page.layoutPositions,
+    pageType: page.pageType,
+    parentSlug: page.parentSlug,
   }));
 
-  return { layoutPositions, pages };
+  const result: {
+    layoutPositions: Record<string, any>;
+    pages: any[];
+    pageTypes?: any[];
+  } = {
+    layoutPositions,
+    pages,
+  };
+
+  if (Array.isArray(config.pageTypes) && config.pageTypes.length > 0) {
+    result.pageTypes = config.pageTypes;
+  }
+
+  return result;
 }
