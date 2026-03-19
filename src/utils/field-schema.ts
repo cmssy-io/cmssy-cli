@@ -138,6 +138,14 @@ const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     allowsDefaultValue: true,
     supportsValidation: false,
   },
+  {
+    type: "pageSelector",
+    label: "Page Selector",
+    description: "Page picker for collection blocks",
+    valueType: "PageRef[]",
+    allowsDefaultValue: false,
+    supportsValidation: false,
+  },
 ];
 
 export async function getFieldTypes(): Promise<FieldTypeDefinition[]> {
