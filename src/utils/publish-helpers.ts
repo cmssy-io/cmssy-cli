@@ -224,30 +224,17 @@ export function convertConfigToPagesData(config: Record<string, any>): {
     Object.assign(layoutPositions, config.layoutPositions);
   }
 
-  const pages = (config.pages || []).map((page: any, index: number) => {
-    // Normalize slug: homepage = "/", others = no leading slash (e.g. "blog", "blog/my-post")
-    let slug: string;
-    if (page.slug === "home" || page.slug === "/" || index === 0) {
-      slug = "/";
-    } else {
-      slug = page.slug.replace(/^\/+/, ""); // strip leading slashes
-    }
-
-    // Normalize parentSlug: strip leading slash
-    let parentSlug: string | undefined;
-    if (page.parentSlug) {
-      parentSlug = page.parentSlug.replace(/^\/+/, "");
-    }
-
-    return {
-      name: page.name,
-      slug,
-      blocks: page.blocks || [],
-      layoutPositions: page.layoutPositions,
-      pageType: page.pageType,
-      parentSlug,
-    };
-  });
+  const pages = (config.pages || []).map((page: any, index: number) => ({
+    name: page.name,
+    slug:
+      page.slug === "home" || page.slug === "/" || index === 0
+        ? "/"
+        : page.slug,
+    blocks: page.blocks || [],
+    layoutPositions: page.layoutPositions,
+    pageType: page.pageType,
+    parentSlug: page.parentSlug,
+  }));
 
   const result: {
     layoutPositions: Record<string, any>;

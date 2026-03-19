@@ -996,9 +996,12 @@ async function publishToWorkspace(
     // IMPORTANT: Convert full block names to simple types
     // "@cmssy-marketing/blocks.hero" -> "hero"
     const pages = (pagesData!.pages || []).map((page: any) => {
+      // Normalize slug: homepage = "/", others strip leading slashes
+      const slug = page.slug === "/" ? "/" : page.slug.replace(/^\/+/, "");
+
       const result: any = {
         name: page.name,
-        slug: page.slug,
+        slug,
         blocks: (page.blocks || []).map((block: any) => ({
           type: convertBlockTypeToSimple(block.type),
           content: block.content || {},
@@ -1008,9 +1011,9 @@ async function publishToWorkspace(
       if (page.pageType) {
         result.pageType = page.pageType;
       }
-      // Pass explicit parentSlug if defined
+      // Pass explicit parentSlug if defined (normalize: strip leading slashes)
       if (page.parentSlug) {
-        result.parentSlug = page.parentSlug;
+        result.parentSlug = page.parentSlug.replace(/^\/+/, "");
       }
       // Per-page layout positions (e.g. sidebar_left only on /docs)
       if (page.layoutPositions) {
@@ -1063,8 +1066,9 @@ async function publishToWorkspace(
     input.requiredBlocks = Array.from(requiredBlockTypes);
 
     // Add pageTypes if defined in template config
-    if (pagesData!.pageTypes && Array.isArray(pagesData!.pageTypes)) {
-      input.pageTypes = pagesData!.pageTypes;
+    const pageTypes = pagesData?.pageTypes;
+    if (Array.isArray(pageTypes) && pageTypes.length > 0) {
+      input.pageTypes = pageTypes;
     }
 
     // Remove fields not supported by ImportTemplateInput
