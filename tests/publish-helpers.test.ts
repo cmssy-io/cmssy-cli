@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   convertSchemaToFields,
+  convertConfigToPagesData,
   extractDefaultContent,
   extractBlockType,
   isTemplate,
@@ -310,7 +311,7 @@ describe("extractBlockType", () => {
 
   it("should handle custom org scope", () => {
     expect(extractBlockType("@my-company/blocks.feature-card")).toBe(
-      "feature-card"
+      "feature-card",
     );
   });
 
@@ -324,7 +325,7 @@ describe("extractBlockType", () => {
 
   it("should handle complex package names", () => {
     expect(extractBlockType("@cmssy-marketing/blocks.cta-section")).toBe(
-      "cta-section"
+      "cta-section",
     );
   });
 });
@@ -461,9 +462,7 @@ describe("parsePagesJson", () => {
         {
           name: "Pricing",
           slug: "/pricing",
-          blocks: [
-            { type: "blocks.pricing", content: { plans: [] } },
-          ],
+          blocks: [{ type: "blocks.pricing", content: { plans: [] } }],
         },
       ],
       layoutPositions: {
@@ -488,7 +487,149 @@ describe("parsePagesJson", () => {
     expect(result.pages[0].slug).toBe("/");
     expect(result.pages[1].slug).toBe("/pricing");
 
-    expect(result.layoutPositions.find((p) => p.position === "header")).toBeDefined();
-    expect(result.layoutPositions.find((p) => p.position === "footer")).toBeDefined();
+    expect(
+      result.layoutPositions.find((p) => p.position === "header"),
+    ).toBeDefined();
+    expect(
+      result.layoutPositions.find((p) => p.position === "footer"),
+    ).toBeDefined();
+  });
+});
+
+// =============================================================================
+// convertConfigToPagesData
+// =============================================================================
+
+describe("convertConfigToPagesData", () => {
+  it("should convert homepage slug from 'home' to '/'", () => {
+    const config = {
+      pages: [{ name: "Homepage", slug: "home", blocks: [] }],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pages[0].slug).toBe("/");
+  });
+
+  it("should convert first page to '/' regardless of slug", () => {
+    const config = {
+      pages: [{ name: "Main", slug: "main", blocks: [] }],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pages[0].slug).toBe("/");
+  });
+
+  it("should pass through non-homepage slugs as-is", () => {
+    const config = {
+      pages: [
+        { name: "Home", slug: "/", blocks: [] },
+        { name: "Blog", slug: "blog", blocks: [] },
+        { name: "About", slug: "about", blocks: [] },
+      ],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pages[1].slug).toBe("blog");
+    expect(result.pages[2].slug).toBe("about");
+  });
+
+  it("should preserve pageType on pages", () => {
+    const config = {
+      pages: [
+        { name: "Home", slug: "/", blocks: [] },
+        { name: "Post", slug: "blog/my-post", pageType: "post", blocks: [] },
+      ],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pages[0].pageType).toBeUndefined();
+    expect(result.pages[1].pageType).toBe("post");
+  });
+
+  it("should preserve parentSlug on pages", () => {
+    const config = {
+      pages: [
+        { name: "Home", slug: "/", blocks: [] },
+        { name: "Blog", slug: "blog", blocks: [] },
+        {
+          name: "Post",
+          slug: "blog/my-post",
+          parentSlug: "blog",
+          pageType: "post",
+          blocks: [],
+        },
+      ],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pages[2].parentSlug).toBe("blog");
+  });
+
+  it("should include pageTypes when provided", () => {
+    const config = {
+      pages: [{ name: "Home", slug: "/", blocks: [] }],
+      pageTypes: [
+        {
+          name: "Blog Post",
+          slug: "post",
+          urlPrefix: "/blog",
+          fields: [{ name: "Author", key: "author", type: "string" }],
+        },
+      ],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pageTypes).toBeDefined();
+    expect(result.pageTypes).toHaveLength(1);
+    expect(result.pageTypes![0].slug).toBe("post");
+    expect(result.pageTypes![0].fields).toHaveLength(1);
+  });
+
+  it("should omit pageTypes when not provided", () => {
+    const config = {
+      pages: [{ name: "Home", slug: "/", blocks: [] }],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pageTypes).toBeUndefined();
+  });
+
+  it("should omit pageTypes when empty array", () => {
+    const config = {
+      pages: [{ name: "Home", slug: "/", blocks: [] }],
+      pageTypes: [],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.pageTypes).toBeUndefined();
+  });
+
+  it("should convert array layoutPositions to object format", () => {
+    const config = {
+      pages: [],
+      layoutPositions: [
+        { position: "header", type: "header-simple", content: { logo: "X" } },
+        { position: "footer", type: "footer-simple", content: {} },
+      ],
+    };
+
+    const result = convertConfigToPagesData(config);
+
+    expect(result.layoutPositions.header).toEqual({
+      type: "header-simple",
+      content: { logo: "X" },
+    });
+    expect(result.layoutPositions.footer).toEqual({
+      type: "footer-simple",
+      content: {},
+    });
   });
 });
