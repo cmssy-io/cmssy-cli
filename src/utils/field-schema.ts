@@ -17,7 +17,7 @@ const CACHE_FILE = ".cmssy/field-types.json";
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Fallback field types if backend is unreachable
-const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
+export const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
   {
     type: "singleLine",
     label: "Single Line Text",
