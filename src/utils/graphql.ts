@@ -65,6 +65,10 @@ export const IMPORT_TEMPLATE_MUTATION = `
   }
 `;
 
+// Note: ImportTemplateInput supports these additional fields:
+// - pageTypes: [TemplatePageTypeInput] - creates page types (e.g. "Blog Post")
+// - resetWorkspace: Boolean - deletes pages, page types, blocks (keeps media)
+
 export const ADD_BLOCK_SOURCE_CODE_MUTATION = `
   mutation AddBlockSourceCode($input: AddBlockSourceCodeInput!) {
     addBlockSourceCode(input: $input) {
