@@ -2,6 +2,13 @@ import chalk from "chalk";
 import { execSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
+import type {
+  FieldType,
+  FieldTypeValueMap,
+  FieldValidation,
+  ShowWhenCondition,
+  TypedFieldConfig,
+} from "@cmssy/types";
 import {
   BlockConfig,
   FieldConfig,
@@ -13,13 +20,75 @@ import {
 } from "../types/block-config.js";
 import { getFieldTypes, isValidFieldType } from "./field-schema.js";
 
-// Accept TypedBlockConfig (strict) at compile time, return BlockConfig (runtime)
-export function defineBlock(config: TypedBlockConfig): BlockConfig {
+// =============================================================================
+// CONFIG AUTHORING HELPERS
+// =============================================================================
+
+// Brand symbol - only field() can produce a FieldDef
+declare const __fieldBrand: unique symbol;
+
+/** Branded field config - must be created via field() helper */
+export type FieldDef = TypedFieldConfig & { readonly [__fieldBrand]: true };
+
+// Extra properties specific to certain field types
+type FieldTypeExtras = {
+  select: { options: Array<{ label: string; value: string }> };
+  multiselect: { options: Array<{ label: string; value: string }> };
+  numeric: { minValue?: number; maxValue?: number };
+  repeater: {
+    minItems?: number;
+    maxItems?: number;
+    schema: Record<string, FieldDef>;
+  };
+  media: { accept?: string; maxSize?: number };
+  pageSelector: { multiple?: boolean };
+};
+
+// Full input config for field() - base props + type-specific extras
+type FieldInputConfig<T extends FieldType> = {
+  type: T;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: FieldTypeValueMap[T];
+  helperText?: string;
+  /** @deprecated Use `helperText` instead */
+  helpText?: string;
+  group?: string;
+  showWhen?: ShowWhenCondition;
+  validation?: FieldValidation;
+} & (T extends keyof FieldTypeExtras ? FieldTypeExtras[T] : {});
+
+/**
+ * Type-safe field config helper. Required for all schema fields.
+ * Infers the field type from `type` and narrows `defaultValue` accordingly.
+ *
+ * @example
+ * field({ type: "singleLine", label: "Title", defaultValue: "Hello" })  // ✓
+ * field({ type: "singleLine", label: "Title", defaultValue: 123 })      // ✗ TS error
+ */
+export function field<T extends FieldType>(
+  config: FieldInputConfig<T>,
+): FieldDef {
+  return config as unknown as FieldDef;
+}
+
+// defineBlock requires branded FieldDef - enforces field() usage
+export function defineBlock(
+  config: Omit<TypedBlockConfig, "schema"> & {
+    schema: Record<string, FieldDef>;
+  },
+): BlockConfig {
   return config as unknown as BlockConfig;
 }
 
-export function defineTemplate(config: TemplateConfig): TemplateConfig {
-  return config;
+// defineTemplate requires branded FieldDef in schema (if present)
+export function defineTemplate(
+  config: Omit<TemplateConfig, "schema"> & {
+    schema?: Record<string, FieldDef>;
+  },
+): TemplateConfig {
+  return config as unknown as TemplateConfig;
 }
 
 /**
@@ -66,7 +135,7 @@ export async function loadBlockConfig(
 
     // Create a mock cmssy-cli/config module in cache
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
-    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;`;
+    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const field = (config) => config;`;
     fs.writeFileSync(mockConfigPath, mockConfig);
 
     // Read original config and replace import path to point to mock
@@ -271,15 +340,17 @@ export async function validateSchema(
       }
     }
 
-    // Validate select options
-    if (field.type === "select") {
+    // Validate select/multiselect options
+    if (field.type === "select" || field.type === "multiselect") {
       const selectField = field as SelectFieldConfig;
       if (
         !selectField.options ||
         !Array.isArray(selectField.options) ||
         selectField.options.length === 0
       ) {
-        errors.push(`Select field "${fullPath}" must have at least one option`);
+        errors.push(
+          `${field.type} field "${fullPath}" must have at least one option`,
+        );
       }
     }
 

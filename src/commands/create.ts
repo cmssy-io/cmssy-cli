@@ -184,7 +184,7 @@ import "./index.css";
     );
 
     // Create config.ts
-    const blockConfigContent = `import { defineBlock } from 'cmssy-cli/config';
+    const blockConfigContent = `import { defineBlock, field } from '@cmssy/cli/config';
 
 export default defineBlock({
   name: '${answers.displayName}',
@@ -193,21 +193,19 @@ export default defineBlock({
   tags: ${JSON.stringify(answers.tags)},
 
   schema: {
-    heading: {
+    heading: field({
       type: 'singleLine',
       label: 'Heading',
       required: true,
       defaultValue: 'Heading',
-    },
-    description: {
+    }),
+    description: field({
       type: 'multiLine',
       label: 'Description',
       placeholder: 'Enter description',
       defaultValue: 'Description',
-    },
+    }),
   },
-
-  pricing: { licenseType: 'free' },
 });
 `;
 
@@ -399,7 +397,7 @@ import './index.css';
     );
 
     // Create config.ts
-    const templateConfigContent = `import { defineTemplate } from 'cmssy-cli/config';
+    const templateConfigContent = `import { defineTemplate, field } from '@cmssy/cli/config';
 
 export default defineTemplate({
   name: '${answers.displayName}',
@@ -415,19 +413,17 @@ export default defineTemplate({
   ],
 
   schema: {
-    title: {
+    title: field({
       type: 'singleLine',
       label: 'Page Title',
       required: true,
       defaultValue: 'Page Title',
-    },
-    sections: {
+    }),
+    sections: field({
       type: 'repeater',
       label: 'Page Sections',
-      schema: {
-        // Define section fields here
-      },
-    },
+      schema: {},
+    }),
   },
 });
 `;
