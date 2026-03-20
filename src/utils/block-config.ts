@@ -34,6 +34,7 @@ export type FieldDef = TypedFieldConfig & { readonly [__fieldBrand]: true };
 type FieldTypeExtras = {
   select: { options: Array<{ label: string; value: string }> };
   multiselect: { options: Array<{ label: string; value: string }> };
+  numeric: { minValue?: number; maxValue?: number };
   repeater: {
     minItems?: number;
     maxItems?: number;
@@ -334,15 +335,17 @@ export async function validateSchema(
       }
     }
 
-    // Validate select options
-    if (field.type === "select") {
+    // Validate select/multiselect options
+    if (field.type === "select" || field.type === "multiselect") {
       const selectField = field as SelectFieldConfig;
       if (
         !selectField.options ||
         !Array.isArray(selectField.options) ||
         selectField.options.length === 0
       ) {
-        errors.push(`Select field "${fullPath}" must have at least one option`);
+        errors.push(
+          `${field.type} field "${fullPath}" must have at least one option`,
+        );
       }
     }
 
