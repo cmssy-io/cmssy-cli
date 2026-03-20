@@ -5,7 +5,11 @@ export { defineBlock, defineTemplate } from "./dist/utils/block-config.js";
 export type {
   // Block types
   BlockConfig,
+  TypedBlockConfig,
   FieldConfig,
+  TypedFieldConfig,
+  FieldValue,
+  FieldTypeValueMap,
   BaseFieldConfig,
   SelectFieldConfig,
   MultiselectFieldConfig,
@@ -35,9 +39,10 @@ export type {
   ResourceConfig,
 } from "@cmssy/types";
 
-// Export const enums and functions
+// Export const enums, functions, and runtime values
 export {
   FieldType,
+  FIELD_TYPE_DEFAULTS,
   LayoutPosition,
   WorkspaceModule,
   FeatureFlag,
