@@ -13,7 +13,6 @@ import {
 import {
   loadBlockConfig,
   validateDefaultValues,
-  validateSchema,
 } from "../utils/block-config.js";
 import {
   convertConfigToPagesData,
@@ -874,7 +873,9 @@ async function publishToWorkspace(
   if (blockConfig?.schema) {
     const result = validateDefaultValues(blockConfig.schema);
     if (!result.valid) {
-      throw new Error(`Schema validation failed:\n${result.errors.join("\n")}`);
+      throw new Error(
+        `Schema defaultValue validation failed:\n${result.errors.join("\n")}`,
+      );
     }
   }
 

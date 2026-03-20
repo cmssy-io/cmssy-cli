@@ -173,9 +173,15 @@ export function validateDefaultValues(schema: Record<string, FieldConfig>): {
         }
         break;
       case "repeater":
-        if (!Array.isArray(val)) {
+        if (
+          !Array.isArray(val) ||
+          !val.every(
+            (item: unknown) =>
+              item !== null && typeof item === "object" && !Array.isArray(item),
+          )
+        ) {
           errors.push(
-            `"${fullPath}": type "repeater" expects array defaultValue, got ${typeof val}`,
+            `"${fullPath}": type "repeater" expects Record<string, unknown>[] defaultValue`,
           );
         }
         break;
