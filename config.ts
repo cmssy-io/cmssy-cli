@@ -8,6 +8,7 @@ export type {
   TypedBlockConfig,
   FieldConfig,
   TypedFieldConfig,
+  FieldValue,
   FieldTypeValueMap,
   BaseFieldConfig,
   SelectFieldConfig,

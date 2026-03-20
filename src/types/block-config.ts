@@ -18,6 +18,7 @@ export {
   type ShowWhenCondition,
 
   // Typed field configs (compile-time defaultValue checking)
+  type FieldValue,
   type FieldTypeValueMap,
   FIELD_TYPE_DEFAULTS,
   type TypedFieldConfig,
