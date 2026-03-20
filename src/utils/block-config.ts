@@ -2,6 +2,13 @@ import chalk from "chalk";
 import { execSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
+import type {
+  FieldType,
+  FieldTypeValueMap,
+  FieldValidation,
+  ShowWhenCondition,
+  TypedFieldConfig,
+} from "@cmssy/types";
 import {
   BlockConfig,
   FieldConfig,
@@ -13,9 +20,56 @@ import {
 } from "../types/block-config.js";
 import { getFieldTypes, isValidFieldType } from "./field-schema.js";
 
+// =============================================================================
+// CONFIG AUTHORING HELPERS
+// =============================================================================
+
 // Accept TypedBlockConfig (strict) at compile time, return BlockConfig (runtime)
 export function defineBlock(config: TypedBlockConfig): BlockConfig {
   return config as unknown as BlockConfig;
+}
+
+// Extra properties specific to certain field types
+type FieldTypeExtras = {
+  select: { options: Array<{ label: string; value: string }> };
+  multiselect: { options: Array<{ label: string; value: string }> };
+  repeater: {
+    minItems?: number;
+    maxItems?: number;
+    schema: Record<string, TypedFieldConfig>;
+  };
+  media: { accept?: string; maxSize?: number };
+  pageSelector: { multiple?: boolean };
+};
+
+// Full input config for field() - base props + type-specific extras
+type FieldInputConfig<T extends FieldType> = {
+  type: T;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: FieldTypeValueMap[T];
+  helperText?: string;
+  /** @deprecated Use `helperText` instead */
+  helpText?: string;
+  group?: string;
+  showWhen?: ShowWhenCondition;
+  validation?: FieldValidation;
+} & (T extends keyof FieldTypeExtras ? FieldTypeExtras[T] : {});
+
+/**
+ * Type-safe field config helper. Infers the field type from `type` and
+ * narrows `defaultValue` + extra properties accordingly.
+ *
+ * @example
+ * field({ type: "singleLine", label: "Title", defaultValue: "Hello" })  // ✓
+ * field({ type: "singleLine", label: "Title", defaultValue: 123 })      // ✗ TS error
+ * field({ type: "boolean", label: "Flag", defaultValue: "wrong" })      // ✗ TS error
+ */
+export function field<T extends FieldType>(
+  config: FieldInputConfig<T>,
+): TypedFieldConfig {
+  return config as TypedFieldConfig;
 }
 
 export function defineTemplate(config: TemplateConfig): TemplateConfig {
