@@ -24,10 +24,11 @@ import { getFieldTypes, isValidFieldType } from "./field-schema.js";
 // CONFIG AUTHORING HELPERS
 // =============================================================================
 
-// Accept TypedBlockConfig (strict) at compile time, return BlockConfig (runtime)
-export function defineBlock(config: TypedBlockConfig): BlockConfig {
-  return config as unknown as BlockConfig;
-}
+// Brand symbol - only field() can produce a FieldDef
+declare const __fieldBrand: unique symbol;
+
+/** Branded field config - must be created via field() helper */
+export type FieldDef = TypedFieldConfig & { readonly [__fieldBrand]: true };
 
 // Extra properties specific to certain field types
 type FieldTypeExtras = {
@@ -36,7 +37,7 @@ type FieldTypeExtras = {
   repeater: {
     minItems?: number;
     maxItems?: number;
-    schema: Record<string, TypedFieldConfig>;
+    schema: Record<string, FieldDef>;
   };
   media: { accept?: string; maxSize?: number };
   pageSelector: { multiple?: boolean };
@@ -58,18 +59,26 @@ type FieldInputConfig<T extends FieldType> = {
 } & (T extends keyof FieldTypeExtras ? FieldTypeExtras[T] : {});
 
 /**
- * Type-safe field config helper. Infers the field type from `type` and
- * narrows `defaultValue` + extra properties accordingly.
+ * Type-safe field config helper. Required for all schema fields.
+ * Infers the field type from `type` and narrows `defaultValue` accordingly.
  *
  * @example
  * field({ type: "singleLine", label: "Title", defaultValue: "Hello" })  // ✓
  * field({ type: "singleLine", label: "Title", defaultValue: 123 })      // ✗ TS error
- * field({ type: "boolean", label: "Flag", defaultValue: "wrong" })      // ✗ TS error
  */
 export function field<T extends FieldType>(
   config: FieldInputConfig<T>,
-): TypedFieldConfig {
-  return config as TypedFieldConfig;
+): FieldDef {
+  return config as unknown as FieldDef;
+}
+
+// defineBlock requires branded FieldDef - enforces field() usage
+export function defineBlock(
+  config: Omit<TypedBlockConfig, "schema"> & {
+    schema: Record<string, FieldDef>;
+  },
+): BlockConfig {
+  return config as unknown as BlockConfig;
 }
 
 export function defineTemplate(config: TemplateConfig): TemplateConfig {

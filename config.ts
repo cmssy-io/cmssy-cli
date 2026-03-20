@@ -3,6 +3,7 @@ export {
   defineBlock,
   defineTemplate,
   field,
+  type FieldDef,
 } from "./dist/utils/block-config.js";
 
 // Re-export all types from @cmssy/types
