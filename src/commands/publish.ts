@@ -874,10 +874,13 @@ async function publishToWorkspace(
   if (blockConfig?.schema) {
     const schemaResult = await validateSchema(blockConfig.schema, packagePath);
     const defaultsResult = validateDefaultValues(blockConfig.schema);
-    const allErrors = [...schemaResult.errors, ...defaultsResult.errors];
+    const allErrors = [
+      ...schemaResult.errors.map((e) => `[schema] ${e}`),
+      ...defaultsResult.errors.map((e) => `[defaultValue] ${e}`),
+    ];
     if (allErrors.length > 0) {
       throw new Error(
-        `Schema validation failed for ${packageJson.name}:\n${allErrors.join("\n")}`,
+        `Validation failed for ${packageJson.name}:\n${allErrors.join("\n")}`,
       );
     }
   }

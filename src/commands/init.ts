@@ -299,13 +299,8 @@ CMSSY_WORKSPACE_ID=
 
     // Create .vscode/extensions.json (recommended extensions)
     const vscodeExtensions = {
-      recommendations: [
-        "bradlc.vscode-tailwindcss",
-        "csstools.postcss",
-      ],
-      unwantedRecommendations: [
-        "dbaeumer.vscode-eslint",
-      ],
+      recommendations: ["bradlc.vscode-tailwindcss", "csstools.postcss"],
+      unwantedRecommendations: ["dbaeumer.vscode-eslint"],
     };
     fs.writeFileSync(
       path.join(projectPath, ".vscode", "extensions.json"),
@@ -414,7 +409,7 @@ import "./index.css";
     );
 
     // config.ts
-    const blockConfig = `import { defineBlock } from "cmssy-cli/config";
+    const blockConfig = `import { defineBlock, field } from "@cmssy/cli/config";
 
 export default defineBlock({
   name: "Hero Section",
@@ -423,29 +418,27 @@ export default defineBlock({
   tags: ["hero", "landing", "cta"],
 
   schema: {
-    heading: {
+    heading: field({
       type: "singleLine",
       label: "Heading",
       defaultValue: "Welcome to Cmssy",
-    },
-    subheading: {
+    }),
+    subheading: field({
       type: "singleLine",
       label: "Subheading",
       defaultValue: "Build reusable UI blocks with React & Tailwind",
-    },
-    ctaText: {
+    }),
+    ctaText: field({
       type: "singleLine",
       label: "CTA Text",
       defaultValue: "Get Started",
-    },
-    ctaUrl: {
+    }),
+    ctaUrl: field({
       type: "link",
       label: "CTA URL",
       defaultValue: "#",
-    },
+    }),
   },
-
-  pricing: { licenseType: "free" },
 });
 `;
     fs.writeFileSync(path.join(heroBlockPath, "config.ts"), blockConfig);

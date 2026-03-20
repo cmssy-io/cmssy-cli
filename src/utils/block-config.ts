@@ -129,7 +129,7 @@ export async function loadBlockConfig(
 
     // Create a mock cmssy-cli/config module in cache
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
-    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;`;
+    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const field = (config) => config;`;
     fs.writeFileSync(mockConfigPath, mockConfig);
 
     // Read original config and replace import path to point to mock
