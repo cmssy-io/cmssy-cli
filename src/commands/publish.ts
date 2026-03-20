@@ -13,6 +13,7 @@ import {
 import {
   loadBlockConfig,
   validateDefaultValues,
+  validateSchema,
 } from "../utils/block-config.js";
 import {
   convertConfigToPagesData,
@@ -869,12 +870,14 @@ async function publishToWorkspace(
   // Use blockConfig if available, fallback to package.json cmssy
   const metadata = blockConfig || packageJson.cmssy || {};
 
-  // Validate defaultValue types at publish time
+  // Validate schema + defaultValue types at publish time
   if (blockConfig?.schema) {
-    const result = validateDefaultValues(blockConfig.schema);
-    if (!result.valid) {
+    const schemaResult = await validateSchema(blockConfig.schema, packagePath);
+    const defaultsResult = validateDefaultValues(blockConfig.schema);
+    const allErrors = [...schemaResult.errors, ...defaultsResult.errors];
+    if (allErrors.length > 0) {
       throw new Error(
-        `Schema defaultValue validation failed:\n${result.errors.join("\n")}`,
+        `Schema validation failed for ${packageJson.name}:\n${allErrors.join("\n")}`,
       );
     }
   }
