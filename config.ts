@@ -1,5 +1,10 @@
 // Package exports for config.ts authoring
-export { defineBlock, defineTemplate } from "./dist/utils/block-config.js";
+export {
+  defineBlock,
+  defineTemplate,
+  field,
+  type FieldDef,
+} from "./dist/utils/block-config.js";
 
 // Re-export all types from @cmssy/types
 export type {
