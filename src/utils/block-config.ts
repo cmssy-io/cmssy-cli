@@ -9,12 +9,13 @@ import {
   ResourceConfig,
   SelectFieldConfig,
   TemplateConfig,
+  TypedBlockConfig,
 } from "../types/block-config.js";
 import { getFieldTypes, isValidFieldType } from "./field-schema.js";
 
-// Helper function for type-safe config authoring
-export function defineBlock(config: BlockConfig): BlockConfig {
-  return config;
+// Accept TypedBlockConfig (strict) at compile time, return BlockConfig (runtime)
+export function defineBlock(config: TypedBlockConfig): BlockConfig {
+  return config as unknown as BlockConfig;
 }
 
 export function defineTemplate(config: TemplateConfig): TemplateConfig {
@@ -115,6 +116,97 @@ export async function loadBlockConfig(
   } catch (error: any) {
     throw new Error(`Failed to load config at ${configPath}: ${error.message}`);
   }
+}
+
+// Validate defaultValue types match field type expectations
+export function validateDefaultValues(schema: Record<string, FieldConfig>): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  function check(key: string, field: FieldConfig, parentPath = ""): void {
+    const fullPath = parentPath ? `${parentPath}.${key}` : key;
+    if (field.defaultValue === undefined) return;
+    const val = field.defaultValue;
+
+    switch (field.type) {
+      case "singleLine":
+      case "multiLine":
+      case "richText":
+      case "date":
+      case "media":
+      case "link":
+      case "select":
+      case "color":
+      case "form":
+      case "emailTemplate":
+      case "emailConfiguration":
+        if (typeof val !== "string") {
+          errors.push(
+            `"${fullPath}": type "${field.type}" expects string defaultValue, got ${typeof val}`,
+          );
+        }
+        break;
+      case "numeric":
+        if (typeof val !== "number") {
+          errors.push(
+            `"${fullPath}": type "numeric" expects number defaultValue, got ${typeof val}`,
+          );
+        }
+        break;
+      case "boolean":
+        if (typeof val !== "boolean") {
+          errors.push(
+            `"${fullPath}": type "boolean" expects boolean defaultValue, got ${typeof val}`,
+          );
+        }
+        break;
+      case "multiselect":
+        if (
+          !Array.isArray(val) ||
+          !val.every((v: unknown) => typeof v === "string")
+        ) {
+          errors.push(
+            `"${fullPath}": type "multiselect" expects string[] defaultValue`,
+          );
+        }
+        break;
+      case "repeater":
+        if (
+          !Array.isArray(val) ||
+          !val.every(
+            (item: unknown) =>
+              item !== null && typeof item === "object" && !Array.isArray(item),
+          )
+        ) {
+          errors.push(
+            `"${fullPath}": type "repeater" expects Record<string, unknown>[] defaultValue`,
+          );
+        }
+        break;
+      case "pageSelector":
+        if (!Array.isArray(val)) {
+          errors.push(
+            `"${fullPath}": type "pageSelector" expects PageRef[] defaultValue, got ${typeof val}`,
+          );
+        }
+        break;
+    }
+
+    // Recurse into repeater schema
+    if (field.type === "repeater") {
+      const repeater = field as RepeaterFieldConfig;
+      if (repeater.schema) {
+        Object.entries(repeater.schema).forEach(([k, f]) =>
+          check(k, f as FieldConfig, fullPath),
+        );
+      }
+    }
+  }
+
+  Object.entries(schema).forEach(([key, field]) => check(key, field));
+  return { valid: errors.length === 0, errors };
 }
 
 // Validate schema against backend field types
