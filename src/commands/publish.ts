@@ -10,7 +10,11 @@ import {
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
-import { loadBlockConfig, validateSchema } from "../utils/block-config.js";
+import {
+  loadBlockConfig,
+  validateDefaultValues,
+  validateSchema,
+} from "../utils/block-config.js";
 import {
   convertConfigToPagesData,
   loadTemplateConfig,
@@ -865,6 +869,14 @@ async function publishToWorkspace(
 
   // Use blockConfig if available, fallback to package.json cmssy
   const metadata = blockConfig || packageJson.cmssy || {};
+
+  // Validate defaultValue types at publish time
+  if (blockConfig?.schema) {
+    const result = validateDefaultValues(blockConfig.schema);
+    if (!result.valid) {
+      throw new Error(`Schema validation failed:\n${result.errors.join("\n")}`);
+    }
+  }
 
   // Generate block_type from package name
   // @cmssy/blocks.hero -> hero
