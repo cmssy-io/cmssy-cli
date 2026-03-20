@@ -82,8 +82,13 @@ export function defineBlock(
   return config as unknown as BlockConfig;
 }
 
-export function defineTemplate(config: TemplateConfig): TemplateConfig {
-  return config;
+// defineTemplate requires branded FieldDef in schema (if present)
+export function defineTemplate(
+  config: Omit<TemplateConfig, "schema"> & {
+    schema?: Record<string, FieldDef>;
+  },
+): TemplateConfig {
+  return config as unknown as TemplateConfig;
 }
 
 /**
