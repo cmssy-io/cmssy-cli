@@ -104,54 +104,45 @@ export async function codegenCommand(options: CodegenOptions) {
     } else {
       // Run codegen inline without config file
       const { execSync } = await import("child_process");
-      // Write a temporary codegen.ts, run, then delete
+      // Write a temporary codegen config, run, then delete
       const tempConfig = generateCodegenConfig(schemaUrl, output);
-      const tempPath = path.join(process.cwd(), ".codegen.tmp.ts");
+      const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".codegen-"));
+      const tempPath = path.join(tempDir, "codegen.ts");
       fs.writeFileSync(tempPath, tempConfig);
 
       try {
-        execSync(`npx graphql-codegen --config .codegen.tmp.ts`, {
+        execSync(`npx graphql-codegen --config "${tempPath}"`, {
           cwd: process.cwd(),
           stdio: "inherit",
         });
       } finally {
-        fs.removeSync(tempPath);
+        fs.removeSync(tempDir);
       }
     }
 
     // Also download schema.graphql for reference
-    const schemaDir = path.dirname(output);
+    const schemaDir = hasConfig
+      ? path.dirname(path.join(process.cwd(), CODEGEN_CONFIG_FILE))
+      : path.dirname(output);
     const schemaPath = path.join(schemaDir, "schema.graphql");
     fs.ensureDirSync(schemaDir);
 
     try {
+      const { getIntrospectionQuery, buildClientSchema, printSchema } =
+        await import("graphql");
+
       const response = await fetch(schemaUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: "{ __schema { types { name } } }",
-          operationName: "IntrospectionQuery",
-        }),
+        body: JSON.stringify({ query: getIntrospectionQuery() }),
       });
 
       if (response.ok) {
-        // Fetch SDL via introspection
-        const sdlResponse = await fetch(schemaUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: (await import("graphql")).getIntrospectionQuery(),
-          }),
-        });
-
-        if (sdlResponse.ok) {
-          const { buildClientSchema, printSchema } = await import("graphql");
-          const json = (await sdlResponse.json()) as { data: unknown };
-          const schema = buildClientSchema(
-            json.data as Parameters<typeof buildClientSchema>[0],
-          );
-          fs.writeFileSync(schemaPath, printSchema(schema));
-        }
+        const json = (await response.json()) as { data: unknown };
+        const schema = buildClientSchema(
+          json.data as Parameters<typeof buildClientSchema>[0],
+        );
+        fs.writeFileSync(schemaPath, printSchema(schema));
       }
     } catch {
       // Schema download is best-effort
