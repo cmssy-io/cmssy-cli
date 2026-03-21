@@ -29,9 +29,9 @@ function generateCodegenConfig(schemaUrl: string, output: string): string {
   return `import type { CodegenConfig } from "@graphql-codegen/cli";
 
 const config: CodegenConfig = {
-  schema: "${schemaUrl}",
+  schema: ${JSON.stringify(schemaUrl)},
   generates: {
-    "${output}": {
+    ${JSON.stringify(output)}: {
       plugins: ["typescript", "typescript-operations"],
       config: {
         avoidOptionals: true,
@@ -99,18 +99,11 @@ export async function codegenCommand(options: CodegenOptions) {
       const { execSync } = await import("child_process");
       execSync("npx graphql-codegen --config codegen.ts", {
         cwd: process.cwd(),
-        stdio: "pipe",
+        stdio: "inherit",
       });
     } else {
       // Run codegen inline without config file
       const { execSync } = await import("child_process");
-      const cmd = [
-        "npx graphql-codegen",
-        `--schema "${schemaUrl}"`,
-        "--require ts-node/register",
-        `--generates "${output}"`,
-      ].join(" ");
-
       // Write a temporary codegen.ts, run, then delete
       const tempConfig = generateCodegenConfig(schemaUrl, output);
       const tempPath = path.join(process.cwd(), ".codegen.tmp.ts");
@@ -119,7 +112,7 @@ export async function codegenCommand(options: CodegenOptions) {
       try {
         execSync(`npx graphql-codegen --config .codegen.tmp.ts`, {
           cwd: process.cwd(),
-          stdio: "pipe",
+          stdio: "inherit",
         });
       } finally {
         fs.removeSync(tempPath);
@@ -147,8 +140,7 @@ export async function codegenCommand(options: CodegenOptions) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            query:
-              "query { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }",
+            query: (await import("graphql")).getIntrospectionQuery(),
           }),
         });
 

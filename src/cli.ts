@@ -328,10 +328,7 @@ Enables AI Block Builder to edit your blocks in the Cmssy editor.
 program
   .command("codegen")
   .description("Generate TypeScript types from workspace public GraphQL schema")
-  .option(
-    "-w, --workspace <slug>",
-    "Workspace slug (or set CMSSY_WORKSPACE_ID)",
-  )
+  .option("-w, --workspace <slug>", "Workspace slug")
   .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
   .option(
     "--init",
