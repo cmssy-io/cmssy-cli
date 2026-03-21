@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { addSourceCommand } from "./commands/add-source.js";
 import { buildCommand } from "./commands/build.js";
+import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
 import { createCommand } from "./commands/create.js";
 import { devCommand } from "./commands/dev.js";
@@ -322,5 +323,29 @@ Enables AI Block Builder to edit your blocks in the Cmssy editor.
 `,
   )
   .action(addSourceCommand);
+
+// cmssy codegen
+program
+  .command("codegen")
+  .description("Generate TypeScript types from workspace public GraphQL schema")
+  .option(
+    "-w, --workspace <slug>",
+    "Workspace slug (or set CMSSY_WORKSPACE_ID)",
+  )
+  .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
+  .option(
+    "--init",
+    "Generate codegen.ts config file instead of running codegen",
+  )
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy codegen --workspace my-workspace
+  $ cmssy codegen --init
+  $ cmssy codegen -o src/types/api.ts
+`,
+  )
+  .action(codegenCommand);
 
 program.parse();
