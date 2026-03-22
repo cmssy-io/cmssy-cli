@@ -31,7 +31,7 @@ export type {
   PlatformContext,
   BlockProps,
   BlockAuthContext,
-  BlockI18nContext,
+  BlockLocaleContext,
   BlockMember,
   BlockMemberProfile,
   // Template types
