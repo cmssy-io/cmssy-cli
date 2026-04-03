@@ -10,6 +10,7 @@ import {
 } from "./api-routes/blocks.js";
 import { generatePreviewApiRoute } from "./api-routes/preview.js";
 import { generateWorkspacesApiRoute } from "./api-routes/workspaces.js";
+import { generateConfigApiRoute } from "./api-routes/config.js";
 import { generatePreviewPages } from "./preview-pages.js";
 
 const DEV_DIR = ".cmssy/dev";
@@ -31,6 +32,7 @@ export function generateDevApp(
   fs.mkdirSync(path.join(devRoot, "app/api/blocks"), { recursive: true });
   fs.mkdirSync(path.join(devRoot, "app/api/preview"), { recursive: true });
   fs.mkdirSync(path.join(devRoot, "app/api/workspaces"), { recursive: true });
+  fs.mkdirSync(path.join(devRoot, "app/api/config"), { recursive: true });
 
   // Generate all files
   generateNextConfig(devRoot, projectRoot);
@@ -42,6 +44,7 @@ export function generateDevApp(
   generateBlockConfigApiRoute(devRoot);
   generatePreviewApiRoute(devRoot);
   generateWorkspacesApiRoute(devRoot);
+  generateConfigApiRoute(devRoot);
   generatePreviewPages(devRoot, projectRoot, resources);
 
   return devRoot;
