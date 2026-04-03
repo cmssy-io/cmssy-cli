@@ -694,7 +694,7 @@ async function readOriginalSourceCode(packagePath: string): Promise<{
 async function bundleSourceCode(
   packagePath: string,
   serverActionFiles?: string[],
-  serverActionNames?: string[],
+  fileExports?: Map<string, string[]>,
 ): Promise<string> {
   const { build } = await import("esbuild");
 
@@ -713,10 +713,9 @@ async function bundleSourceCode(
 
   // If server action files exist, use esbuild plugin to replace their
   // contents with stubs that call globalThis.__cmssyCallAction (CMS-224)
-  const plugins =
-    serverActionFiles?.length && serverActionNames?.length
-      ? [createServerActionStubPlugin(serverActionFiles, serverActionNames)]
-      : [];
+  const plugins = serverActionFiles?.length
+    ? [createServerActionStubPlugin(serverActionFiles, fileExports ?? new Map())]
+    : [];
 
   const result = await build({
     entryPoints: [entryPoint],
@@ -749,50 +748,139 @@ async function bundleSourceCode(
 }
 
 /**
+ * Recursively collect .ts/.tsx files (excluding .d.ts) from a directory.
+ */
+function collectSourceFiles(dir: string): string[] {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectSourceFiles(entryPath);
+    if (
+      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
+      !entry.name.endsWith(".d.ts")
+    ) {
+      return [entryPath];
+    }
+    return [];
+  });
+}
+
+/**
+ * Check if a file has a top-level "use server" directive.
+ * Properly skips single-line and multi-line comments.
+ */
+function hasUseServerDirective(filePath: string): boolean {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  let inBlockComment = false;
+
+  for (const line of lines) {
+    let remaining = line.trim();
+
+    if (inBlockComment) {
+      const blockEnd = remaining.indexOf("*/");
+      if (blockEnd === -1) continue;
+      inBlockComment = false;
+      remaining = remaining.slice(blockEnd + 2).trim();
+    }
+
+    while (remaining.startsWith("/*")) {
+      const blockEnd = remaining.indexOf("*/", 2);
+      if (blockEnd === -1) {
+        inBlockComment = true;
+        remaining = "";
+        break;
+      }
+      remaining = remaining.slice(blockEnd + 2).trim();
+    }
+
+    if (remaining === "" || remaining.startsWith("//")) continue;
+
+    return (
+      remaining === '"use server"' ||
+      remaining === "'use server'" ||
+      remaining === '"use server";' ||
+      remaining === "'use server';"
+    );
+  }
+  return false;
+}
+
+/**
  * Detect files with "use server" directive in block's src/ directory.
- * Only file-level directives are detected (top of file).
+ * Recursively scans all subdirectories, excludes .d.ts files.
  */
 function detectServerActionFiles(packagePath: string): string[] {
   const srcDir = path.join(packagePath, "src");
   if (!fs.existsSync(srcDir)) return [];
 
-  const actionFiles: string[] = [];
-  const files = fs.readdirSync(srcDir).filter((f) => /\.(ts|tsx)$/.test(f));
-
-  for (const file of files) {
-    const filePath = path.join(srcDir, file);
-    const content = fs.readFileSync(filePath, "utf-8");
-    const lines = content.split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === "" || trimmed.startsWith("//") || trimmed.startsWith("/*"))
-        continue;
-      if (
-        trimmed === '"use server"' ||
-        trimmed === "'use server'" ||
-        trimmed === '"use server";' ||
-        trimmed === "'use server';"
-      ) {
-        actionFiles.push(filePath);
-      }
-      break;
-    }
-  }
-
-  return actionFiles;
+  return collectSourceFiles(srcDir).filter(hasUseServerDirective);
 }
 
 /**
  * Bundle server action files separately for server-side execution.
- * Returns the bundled code and list of exported action function names.
+ * Uses a virtual entry that re-exports all action files to produce
+ * a single output bundle. Returns per-file export maps for stub generation.
  */
 async function bundleServerActions(
   actionFiles: string[],
-): Promise<{ code: string; actionNames: string[] }> {
+): Promise<{
+  code: string;
+  actionNames: string[];
+  /** Map of resolved file path → exported names (for per-file stubs) */
+  fileExports: Map<string, string[]>;
+}> {
   const { build } = await import("esbuild");
 
-  const result = await build({
+  // Create a virtual entry that re-exports all action files
+  const reExports = actionFiles
+    .map((f, i) => `export { ${`__re${i}`} } from ${JSON.stringify(f)};`)
+    .join("\n");
+
+  // First pass: get per-file exports via metafile
+  const metaResult = await build({
     entryPoints: actionFiles,
+    bundle: false,
+    write: false,
+    format: "esm",
+    metafile: true,
+    loader: { ".tsx": "tsx", ".ts": "ts" },
+  });
+
+  const fileExports = new Map<string, string[]>();
+  const allNames: string[] = [];
+  if (metaResult.metafile) {
+    for (const [outputPath, output] of Object.entries(
+      metaResult.metafile.outputs,
+    )) {
+      if (output.exports && output.entryPoint) {
+        const resolvedEntry = path.resolve(output.entryPoint);
+        const names = output.exports.filter(
+          (e) => e !== "default" && e !== "__esModule",
+        );
+        fileExports.set(resolvedEntry, names);
+        allNames.push(...names);
+      }
+    }
+  }
+
+  // Second pass: bundle all action files into a single CJS output
+  // Use a stdin virtual entry that re-exports everything
+  const virtualEntry = actionFiles
+    .map((f) => {
+      const names = fileExports.get(path.resolve(f)) ?? [];
+      if (names.length === 0) return "";
+      return `export { ${names.join(", ")} } from ${JSON.stringify(f)};`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const bundleResult = await build({
+    stdin: {
+      contents: virtualEntry,
+      resolveDir: path.dirname(actionFiles[0]),
+      loader: "ts",
+    },
     bundle: true,
     write: false,
     format: "cjs",
@@ -800,37 +888,24 @@ async function bundleServerActions(
     loader: { ".tsx": "tsx", ".ts": "ts" },
     external: ["react", "react-dom", "react/jsx-runtime"],
     minify: true,
-    metafile: true,
     define: {
       "process.env.NODE_ENV": '"production"',
     },
   });
 
-  const code = result.outputFiles![0].text;
+  const code = bundleResult.outputFiles![0].text;
 
-  const actionNames: string[] = [];
-  if (result.metafile) {
-    for (const output of Object.values(result.metafile.outputs)) {
-      if (output.exports) {
-        actionNames.push(
-          ...output.exports.filter(
-            (e) => e !== "default" && e !== "__esModule",
-          ),
-        );
-      }
-    }
-  }
-
-  return { code, actionNames };
+  return { code, actionNames: allNames, fileExports };
 }
 
 /**
  * Create an esbuild plugin that replaces "use server" file contents
  * with client-side stubs that call globalThis.__cmssyCallAction.
+ * Generates per-file stubs based on each file's actual exports.
  */
 function createServerActionStubPlugin(
   actionFiles: string[],
-  actionNames: string[],
+  fileExports: Map<string, string[]>,
 ) {
   const actionFileSet = new Set(actionFiles.map((f) => path.resolve(f)));
 
@@ -840,9 +915,12 @@ function createServerActionStubPlugin(
       build.onLoad(
         { filter: /\.(ts|tsx)$/ },
         (args: { path: string }) => {
-          if (!actionFileSet.has(path.resolve(args.path))) return null;
+          const resolved = path.resolve(args.path);
+          if (!actionFileSet.has(resolved)) return null;
 
-          const stubs = actionNames
+          // Generate stubs only for this file's exports
+          const names = fileExports.get(resolved) ?? [];
+          const stubs = names
             .map(
               (name) =>
                 `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
@@ -1028,16 +1106,27 @@ async function publishToWorkspace(
     // Detect "use server" files (CMS-224)
     const actionFiles = detectServerActionFiles(packagePath);
 
+    let actionFileExports: Map<string, string[]> | undefined;
+
     if (actionFiles.length > 0) {
       const actionBundle = await bundleServerActions(actionFiles);
       serverActionCode = actionBundle.code;
       serverActionNames = actionBundle.actionNames;
+      actionFileExports = actionBundle.fileExports;
 
-      console.log(
-        chalk.cyan(
-          `  ⚡ Server actions detected: ${serverActionNames.join(", ")}`,
-        ),
-      );
+      if (serverActionNames.length > 0) {
+        console.log(
+          chalk.cyan(
+            `  ⚡ Server actions detected: ${serverActionNames.join(", ")}`,
+          ),
+        );
+      } else {
+        console.log(
+          chalk.cyan(
+            `  ⚡ Server action files detected: ${actionFiles.map((f) => path.basename(f)).join(", ")}`,
+          ),
+        );
+      }
     }
 
     // Bundle source code (combines all local imports into single CJS file)
@@ -1045,7 +1134,7 @@ async function publishToWorkspace(
     bundledSourceCode = await bundleSourceCode(
       packagePath,
       actionFiles.length > 0 ? actionFiles : undefined,
-      serverActionNames.length > 0 ? serverActionNames : undefined,
+      actionFileExports,
     );
 
     // Compile CSS (with Tailwind if needed)
