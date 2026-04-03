@@ -36,7 +36,8 @@ program
     "after",
     `
 Examples:
-  $ cmssy init my-blocks          Create a new project
+  $ cmssy init my-blocks          Create new project (uses create-next-app)
+  $ cmssy init                    Add Cmssy to existing Next.js project
   $ cmssy create block hero       Add a new block to your project
   $ cmssy dev                     Start dev server with hot reload
   $ cmssy build                   Build all blocks for production
@@ -56,22 +57,19 @@ Documentation: https://cmssy.io/docs/cli
 // cmssy init
 program
   .command("init")
-  .description("Initialize a new Cmssy project")
-  .argument("[name]", "Project name (creates directory)")
-  .option(
-    "-f, --framework <framework>",
-    "Framework (react, vue, angular, vanilla)",
-    "react",
+  .description("Initialize a new Cmssy project or add Cmssy to existing one")
+  .argument(
+    "[name]",
+    "Project name (creates new directory with create-next-app)",
   )
   .option("-y, --yes", "Skip prompts and use defaults")
   .addHelpText(
     "after",
     `
 Examples:
-  $ cmssy init                    Create project in current directory
-  $ cmssy init my-blocks          Create project in ./my-blocks
-  $ cmssy init -f vue my-blocks   Create Vue project
-  $ cmssy init -y my-blocks       Create with defaults (no prompts)
+  $ cmssy init my-blocks          New project (runs create-next-app)
+  $ cmssy init -y my-blocks       New project with defaults (no prompts)
+  $ cmssy init                    Add Cmssy to existing Next.js project
 `,
   )
   .action((name, options) => initCommand(name, options));

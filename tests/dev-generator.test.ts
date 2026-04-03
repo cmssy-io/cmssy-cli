@@ -5,7 +5,7 @@ import os from "os";
 import {
   generateDevApp,
   regeneratePreviewPages,
-} from "../src/utils/dev-generator.js";
+} from "../src/utils/dev-generator/index.js";
 import type { ScannedResource } from "../src/utils/scanner.js";
 
 let tmpDir: string;
