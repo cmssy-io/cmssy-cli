@@ -42,6 +42,8 @@ export const IMPORT_BLOCK_MUTATION = `
         permissions
         features
       }
+      serverActionUrl
+      serverActions
       version
       createdAt
     }
