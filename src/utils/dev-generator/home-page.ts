@@ -55,6 +55,37 @@ export default function DevHome() {
   const [showEditor, setShowEditor] = useState(true);
   const [wsInfo, setWsInfo] = useState<WorkspaceInfo | null>(null);
   const [wsLoading, setWsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsData, setSettingsData] = useState<{
+    apiUrl: string; hasToken: boolean; maskedToken: string | null;
+    workspaceId: string | null; newToken: string; newApiUrl: string; newWorkspaceId: string;
+    saving: boolean; testing: boolean; testResult: string | null;
+    project: any;
+  }>({
+    apiUrl: "", hasToken: false, maskedToken: null, workspaceId: null,
+    newToken: "", newApiUrl: "", newWorkspaceId: "",
+    saving: false, testing: false, testResult: null, project: null,
+  });
+
+  // Load config when settings opened
+  useEffect(() => {
+    if (!showSettings) return;
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => {
+        setSettingsData((prev) => ({
+          ...prev,
+          apiUrl: data.env.apiUrl,
+          hasToken: data.env.hasToken,
+          maskedToken: data.env.maskedToken,
+          workspaceId: data.env.workspaceId,
+          newApiUrl: data.env.apiUrl,
+          newWorkspaceId: data.env.workspaceId || "",
+          project: data.project,
+        }));
+      })
+      .catch(console.error);
+  }, [showSettings]);
 
   // Load workspace info
   useEffect(() => {
@@ -390,6 +421,12 @@ export default function DevHome() {
             title={showEditor ? "Hide editor" : "Show editor"}
             style={{ background: showEditor ? "#f0f0f0" : "#667eea", color: showEditor ? "#333" : "#fff", border: "1px solid #ddd", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "13px", fontWeight: 500, whiteSpace: "nowrap" }}
           >{showEditor ? "Editor \u2192" : "Editor \u2190"}</button>
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            title="Settings"
+            style={{ background: showSettings ? "#667eea" : "#f0f0f0", color: showSettings ? "#fff" : "#333", border: "1px solid #ddd", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "15px", lineHeight: 1 }}
+          >\u2699</button>
         </div>
         <div style={{ flex: 1, padding: "24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {previewUrl ? (
@@ -439,6 +476,165 @@ export default function DevHome() {
           )}
         </div>
       </div>
+
+      {/* Settings Panel (slide-over) */}
+      {showSettings && (
+        <div style={{
+          position: "fixed", top: 0, right: 0, bottom: 0, width: "420px",
+          background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+          zIndex: 1000, display: "flex", flexDirection: "column",
+          animation: "slideIn 0.2s ease",
+        }}>
+          <style>{\`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }\`}</style>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fafafa" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>Settings</h2>
+            <button type="button" onClick={() => setShowSettings(false)}
+              style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#666", padding: "4px" }}
+            >\u2715</button>
+          </div>
+          <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+            {/* Connection */}
+            <div style={{ marginBottom: "24px" }}>
+              <h3 style={{ fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#666", marginBottom: "12px" }}>Connection</h3>
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 500, marginBottom: "4px" }}>API URL</label>
+                <input
+                  type="text"
+                  value={settingsData.newApiUrl}
+                  onChange={(e) => setSettingsData({ ...settingsData, newApiUrl: e.target.value })}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 500, marginBottom: "4px" }}>
+                  API Token {settingsData.hasToken && <span style={{ color: "#22c55e", fontSize: "11px" }}>({settingsData.maskedToken})</span>}
+                </label>
+                <input
+                  type="password"
+                  value={settingsData.newToken}
+                  onChange={(e) => setSettingsData({ ...settingsData, newToken: e.target.value })}
+                  placeholder={settingsData.hasToken ? "Leave empty to keep current" : "bf_..."}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  disabled={settingsData.testing}
+                  onClick={async () => {
+                    setSettingsData((s) => ({ ...s, testing: true, testResult: null }));
+                    try {
+                      // Save first if token changed
+                      if (settingsData.newToken) {
+                        await fetch("/api/config", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ apiToken: settingsData.newToken, apiUrl: settingsData.newApiUrl }),
+                        });
+                      }
+                      const res = await fetch("/api/workspaces");
+                      const data = await res.json();
+                      if (data.connected) {
+                        setSettingsData((s) => ({ ...s, testing: false, testResult: "success" }));
+                        setWsInfo(data);
+                        setWsLoading(false);
+                      } else {
+                        setSettingsData((s) => ({ ...s, testing: false, testResult: data.error || data.reason || "failed" }));
+                      }
+                    } catch {
+                      setSettingsData((s) => ({ ...s, testing: false, testResult: "Network error" }));
+                    }
+                  }}
+                  style={{
+                    padding: "8px 16px", border: "1px solid #ddd", borderRadius: "6px",
+                    background: "#f8f8f8", cursor: "pointer", fontSize: "13px", fontWeight: 500,
+                  }}
+                >{settingsData.testing ? "Testing..." : "Test Connection"}</button>
+                {settingsData.testResult && (
+                  <span style={{
+                    display: "flex", alignItems: "center", fontSize: "12px",
+                    color: settingsData.testResult === "success" ? "#22c55e" : "#ef4444",
+                  }}>
+                    {settingsData.testResult === "success" ? "\u2713 Connected" : "\u2717 " + settingsData.testResult}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Workspace */}
+            <div style={{ marginBottom: "24px" }}>
+              <h3 style={{ fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#666", marginBottom: "12px" }}>Workspace</h3>
+              {wsInfo?.connected && wsInfo.workspaces && wsInfo.workspaces.length > 0 ? (
+                <select
+                  value={settingsData.newWorkspaceId}
+                  onChange={(e) => setSettingsData({ ...settingsData, newWorkspaceId: e.target.value })}
+                  style={{ width: "100%", padding: "8px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "13px" }}
+                >
+                  <option value="">Select workspace...</option>
+                  {wsInfo.workspaces.map((w: any) => (
+                    <option key={w.id} value={w.id}>{w.name} ({w.slug})</option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ fontSize: "13px", color: "#999" }}>Connect to see available workspaces</p>
+              )}
+            </div>
+
+            {/* Project Info */}
+            {settingsData.project && (
+              <div style={{ marginBottom: "24px" }}>
+                <h3 style={{ fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#666", marginBottom: "12px" }}>Project</h3>
+                <div style={{ background: "#f8f8f8", borderRadius: "6px", padding: "12px", fontSize: "12px", fontFamily: "monospace" }}>
+                  {Object.entries(settingsData.project).map(([k, v]) => (
+                    <div key={k} style={{ marginBottom: "4px" }}>
+                      <span style={{ color: "#666" }}>{k}:</span>{" "}
+                      <span>{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save */}
+            <button
+              type="button"
+              disabled={settingsData.saving}
+              onClick={async () => {
+                setSettingsData((s) => ({ ...s, saving: true }));
+                const body: any = { apiUrl: settingsData.newApiUrl };
+                if (settingsData.newToken) body.apiToken = settingsData.newToken;
+                if (settingsData.newWorkspaceId) body.workspaceId = settingsData.newWorkspaceId;
+                try {
+                  await fetch("/api/config", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  });
+                  setSettingsData((s) => ({ ...s, saving: false, newToken: "" }));
+                  // Refresh workspace info
+                  const res = await fetch("/api/workspaces");
+                  const data = await res.json();
+                  setWsInfo(data);
+                  // Reload config display
+                  const cfgRes = await fetch("/api/config");
+                  const cfgData = await cfgRes.json();
+                  setSettingsData((s) => ({
+                    ...s, hasToken: cfgData.env.hasToken, maskedToken: cfgData.env.maskedToken,
+                    workspaceId: cfgData.env.workspaceId,
+                  }));
+                } catch {
+                  setSettingsData((s) => ({ ...s, saving: false }));
+                }
+              }}
+              style={{
+                width: "100%", padding: "10px", background: "#667eea", color: "#fff",
+                border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >{settingsData.saving ? "Saving..." : "Save Settings"}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
