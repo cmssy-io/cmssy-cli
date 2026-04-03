@@ -23,6 +23,25 @@ interface Block {
   layoutPositions?: Array<{ position: string; type: string }>;
 }
 
+interface WorkspaceInfo {
+  connected: boolean;
+  reason?: string;
+  error?: string;
+  workspace?: { id: string; slug: string; name: string; myRole?: { name: string } };
+  workspaces?: any[];
+  publishedBlocks?: Array<{ blockType: string; name: string; version: string }>;
+}
+
+type SyncStatus = "local-only" | "published" | "outdated";
+
+function getSyncStatus(blockName: string, localVersion: string, wsInfo: WorkspaceInfo | null): SyncStatus {
+  if (!wsInfo?.connected || !wsInfo.publishedBlocks) return "local-only";
+  const remote = wsInfo.publishedBlocks.find((b) => b.blockType === blockName || b.name === blockName);
+  if (!remote) return "local-only";
+  if (remote.version === localVersion) return "published";
+  return "outdated";
+}
+
 export default function DevHome() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selected, setSelected] = useState<Block | null>(null);
@@ -34,6 +53,16 @@ export default function DevHome() {
   const [isDirty, setIsDirty] = useState(false);
   const [showBlockList, setShowBlockList] = useState(true);
   const [showEditor, setShowEditor] = useState(true);
+  const [wsInfo, setWsInfo] = useState<WorkspaceInfo | null>(null);
+  const [wsLoading, setWsLoading] = useState(true);
+
+  // Load workspace info
+  useEffect(() => {
+    fetch("/api/workspaces")
+      .then((r) => r.json())
+      .then((data) => { setWsInfo(data); setWsLoading(false); })
+      .catch(() => setWsLoading(false));
+  }, []);
 
   // Load blocks list
   useEffect(() => {
@@ -268,6 +297,38 @@ export default function DevHome() {
             {blocks.length} blocks
           </p>
         </div>
+        {/* Workspace Connection */}
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e0e0e0", fontSize: "12px" }}>
+          {wsLoading ? (
+            <div style={{ color: "#999" }}>Connecting...</div>
+          ) : wsInfo?.connected ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", flexShrink: 0 }} />
+                <span style={{ fontWeight: 500 }}>{wsInfo.workspace?.name}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setWsLoading(true);
+                  fetch("/api/workspaces")
+                    .then((r) => r.json())
+                    .then((data) => { setWsInfo(data); setWsLoading(false); })
+                    .catch(() => setWsLoading(false));
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#667eea", fontSize: "11px", padding: "2px 4px" }}
+                title="Refresh"
+              >\u21BB</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+              <span style={{ color: "#999" }}>
+                {wsInfo?.reason === "no_token" ? "Not configured" : wsInfo?.reason === "auth_error" ? "Invalid token" : "Disconnected"}
+              </span>
+            </div>
+          )}
+        </div>
         <div style={{ padding: "12px" }}>
           {blocks.map((b) => (
             <div
@@ -287,7 +348,22 @@ export default function DevHome() {
                 color: selected?.name === b.name ? "white" : "inherit",
               }}
             >
-              <div style={{ fontSize: "14px", fontWeight: 500 }}>{b.displayName}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "14px", fontWeight: 500 }}>{b.displayName}</div>
+                {wsInfo?.connected && (() => {
+                  const status = getSyncStatus(b.name, b.version, wsInfo);
+                  const colors: Record<SyncStatus, { bg: string; text: string; label: string }> = {
+                    "published": { bg: selected?.name === b.name ? "rgba(255,255,255,0.2)" : "#dcfce7", text: selected?.name === b.name ? "#fff" : "#166534", label: "\u2713" },
+                    "outdated": { bg: selected?.name === b.name ? "rgba(255,255,255,0.2)" : "#fef3c7", text: selected?.name === b.name ? "#fff" : "#92400e", label: "\u2191" },
+                    "local-only": { bg: "transparent", text: "transparent", label: "" },
+                  };
+                  const c = colors[status];
+                  if (status === "local-only") return null;
+                  return (
+                    <span title={status} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: c.bg, color: c.text, fontWeight: 600 }}>{c.label}</span>
+                  );
+                })()}
+              </div>
               <div style={{ fontSize: "12px", opacity: 0.7 }}>
                 {b.type} &middot; v{b.version}
               </div>
