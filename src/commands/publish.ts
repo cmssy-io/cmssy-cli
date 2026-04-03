@@ -691,7 +691,11 @@ async function readOriginalSourceCode(packagePath: string): Promise<{
 // Bundle source code with esbuild (combines all local imports into single file)
 // Bundle source code with esbuild (combines all local imports into single file)
 // UPDATED: Use CommonJS format to avoid ES module export statements
-async function bundleSourceCode(packagePath: string): Promise<string> {
+async function bundleSourceCode(
+  packagePath: string,
+  serverActionFiles?: string[],
+  serverActionNames?: string[],
+): Promise<string> {
   const { build } = await import("esbuild");
 
   const srcDir = path.join(packagePath, "src");
@@ -706,6 +710,13 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
   } else {
     throw new Error(`Source code not found. Expected ${tsxPath} or ${tsPath}`);
   }
+
+  // If server action files exist, use esbuild plugin to replace their
+  // contents with stubs that call globalThis.__cmssyCallAction (CMS-224)
+  const plugins =
+    serverActionFiles?.length && serverActionNames?.length
+      ? [createServerActionStubPlugin(serverActionFiles, serverActionNames)]
+      : [];
 
   const result = await build({
     entryPoints: [entryPoint],
@@ -729,11 +740,123 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
       // Replace process.env references with static values
       "process.env.NODE_ENV": '"production"',
     },
+    plugins,
   });
 
-  let bundledCode = result.outputFiles[0].text;
+  const bundledCode = result.outputFiles![0].text;
 
   return bundledCode;
+}
+
+/**
+ * Detect files with "use server" directive in block's src/ directory.
+ * Only file-level directives are detected (top of file).
+ */
+function detectServerActionFiles(packagePath: string): string[] {
+  const srcDir = path.join(packagePath, "src");
+  if (!fs.existsSync(srcDir)) return [];
+
+  const actionFiles: string[] = [];
+  const files = fs.readdirSync(srcDir).filter((f) => /\.(ts|tsx)$/.test(f));
+
+  for (const file of files) {
+    const filePath = path.join(srcDir, file);
+    const content = fs.readFileSync(filePath, "utf-8");
+    const lines = content.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === "" || trimmed.startsWith("//") || trimmed.startsWith("/*"))
+        continue;
+      if (
+        trimmed === '"use server"' ||
+        trimmed === "'use server'" ||
+        trimmed === '"use server";' ||
+        trimmed === "'use server';"
+      ) {
+        actionFiles.push(filePath);
+      }
+      break;
+    }
+  }
+
+  return actionFiles;
+}
+
+/**
+ * Bundle server action files separately for server-side execution.
+ * Returns the bundled code and list of exported action function names.
+ */
+async function bundleServerActions(
+  actionFiles: string[],
+): Promise<{ code: string; actionNames: string[] }> {
+  const { build } = await import("esbuild");
+
+  const result = await build({
+    entryPoints: actionFiles,
+    bundle: true,
+    write: false,
+    format: "cjs",
+    platform: "node",
+    loader: { ".tsx": "tsx", ".ts": "ts" },
+    external: ["react", "react-dom", "react/jsx-runtime"],
+    minify: true,
+    metafile: true,
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+  });
+
+  const code = result.outputFiles![0].text;
+
+  const actionNames: string[] = [];
+  if (result.metafile) {
+    for (const output of Object.values(result.metafile.outputs)) {
+      if (output.exports) {
+        actionNames.push(
+          ...output.exports.filter(
+            (e) => e !== "default" && e !== "__esModule",
+          ),
+        );
+      }
+    }
+  }
+
+  return { code, actionNames };
+}
+
+/**
+ * Create an esbuild plugin that replaces "use server" file contents
+ * with client-side stubs that call globalThis.__cmssyCallAction.
+ */
+function createServerActionStubPlugin(
+  actionFiles: string[],
+  actionNames: string[],
+) {
+  const actionFileSet = new Set(actionFiles.map((f) => path.resolve(f)));
+
+  return {
+    name: "server-action-stub",
+    setup(build: { onLoad: Function }) {
+      build.onLoad(
+        { filter: /\.(ts|tsx)$/ },
+        (args: { path: string }) => {
+          if (!actionFileSet.has(path.resolve(args.path))) return null;
+
+          const stubs = actionNames
+            .map(
+              (name) =>
+                `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
+            )
+            .join("\n");
+
+          return {
+            contents: `"use strict";\n${stubs}`,
+            loader: "js",
+          };
+        },
+      );
+    },
+  };
 }
 
 // Compile CSS with optional Tailwind support
@@ -898,10 +1021,32 @@ async function publishToWorkspace(
   let rawSourceCode: string | undefined;
   let rawSourceCss: string | undefined;
   let dependencies: Record<string, string> = {};
+  let serverActionCode: string | undefined;
+  let serverActionNames: string[] = [];
 
   if (packageType !== "template") {
+    // Detect "use server" files (CMS-224)
+    const actionFiles = detectServerActionFiles(packagePath);
+
+    if (actionFiles.length > 0) {
+      const actionBundle = await bundleServerActions(actionFiles);
+      serverActionCode = actionBundle.code;
+      serverActionNames = actionBundle.actionNames;
+
+      console.log(
+        chalk.cyan(
+          `  ⚡ Server actions detected: ${serverActionNames.join(", ")}`,
+        ),
+      );
+    }
+
     // Bundle source code (combines all local imports into single CJS file)
-    bundledSourceCode = await bundleSourceCode(packagePath);
+    // If server actions exist, stubs replace "use server" file contents
+    bundledSourceCode = await bundleSourceCode(
+      packagePath,
+      actionFiles.length > 0 ? actionFiles : undefined,
+      serverActionNames.length > 0 ? serverActionNames : undefined,
+    );
 
     // Compile CSS (with Tailwind if needed)
     compiledCss = await compileCss(packagePath, bundledSourceCode);
@@ -943,6 +1088,10 @@ async function publishToWorkspace(
     rawSourceCss,
     dependencies:
       Object.keys(dependencies).length > 0 ? dependencies : undefined,
+    // Server action support (CMS-224)
+    serverActionCode: serverActionCode || undefined,
+    serverActions:
+      serverActionNames.length > 0 ? serverActionNames : undefined,
   };
 
   // Add layoutPosition if defined (for layout blocks)
