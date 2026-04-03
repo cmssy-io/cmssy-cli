@@ -1124,7 +1124,9 @@ async function publishToWorkspace(
       throw error;
     }
   } else {
-    // Standard block import
+    // Standard block import — remove fields not in ImportBlockInput
+    delete input.preserveContent;
+    delete input.packageType;
     const requestPromise = client.request(IMPORT_BLOCK_MUTATION, { input });
 
     try {
