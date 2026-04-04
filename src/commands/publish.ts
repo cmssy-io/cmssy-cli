@@ -920,10 +920,12 @@ function createServerActionStubPlugin(
 
           // Generate stubs only for this file's exports
           const names = fileExports.get(resolved) ?? [];
+          // Capture __cmssyCallAction at eval time via IIFE so concurrent
+          // block loads can't overwrite each other's action routing.
           const stubs = names
             .map(
               (name) =>
-                `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
+                `module.exports.${name} = (function(dispatch) { return function() { return dispatch("${name}", Array.prototype.slice.call(arguments)); }; })(globalThis.__cmssyCallAction);`,
             )
             .join("\n");
 
