@@ -796,12 +796,13 @@ function hasUseServerDirective(filePath: string): boolean {
 
     if (remaining === "" || remaining.startsWith("//")) continue;
 
-    return (
-      remaining === '"use server"' ||
-      remaining === "'use server'" ||
-      remaining === '"use server";' ||
-      remaining === "'use server';"
-    );
+    // Strip trailing semicolons, whitespace, and inline comments
+    const stripped = remaining
+      .replace(/\/\/.*$/, "")
+      .replace(/\/\*.*?\*\//, "")
+      .replace(/;/g, "")
+      .trim();
+    return stripped === '"use server"' || stripped === "'use server'";
   }
   return false;
 }
@@ -832,11 +833,6 @@ async function bundleServerActions(
 }> {
   const { build } = await import("esbuild");
 
-  // Create a virtual entry that re-exports all action files
-  const reExports = actionFiles
-    .map((f, i) => `export { ${`__re${i}`} } from ${JSON.stringify(f)};`)
-    .join("\n");
-
   // First pass: get per-file exports via metafile
   const metaResult = await build({
     entryPoints: actionFiles,
@@ -850,14 +846,10 @@ async function bundleServerActions(
   const fileExports = new Map<string, string[]>();
   const allNames: string[] = [];
   if (metaResult.metafile) {
-    for (const [outputPath, output] of Object.entries(
-      metaResult.metafile.outputs,
-    )) {
+    for (const [, output] of Object.entries(metaResult.metafile.outputs)) {
       if (output.exports && output.entryPoint) {
         const resolvedEntry = path.resolve(output.entryPoint);
-        const names = output.exports.filter(
-          (e) => e !== "default" && e !== "__esModule",
-        );
+        const names = output.exports.filter((e) => e !== "__esModule");
         fileExports.set(resolvedEntry, names);
         allNames.push(...names);
       }
@@ -870,7 +862,20 @@ async function bundleServerActions(
     .map((f) => {
       const names = fileExports.get(path.resolve(f)) ?? [];
       if (names.length === 0) return "";
-      return `export { ${names.join(", ")} } from ${JSON.stringify(f)};`;
+      const defaultExport = names.includes("default");
+      const namedExports = names.filter((n) => n !== "default");
+      const parts: string[] = [];
+      if (namedExports.length > 0) {
+        parts.push(
+          `export { ${namedExports.join(", ")} } from ${JSON.stringify(f)};`,
+        );
+      }
+      if (defaultExport) {
+        parts.push(
+          `export { default as __default_${path.basename(f, path.extname(f))} } from ${JSON.stringify(f)};`,
+        );
+      }
+      return parts.join("\n");
     })
     .filter(Boolean)
     .join("\n");
@@ -918,15 +923,16 @@ function createServerActionStubPlugin(
           const resolved = path.resolve(args.path);
           if (!actionFileSet.has(resolved)) return null;
 
-          // Generate stubs only for this file's exports
-          const names = fileExports.get(resolved) ?? [];
+          // Generate stubs only for this file's exports (including default).
           // Capture __cmssyCallAction at eval time via IIFE so concurrent
           // block loads can't overwrite each other's action routing.
+          const names = fileExports.get(resolved) ?? [];
           const stubs = names
-            .map(
-              (name) =>
-                `module.exports.${name} = (function(dispatch) { return function() { return dispatch("${name}", Array.prototype.slice.call(arguments)); }; })(globalThis.__cmssyCallAction);`,
-            )
+            .map((name) => {
+              const exportKey = name === "default" ? "default" : name;
+              const actionId = name === "default" ? `__default_${path.basename(resolved, path.extname(resolved))}` : name;
+              return `module.exports.${exportKey} = (function(dispatch) { return function() { return dispatch("${actionId}", Array.prototype.slice.call(arguments)); }; })(globalThis.__cmssyCallAction);`;
+            })
             .join("\n");
 
           return {
