@@ -61,6 +61,8 @@ export default function DevHome() {
   const [previewData, setPreviewData] = useState<Record<string, unknown>>({});
   const [configLoading, setConfigLoading] = useState(false);
   const configDataRef = useRef<Record<string, unknown>>({});
+  const [variants, setVariants] = useState<string[]>([]);
+  const [currentVariant, setCurrentVariant] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const iframeLoadedRef = useRef(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -157,23 +159,31 @@ export default function DevHome() {
       .catch(console.error);
   }, []);
 
-  // Load config when block selected
+  // Load config + preview data when block selected or variant changes
   useEffect(() => {
     if (!selected || selected.type === "template") return;
     setConfigLoading(true);
-    fetch(`/api/blocks/${selected.name}/config`)
-      .then((r) => r.json())
-      .then((config) => {
+
+    const variantParam = currentVariant ? `?variant=${currentVariant}` : "";
+
+    Promise.all([
+      fetch(`/api/blocks/${selected.name}/config`).then((r) => r.json()),
+      fetch(`/api/preview/${selected.name}${variantParam}`).then((r) =>
+        r.json(),
+      ),
+    ])
+      .then(([config, preview]) => {
         setSelected((prev) =>
           prev ? { ...prev, schema: config.schema } : null,
         );
-        const data = config.previewData || {};
+        const data = preview.data || config.previewData || {};
         configDataRef.current = data;
         setPreviewData(data);
+        setVariants(preview.variants || []);
         setConfigLoading(false);
       })
       .catch(() => setConfigLoading(false));
-  }, [selected?.name]);
+  }, [selected?.name, currentVariant]);
 
   // Select block — templates redirect to full-page preview
   const handleSelect = useCallback((block: Block) => {
@@ -185,6 +195,8 @@ export default function DevHome() {
     setPreviewData({});
     configDataRef.current = {};
     setIsDirty(false);
+    setCurrentVariant(null);
+    setVariants([]);
     iframeLoadedRef.current = false;
   }, []);
 
@@ -208,7 +220,8 @@ export default function DevHome() {
       return;
     const t = setTimeout(async () => {
       const dataToSave = { ...configDataRef.current, ...previewData };
-      await fetch(`/api/preview/${selected.name}`, {
+      const variantParam = currentVariant ? `?variant=${currentVariant}` : "";
+      await fetch(`/api/preview/${selected.name}${variantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSave),
@@ -965,6 +978,89 @@ export default function DevHome() {
             Editor
           </h2>
         </div>
+        {/* Variant picker */}
+        {selected && variants.length > 0 && (
+          <div
+            style={{
+              padding: "8px 16px",
+              borderBottom: "1px solid #e0e0e0",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setCurrentVariant(null)}
+              style={{
+                padding: "3px 8px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                background: currentVariant === null ? "#667eea" : "#fff",
+                color: currentVariant === null ? "#fff" : "#333",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: 500,
+              }}
+            >
+              Default
+            </button>
+            {variants.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setCurrentVariant(v)}
+                style={{
+                  padding: "3px 8px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  background: currentVariant === v ? "#667eea" : "#fff",
+                  color: currentVariant === v ? "#fff" : "#333",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  fontWeight: 500,
+                }}
+              >
+                {v}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={async () => {
+                const name = prompt("Variant name (e.g., long-text):");
+                if (!name) return;
+                const dataToSave = { ...configDataRef.current, ...previewData };
+                await fetch(
+                  `/api/preview/${selected.name}?action=save-variant`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      variantName: name,
+                      data: dataToSave,
+                    }),
+                  },
+                );
+                setVariants((prev) => [...prev, name]);
+                setCurrentVariant(name);
+              }}
+              style={{
+                padding: "3px 8px",
+                border: "1px dashed #ccc",
+                borderRadius: "4px",
+                background: "transparent",
+                color: "#667eea",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: 500,
+              }}
+            >
+              + Save as...
+            </button>
+          </div>
+        )}
         <div style={{ padding: "20px" }}>
           {!selected && <p style={{ color: "#999" }}>Select a block to edit</p>}
           {selected && configLoading && (
