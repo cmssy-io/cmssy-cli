@@ -6,6 +6,10 @@ import { scanResources } from "../utils/scanner.js";
 import { buildResource } from "../utils/builder.js";
 import { updateBlockInCache } from "../utils/blocks-meta-cache.js";
 import { getFieldTypes } from "../utils/field-schema.js";
+import {
+  checkBlockDependencies,
+  printMissingDeps,
+} from "../utils/dependency-check.js";
 
 interface BuildOptions {
   framework?: string;
@@ -51,6 +55,16 @@ export async function buildCommand(options: BuildOptions) {
       process.exit(0);
     }
 
+    // Check block dependencies
+    const blocksWithDeps = resources
+      .filter((r) => r.type === "block" && r.blockConfig?.dependencies)
+      .map((r) => ({ name: r.name, config: r.blockConfig }));
+    const missingDeps = checkBlockDependencies(blocksWithDeps, process.cwd());
+    if (missingDeps.length > 0) {
+      spinner.warn("Missing block dependencies");
+      printMissingDeps(missingDeps);
+    }
+
     spinner.text = `Building ${resources.length} resources...`;
 
     const outDir = path.join(process.cwd(), config.build?.outDir || "public");
@@ -71,7 +85,11 @@ export async function buildCommand(options: BuildOptions) {
       fieldTypes,
     };
 
-    const results: { resource: typeof resources[0]; success: boolean; error?: any }[] = [];
+    const results: {
+      resource: (typeof resources)[0];
+      success: boolean;
+      error?: any;
+    }[] = [];
 
     // Process in batches for controlled parallelism
     for (let i = 0; i < resources.length; i += CONCURRENCY) {
@@ -84,7 +102,7 @@ export async function buildCommand(options: BuildOptions) {
           } catch (error) {
             return { resource, success: false, error };
           }
-        })
+        }),
       );
       results.push(...batchResults);
     }
@@ -97,8 +115,8 @@ export async function buildCommand(options: BuildOptions) {
         successCount++;
         console.log(
           chalk.green(
-            `  ✓ ${resource.packageJson.name}@${resource.packageJson.version}`
-          )
+            `  ✓ ${resource.packageJson.name}@${resource.packageJson.version}`,
+          ),
         );
 
         // Update metadata cache with fresh data
@@ -107,7 +125,7 @@ export async function buildCommand(options: BuildOptions) {
             resource.name,
             resource.type,
             resource.blockConfig,
-            resource.packageJson?.version
+            resource.packageJson?.version,
           );
         }
       } else {
@@ -121,7 +139,7 @@ export async function buildCommand(options: BuildOptions) {
       console.log(chalk.cyan(`\nOutput directory: ${outDir}\n`));
     } else {
       spinner.warn(
-        `Build completed with errors: ${successCount} succeeded, ${errorCount} failed`
+        `Build completed with errors: ${successCount} succeeded, ${errorCount} failed`,
       );
     }
   } catch (error) {

@@ -9,6 +9,11 @@ import {
 } from "../utils/dev-generator/index.js";
 import { loadMetaCache } from "../utils/blocks-meta-cache.js";
 import { scanResources } from "../utils/scanner.js";
+import { loadBlockConfig } from "../utils/block-config.js";
+import {
+  checkBlockDependencies,
+  printMissingDeps,
+} from "../utils/dependency-check.js";
 
 interface DevOptions {
   port: string;
@@ -61,6 +66,27 @@ export async function devCommand(options: DevOptions) {
         r.description = cached.description;
       }
     });
+
+    // Check block dependencies (non-blocking - don't abort dev on config errors)
+    const blocksWithConfigs = await Promise.all(
+      resources
+        .filter((r) => r.type === "block")
+        .map(async (r) => {
+          try {
+            const config = (await loadBlockConfig(r.path)) as {
+              dependencies?: Record<string, string>;
+            } | null;
+            return { name: r.name, config };
+          } catch {
+            return { name: r.name, config: null };
+          }
+        }),
+    );
+    const missingDeps = checkBlockDependencies(blocksWithConfigs, projectRoot);
+    if (missingDeps.length > 0) {
+      spinner.warn("Missing block dependencies");
+      printMissingDeps(missingDeps);
+    }
 
     // Generate the .cmssy/dev/ Next.js app
     spinner.text = "Generating Next.js dev app...";
