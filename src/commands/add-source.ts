@@ -166,7 +166,7 @@ export async function addSourceCommand(
 
   // Check configuration
   if (!hasConfig()) {
-    console.error(chalk.red("✖ Not configured. Run: cmssy configure\n"));
+    console.error(chalk.red("✖ Not configured. Run: cmssy link\n"));
     process.exit(1);
   }
 

@@ -34,7 +34,7 @@ export async function workspacesCommand() {
   if (!config.apiToken) {
     console.error(
       chalk.red("✖ API token not configured. Run:") +
-        chalk.white("\n  cmssy configure")
+        chalk.white("\n  cmssy link"),
     );
     process.exit(1);
   }
@@ -55,8 +55,8 @@ export async function workspacesCommand() {
       console.log(chalk.yellow("\n⚠ No workspaces found"));
       console.log(
         chalk.gray(
-          "Create a workspace at https://cmssy.io or ask for an invitation"
-        )
+          "Create a workspace at https://cmssy.io or ask for an invitation",
+        ),
       );
       return;
     }
@@ -70,8 +70,8 @@ export async function workspacesCommand() {
         roleSlug === "owner"
           ? chalk.green
           : roleSlug === "admin"
-          ? chalk.blue
-          : chalk.gray;
+            ? chalk.blue
+            : chalk.gray;
 
       console.log(chalk.white.bold(workspace.name));
       console.log(chalk.gray(`  Slug: ${workspace.slug}`));
@@ -81,9 +81,7 @@ export async function workspacesCommand() {
     }
 
     console.log(chalk.gray("💡 Tip: Copy the ID above and add to .env:"));
-    console.log(
-      chalk.white(`   CMSSY_WORKSPACE_ID=${workspaces[0].id}`)
-    );
+    console.log(chalk.white(`   CMSSY_WORKSPACE_ID=${workspaces[0].id}`));
     console.log();
   } catch (error: any) {
     console.error(chalk.red(`✖ Failed to fetch workspaces: ${error.message}`));

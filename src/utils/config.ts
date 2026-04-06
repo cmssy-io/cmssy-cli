@@ -31,40 +31,27 @@ export function saveConfig(config: Partial<CmssyConfig>): void {
 
   let newEnv = existingEnv;
 
-  // Update or add CMSSY_API_TOKEN
+  // Helper: append a key=value, ensuring a leading newline
+  function appendKey(key: string, value: string) {
+    if (newEnv.includes(`${key}=`)) {
+      newEnv = newEnv.replace(new RegExp(`${key}=.*`), `${key}=${value}`);
+    } else {
+      // Ensure newline before appending to avoid concatenation with last line
+      if (newEnv.length > 0 && !newEnv.endsWith("\n")) {
+        newEnv += "\n";
+      }
+      newEnv += `${key}=${value}\n`;
+    }
+  }
+
   if (config.apiToken !== undefined) {
-    if (existingEnv.includes("CMSSY_API_TOKEN=")) {
-      newEnv = newEnv.replace(
-        /CMSSY_API_TOKEN=.*/,
-        `CMSSY_API_TOKEN=${config.apiToken}`,
-      );
-    } else {
-      newEnv += `\nCMSSY_API_TOKEN=${config.apiToken}\n`;
-    }
+    appendKey("CMSSY_API_TOKEN", config.apiToken!);
   }
-
-  // Update or add CMSSY_API_URL
   if (config.apiUrl !== undefined) {
-    if (existingEnv.includes("CMSSY_API_URL=")) {
-      newEnv = newEnv.replace(
-        /CMSSY_API_URL=.*/,
-        `CMSSY_API_URL=${config.apiUrl}`,
-      );
-    } else {
-      newEnv += `CMSSY_API_URL=${config.apiUrl}\n`;
-    }
+    appendKey("CMSSY_API_URL", config.apiUrl);
   }
-
-  // Update or add CMSSY_WORKSPACE_ID
   if (config.workspaceId !== undefined) {
-    if (existingEnv.includes("CMSSY_WORKSPACE_ID=")) {
-      newEnv = newEnv.replace(
-        /CMSSY_WORKSPACE_ID=.*/,
-        `CMSSY_WORKSPACE_ID=${config.workspaceId}`,
-      );
-    } else {
-      newEnv += `CMSSY_WORKSPACE_ID=${config.workspaceId}\n`;
-    }
+    appendKey("CMSSY_WORKSPACE_ID", config.workspaceId!);
   }
 
   fs.writeFileSync(envPath, newEnv.trim() + "\n");

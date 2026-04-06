@@ -24,7 +24,7 @@ export async function uploadCommand(
   if (!config.apiToken) {
     console.error(
       chalk.red("✖ API token not configured. Run:") +
-        chalk.white("\n  cmssy configure"),
+        chalk.white("\n  cmssy link"),
     );
     process.exit(1);
   }

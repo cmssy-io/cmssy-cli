@@ -63,7 +63,7 @@ export async function publishCommand(
 
   // Check configuration
   if (!hasConfig()) {
-    console.error(chalk.red("✖ Not configured. Run: cmssy configure\n"));
+    console.error(chalk.red("✖ Not configured. Run: cmssy link\n"));
     process.exit(1);
   }
 
@@ -275,6 +275,13 @@ export async function publishCommand(
 
   // --zip mode: package into ZIPs and upload
   if (options.zip) {
+    if (options.withSource) {
+      console.log(
+        chalk.yellow(
+          "⚠ --with-source is not supported with --zip mode, ignoring\n",
+        ),
+      );
+    }
     console.log(
       chalk.cyan(
         `🏢 Target: Workspace (${workspaceId})\n` +
