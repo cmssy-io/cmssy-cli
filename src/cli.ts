@@ -11,6 +11,7 @@ import { createCommand } from "./commands/create.js";
 import { devCommand } from "./commands/dev.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
+import { testCommand } from "./commands/test.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
@@ -51,8 +52,9 @@ Workflow:
   2. link     → Connect to your workspace
   3. create   → Add more blocks/templates
   4. dev      → Develop with live preview
-  5. build    → Bundle for production
-  6. publish  → Deploy to workspace
+  5. test     → Run block tests
+  6. build    → Bundle for production
+  7. publish  → Deploy to workspace
 
 Documentation: https://cmssy.io/docs/cli
 `,
@@ -169,6 +171,28 @@ Features:
 `,
   )
   .action(devCommand);
+
+// cmssy test
+program
+  .command("test")
+  .description("Run block tests with vitest")
+  .option("--block <names...>", "Test specific blocks")
+  .option("--watch", "Watch mode")
+  .option("--coverage", "Generate coverage report")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy test                    Run all block tests
+  $ cmssy test --block hero       Test specific block
+  $ cmssy test --watch            Watch mode
+  $ cmssy test --coverage         With coverage
+
+Test files: blocks/*/src/**/*.{test,spec}.{ts,tsx}
+             templates/*/src/**/*.{test,spec}.{ts,tsx}
+`,
+  )
+  .action(testCommand);
 
 // cmssy link
 program
