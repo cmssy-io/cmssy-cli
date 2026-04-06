@@ -349,13 +349,6 @@ export async function publishCommand(
       }
 
       if (hasAnyBreaking && !options.dryRun && !options.force) {
-        if (options.overwriteContent) {
-          console.log(
-            chalk.yellow(
-              "  ⚠ --overwrite-content will reset all page content to defaults\n",
-            ),
-          );
-        }
         const answer = await inquirer.prompt([
           {
             type: "confirm",
@@ -370,6 +363,14 @@ export async function publishCommand(
         }
       }
     }
+  }
+
+  if (options.overwriteContent) {
+    console.log(
+      chalk.yellow(
+        "  ⚠ --overwrite-content will reset all page content to defaults\n",
+      ),
+    );
   }
 
   if (options.dryRun) {

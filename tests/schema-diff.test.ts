@@ -93,6 +93,52 @@ describe("diffSchema", () => {
     expect(changes[0].message).toContain("defaultValue");
   });
 
+  it("detects optional to required as breaking", () => {
+    const local: Schema = {
+      name: { type: "singleLine", required: true },
+    };
+    const remote: Schema = {
+      name: { type: "singleLine" },
+    };
+    const changes = diffSchema(local, remote);
+    expect(
+      changes.some(
+        (c) =>
+          c.kind === "breaking" && c.message.includes("optional to required"),
+      ),
+    ).toBe(true);
+  });
+
+  it("detects required to optional as info", () => {
+    const local: Schema = {
+      name: { type: "singleLine" },
+    };
+    const remote: Schema = {
+      name: { type: "singleLine", required: true },
+    };
+    const changes = diffSchema(local, remote);
+    expect(
+      changes.some(
+        (c) => c.kind === "info" && c.message.includes("required to optional"),
+      ),
+    ).toBe(true);
+  });
+
+  it("detects label removed as info", () => {
+    const local: Schema = {
+      title: { type: "singleLine" },
+    };
+    const remote: Schema = {
+      title: { type: "singleLine", label: "Title" },
+    };
+    const changes = diffSchema(local, remote);
+    expect(
+      changes.some(
+        (c) => c.kind === "info" && c.message.includes("label removed"),
+      ),
+    ).toBe(true);
+  });
+
   it("detects defaultValue removed as info", () => {
     const local: Schema = {
       color: { type: "color" },

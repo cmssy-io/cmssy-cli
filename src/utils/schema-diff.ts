@@ -68,15 +68,32 @@ export function diffSchema(local: Schema, remote: Schema): SchemaChange[] {
       });
     }
 
-    // Label changed
-    if (
-      localField.label !== remoteField.label &&
-      localField.label !== undefined
-    ) {
+    // Required flag changed
+    if (localField.required && !remoteField.required) {
+      changes.push({
+        kind: "breaking",
+        message: `Field "${key}" changed from optional to required`,
+      });
+    } else if (!localField.required && remoteField.required) {
       changes.push({
         kind: "info",
-        message: `Field "${key}" label changed: "${remoteField.label}" -> "${localField.label}"`,
+        message: `Field "${key}" changed from required to optional`,
       });
+    }
+
+    // Label changed
+    if (localField.label !== remoteField.label) {
+      if (localField.label !== undefined) {
+        changes.push({
+          kind: "info",
+          message: `Field "${key}" label changed: "${remoteField.label}" -> "${localField.label}"`,
+        });
+      } else if (remoteField.label !== undefined) {
+        changes.push({
+          kind: "info",
+          message: `Field "${key}" label removed`,
+        });
+      }
     }
 
     // DefaultValue changed or removed
