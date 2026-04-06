@@ -67,16 +67,20 @@ export async function devCommand(options: DevOptions) {
       }
     });
 
-    // Check block dependencies
+    // Check block dependencies (non-blocking - don't abort dev on config errors)
     const blocksWithConfigs = await Promise.all(
       resources
         .filter((r) => r.type === "block")
-        .map(async (r) => ({
-          name: r.name,
-          config: (await loadBlockConfig(r.path)) as {
-            dependencies?: Record<string, string>;
-          } | null,
-        })),
+        .map(async (r) => {
+          try {
+            const config = (await loadBlockConfig(r.path)) as {
+              dependencies?: Record<string, string>;
+            } | null;
+            return { name: r.name, config };
+          } catch {
+            return { name: r.name, config: null };
+          }
+        }),
     );
     const missingDeps = checkBlockDependencies(blocksWithConfigs, projectRoot);
     if (missingDeps.length > 0) {

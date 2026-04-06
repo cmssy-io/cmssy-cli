@@ -61,9 +61,13 @@ export function printMissingDeps(missing: BlockDep[]): void {
     console.log(chalk.yellow(`  ${key}`) + chalk.gray(` (used by: ${blocks})`));
   }
 
-  // Build install command
-  const packages = [
-    ...new Set(missing.map((d) => `${d.packageName}@${d.versionRange}`)),
-  ];
+  // Build install command (deduplicate by package name)
+  const seen = new Map<string, string>();
+  for (const dep of missing) {
+    if (!seen.has(dep.packageName)) {
+      seen.set(dep.packageName, dep.versionRange);
+    }
+  }
+  const packages = [...seen.entries()].map(([name, ver]) => `${name}@${ver}`);
   console.log(chalk.gray(`\n  Run: npm install ${packages.join(" ")}\n`));
 }
