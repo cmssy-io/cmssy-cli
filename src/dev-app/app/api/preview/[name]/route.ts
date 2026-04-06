@@ -9,6 +9,10 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  }
+
   let blockPath = path.join(projectRoot, "blocks", name);
   if (!fs.existsSync(blockPath)) {
     blockPath = path.join(projectRoot, "templates", name);
@@ -27,6 +31,10 @@ export async function POST(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  }
+
   const body = await request.json();
 
   let blockPath = path.join(projectRoot, "blocks", name);
