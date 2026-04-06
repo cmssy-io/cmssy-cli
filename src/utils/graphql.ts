@@ -91,6 +91,14 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
       blockType
       name
       sourceUrl
+      version
+      schemaFields {
+        key
+        type
+        label
+        required
+        defaultValue
+      }
     }
   }
 `;
