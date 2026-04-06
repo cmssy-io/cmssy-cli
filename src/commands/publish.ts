@@ -275,7 +275,7 @@ export async function publishCommand(
   console.log("");
 
   // Schema diff: compare local vs remote and warn about breaking changes
-  if (!options.force) {
+  {
     const blocksWithConfig = packages.filter(
       (p) => p.type === "block" && p.blockConfig?.schema,
     );
@@ -301,15 +301,21 @@ export async function publishCommand(
         });
         const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
         remoteBlocks = result.workspaceBlocks || [];
-      } catch {
-        // Can't fetch remote - skip diff
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            "  ⚠ Could not fetch remote blocks; schema diff skipped.",
+          ),
+        );
+        if (error instanceof Error) {
+          console.warn(chalk.gray(`    ${error.message}`));
+        }
+        console.log("");
       }
 
       let hasAnyBreaking = false;
       for (const pkg of blocksWithConfig) {
-        const blockType = pkg.packageJson.name
-          .replace(/@[^/]+\//, "")
-          .replace(/^blocks\./, "");
+        const blockType = convertBlockTypeToSimple(pkg.packageJson.name);
         const remote = remoteBlocks.find((b) => b.blockType === blockType);
         if (!remote || !remote.schemaFields?.length) continue;
 
@@ -342,7 +348,7 @@ export async function publishCommand(
         }
       }
 
-      if (hasAnyBreaking && !options.dryRun) {
+      if (hasAnyBreaking && !options.dryRun && !options.force) {
         if (options.overwriteContent) {
           console.log(
             chalk.yellow(

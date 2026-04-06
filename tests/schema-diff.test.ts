@@ -56,15 +56,15 @@ describe("diffSchema", () => {
     expect(changes[0].message).toContain("optional");
   });
 
-  it("detects required field with default as info", () => {
+  it("detects required field with default as breaking", () => {
     const local: Schema = {
       title: { type: "singleLine", required: true, defaultValue: "Hello" },
     };
     const remote: Schema = {};
     const changes = diffSchema(local, remote);
     expect(changes).toHaveLength(1);
-    expect(changes[0].kind).toBe("info");
-    expect(changes[0].message).toContain("required");
+    expect(changes[0].kind).toBe("breaking");
+    expect(changes[0].message).toContain("Required");
   });
 
   it("detects label change as info", () => {
@@ -91,6 +91,19 @@ describe("diffSchema", () => {
     expect(changes).toHaveLength(1);
     expect(changes[0].kind).toBe("info");
     expect(changes[0].message).toContain("defaultValue");
+  });
+
+  it("detects defaultValue removed as info", () => {
+    const local: Schema = {
+      color: { type: "color" },
+    };
+    const remote: Schema = {
+      color: { type: "color", defaultValue: "#fff" },
+    };
+    const changes = diffSchema(local, remote);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].kind).toBe("info");
+    expect(changes[0].message).toContain("defaultValue removed");
   });
 
   it("handles multiple changes", () => {

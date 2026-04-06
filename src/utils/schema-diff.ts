@@ -36,11 +36,10 @@ export function diffSchema(local: Schema, remote: Schema): SchemaChange[] {
   for (const key of localKeys) {
     if (!remoteKeys.has(key)) {
       const field = local[key];
-      const isRequired = field.required && field.defaultValue === undefined;
-      if (isRequired) {
+      if (field.required) {
         changes.push({
           kind: "breaking",
-          message: `Required field "${key}" added without defaultValue`,
+          message: `Required field "${key}" added`,
         });
       } else {
         const defaultInfo =
@@ -80,12 +79,19 @@ export function diffSchema(local: Schema, remote: Schema): SchemaChange[] {
       });
     }
 
-    // DefaultValue changed
-    if (
-      JSON.stringify(localField.defaultValue) !==
-      JSON.stringify(remoteField.defaultValue)
-    ) {
-      if (localField.defaultValue !== undefined) {
+    // DefaultValue changed or removed
+    const localDefault = JSON.stringify(localField.defaultValue ?? null);
+    const remoteDefault = JSON.stringify(remoteField.defaultValue ?? null);
+    if (localDefault !== remoteDefault) {
+      if (
+        localField.defaultValue === undefined &&
+        remoteField.defaultValue !== undefined
+      ) {
+        changes.push({
+          kind: "info",
+          message: `Field "${key}" defaultValue removed`,
+        });
+      } else if (localField.defaultValue !== undefined) {
         changes.push({
           kind: "info",
           message: `Field "${key}" defaultValue changed`,

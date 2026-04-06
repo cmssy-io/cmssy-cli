@@ -93,11 +93,7 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
       sourceUrl
       version
       schemaFields {
-        key
-        type
-        label
-        required
-        defaultValue
+        ${SCHEMA_FIELDS_FRAGMENT}
       }
     }
   }
