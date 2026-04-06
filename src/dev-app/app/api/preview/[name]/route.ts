@@ -25,6 +25,7 @@ function getVariants(blockPath: string): string[] {
     .readdirSync(previewsDir)
     .filter((f) => f.endsWith(".json"))
     .map((f) => f.replace(/\.json$/, ""))
+    .filter((name) => SAFE_NAME_RE.test(name))
     .sort((a, b) => a.localeCompare(b));
 }
 

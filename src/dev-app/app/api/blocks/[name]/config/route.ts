@@ -4,6 +4,7 @@ import path from "path";
 import { execSync } from "child_process";
 
 const projectRoot = process.env.CMSSY_PROJECT_ROOT || process.cwd();
+const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 function loadBlockConfig(blockPath: string): Record<string, unknown> | null {
   const configPath = path.join(blockPath, "config.ts");
@@ -71,7 +72,7 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
-  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+  if (!SAFE_NAME_RE.test(name)) {
     return NextResponse.json({ error: "Invalid name" }, { status: 400 });
   }
 

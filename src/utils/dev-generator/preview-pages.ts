@@ -50,18 +50,24 @@ ${hasCss ? `import "${finalCssImport}";` : ""}
 
 export default function ${toPascalCase(resource.name)}Preview() {
   const [data, setData] = useState<Record<string, unknown>>({});
+  const [context, setContext] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     fetch("/api/preview/${resource.name}")
       .then((r) => r.json())
-      .then(setData)
+      .then((res) => setData(res.data || res))
       .catch(console.error);
+    fetch("/api/context")
+      .then((r) => r.json())
+      .then(setContext)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
       if (e.data?.type === "UPDATE_PROPS") {
         setData(e.data.props);
+        if (e.data.context) setContext(e.data.context);
       }
     }
     window.addEventListener("message", handleMessage);
@@ -82,7 +88,7 @@ export default function ${toPascalCase(resource.name)}Preview() {
         </a>
       </div>
       <div style={{ marginTop: "60px", minHeight: "calc(100vh - 60px)" }}>
-        <BlockComponent content={data} />
+        <BlockComponent content={data} context={context} />
       </div>
     </div>
   );

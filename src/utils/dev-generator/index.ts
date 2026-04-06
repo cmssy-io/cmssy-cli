@@ -46,6 +46,7 @@ function copyDevAppFiles(devRoot: string): void {
     "app/api/blocks/[name]/config/route.ts",
     "app/api/preview/[name]/route.ts",
     "app/api/config/route.ts",
+    "app/api/context/route.ts",
     "app/api/workspaces/route.ts",
   ];
 
