@@ -46,6 +46,8 @@ function getSyncStatus(
   return "outdated";
 }
 
+const VIEWPORT_STORAGE_KEY = VIEWPORT_STORAGE_KEY;
+
 const VIEWPORT_PRESETS = [
   { label: "Desktop", width: 1440 },
   { label: "Laptop", width: 1024 },
@@ -68,22 +70,22 @@ export default function DevHome() {
 
   // Load saved viewport from localStorage after mount (avoid SSR mismatch)
   useEffect(() => {
-    const saved = localStorage.getItem("cmssy-dev-viewport");
+    const saved = localStorage.getItem(VIEWPORT_STORAGE_KEY);
     if (!saved) return;
     const parsed = parseInt(saved, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
       setViewport(parsed);
     } else {
-      localStorage.removeItem("cmssy-dev-viewport");
+      localStorage.removeItem(VIEWPORT_STORAGE_KEY);
     }
   }, []);
 
   // Persist viewport changes
   useEffect(() => {
     if (viewport === null) {
-      localStorage.removeItem("cmssy-dev-viewport");
+      localStorage.removeItem(VIEWPORT_STORAGE_KEY);
     } else {
-      localStorage.setItem("cmssy-dev-viewport", String(viewport));
+      localStorage.setItem(VIEWPORT_STORAGE_KEY, String(viewport));
     }
   }, [viewport]);
 
@@ -825,8 +827,10 @@ export default function DevHome() {
               background: "#f8f8f8",
               borderBottom: "1px solid #e0e0e0",
               display: "flex",
+              flexWrap: "wrap",
               alignItems: "center",
               gap: "4px",
+              rowGap: "6px",
               fontSize: "12px",
             }}
           >
