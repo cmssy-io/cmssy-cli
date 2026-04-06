@@ -46,7 +46,7 @@ function getSyncStatus(
   return "outdated";
 }
 
-const VIEWPORT_STORAGE_KEY = VIEWPORT_STORAGE_KEY;
+const VIEWPORT_STORAGE_KEY = "cmssy-dev-viewport";
 
 const VIEWPORT_PRESETS = [
   { label: "Desktop", width: 1440 },

@@ -32,7 +32,7 @@ function loadBlockConfig(blockPath: string): Record<string, unknown> | null {
       const mockConfigPath = path.join(tempDir, "cmssy-cli-config.mjs");
       fs.writeFileSync(
         mockConfigPath,
-        "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;",
+        "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const field = (config) => config;",
       );
 
       const configContent = fs.readFileSync(configPath, "utf-8");

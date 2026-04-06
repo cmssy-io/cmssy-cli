@@ -53,9 +53,6 @@ export async function linkCommand(options: LinkOptions) {
           if (!input || input.length < 10) {
             return "Please enter a valid API token";
           }
-          if (!input.startsWith("bf_")) {
-            return 'Token should start with "bf_"';
-          }
           return true;
         },
       },
