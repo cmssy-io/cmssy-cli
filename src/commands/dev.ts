@@ -86,6 +86,7 @@ export async function devCommand(options: DevOptions) {
     if (missingDeps.length > 0) {
       spinner.warn("Missing block dependencies");
       printMissingDeps(missingDeps);
+      spinner.start("Generating Next.js dev app...");
     }
 
     // Generate the .cmssy/dev/ Next.js app

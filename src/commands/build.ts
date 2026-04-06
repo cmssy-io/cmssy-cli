@@ -63,6 +63,7 @@ export async function buildCommand(options: BuildOptions) {
     if (missingDeps.length > 0) {
       spinner.warn("Missing block dependencies");
       printMissingDeps(missingDeps);
+      spinner.start();
     }
 
     spinner.text = `Building ${resources.length} resources...`;

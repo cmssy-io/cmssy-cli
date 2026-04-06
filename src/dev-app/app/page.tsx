@@ -68,6 +68,9 @@ export default function DevHome() {
   const [isDirty, setIsDirty] = useState(false);
   const [showBlockList, setShowBlockList] = useState(true);
   const [showEditor, setShowEditor] = useState(true);
+  const [editorTab, setEditorTab] = useState<"content" | "context">("content");
+  const [mockContext, setMockContext] = useState<Record<string, any>>({});
+  const [contextPresets, setContextPresets] = useState<string[]>([]);
   const [viewport, setViewport] = useState<number | null>(null);
 
   // Load saved viewport from localStorage after mount (avoid SSR mismatch)
@@ -151,6 +154,18 @@ export default function DevHome() {
       .catch(() => setWsLoading(false));
   }, []);
 
+  // Load mock context + presets
+  useEffect(() => {
+    fetch("/api/context")
+      .then((r) => r.json())
+      .then(setMockContext)
+      .catch(() => {});
+    fetch("/api/context?presets=true")
+      .then((r) => r.json())
+      .then((data) => setContextPresets(data.presets || []))
+      .catch(() => {});
+  }, []);
+
   // Load blocks list
   useEffect(() => {
     fetch("/api/blocks")
@@ -202,15 +217,15 @@ export default function DevHome() {
     iframeLoadedRef.current = false;
   }, []);
 
-  // Send props to iframe
+  // Send props + context to iframe
   useEffect(() => {
     if (!iframeRef.current?.contentWindow || !iframeLoadedRef.current) return;
     if (!previewData || Object.keys(previewData).length === 0) return;
     iframeRef.current.contentWindow.postMessage(
-      { type: "UPDATE_PROPS", props: previewData },
+      { type: "UPDATE_PROPS", props: previewData, context: mockContext },
       window.location.origin,
     );
-  }, [previewData]);
+  }, [previewData, mockContext]);
 
   // Auto-save preview data
   useEffect(() => {
@@ -978,9 +993,31 @@ export default function DevHome() {
             background: "#fafafa",
           }}
         >
-          <h2 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>
-            Editor
-          </h2>
+          <div style={{ display: "flex", gap: "0" }}>
+            {(["content", "context"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setEditorTab(tab)}
+                style={{
+                  padding: "6px 16px",
+                  border: "none",
+                  background: editorTab === tab ? "#fff" : "transparent",
+                  borderBottom:
+                    editorTab === tab
+                      ? "2px solid #667eea"
+                      : "2px solid transparent",
+                  fontSize: "14px",
+                  fontWeight: editorTab === tab ? 600 : 400,
+                  cursor: "pointer",
+                  color: editorTab === tab ? "#333" : "#888",
+                  textTransform: "capitalize",
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
         </div>
         {/* Variant picker */}
         {selected && (
@@ -1036,19 +1073,30 @@ export default function DevHome() {
                 const name = prompt("Variant name (e.g., long-text):");
                 if (!name) return;
                 const dataToSave = { ...configDataRef.current, ...previewData };
-                await fetch(
-                  `/api/preview/${selected.name}?action=save-variant`,
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      variantName: name,
-                      data: dataToSave,
-                    }),
-                  },
-                );
-                setVariants((prev) => [...prev, name]);
-                setCurrentVariant(name);
+                try {
+                  const res = await fetch(
+                    `/api/preview/${selected.name}?action=save-variant`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        variantName: name,
+                        data: dataToSave,
+                      }),
+                    },
+                  );
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.error || "Failed to save variant");
+                    return;
+                  }
+                  setVariants((prev) =>
+                    prev.includes(name) ? prev : [...prev, name],
+                  );
+                  setCurrentVariant(name);
+                } catch {
+                  alert("Failed to save variant");
+                }
               }}
               style={{
                 padding: "3px 8px",
@@ -1065,50 +1113,340 @@ export default function DevHome() {
             </button>
           </div>
         )}
-        <div style={{ padding: "20px" }}>
-          {!selected && <p style={{ color: "#999" }}>Select a block to edit</p>}
-          {selected && configLoading && (
-            <p style={{ color: "#999" }}>Loading...</p>
-          )}
-          {selected && !configLoading && selected.schema && (
-            <div>
-              {Object.entries(selected.schema).map(
-                ([key, field]: [string, any]) => (
-                  <div key={key} style={{ marginBottom: "20px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        marginBottom: "6px",
-                      }}
-                    >
-                      {field.label || key}
-                      {field.required && (
-                        <span style={{ color: "#e53935" }}> *</span>
-                      )}
-                    </label>
-                    {renderField(field, previewData[key], (val) => {
-                      setPreviewData({ ...previewData, [key]: val });
-                      setIsDirty(true);
-                    })}
-                    {field.helpText && (
-                      <div
+        {/* Content tab */}
+        {editorTab === "content" && (
+          <div style={{ padding: "20px" }}>
+            {!selected && (
+              <p style={{ color: "#999" }}>Select a block to edit</p>
+            )}
+            {selected && configLoading && (
+              <p style={{ color: "#999" }}>Loading...</p>
+            )}
+            {selected && !configLoading && selected.schema && (
+              <div>
+                {Object.entries(selected.schema).map(
+                  ([key, field]: [string, any]) => (
+                    <div key={key} style={{ marginBottom: "20px" }}>
+                      <label
                         style={{
-                          fontSize: "12px",
-                          color: "#666",
-                          marginTop: "4px",
+                          display: "block",
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          marginBottom: "6px",
                         }}
                       >
-                        {field.helpText}
-                      </div>
-                    )}
-                  </div>
-                ),
+                        {field.label || key}
+                        {field.required && (
+                          <span style={{ color: "#e53935" }}> *</span>
+                        )}
+                      </label>
+                      {renderField(field, previewData[key], (val) => {
+                        setPreviewData({ ...previewData, [key]: val });
+                        setIsDirty(true);
+                      })}
+                      {field.helpText && (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "#666",
+                            marginTop: "4px",
+                          }}
+                        >
+                          {field.helpText}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Context tab */}
+        {editorTab === "context" && (
+          <div style={{ padding: "20px" }}>
+            {/* Presets */}
+            <div style={{ marginBottom: "20px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                }}
+              >
+                Presets
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                {contextPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={async () => {
+                      const res = await fetch(
+                        `/api/context?preset=${encodeURIComponent(preset)}`,
+                      );
+                      const data = await res.json();
+                      setMockContext(data);
+                      fetch("/api/context", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(data),
+                      });
+                    }}
+                    style={{
+                      padding: "4px 10px",
+                      border: "1px solid #ddd",
+                      borderRadius: "4px",
+                      background: "#fff",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Locale */}
+            <div style={{ marginBottom: "20px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                }}
+              >
+                Locale
+              </label>
+              <div style={{ marginBottom: "8px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    color: "#666",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Current language
+                </label>
+                <input
+                  type="text"
+                  value={mockContext.locale?.current || "en"}
+                  onChange={(e) => {
+                    const updated = {
+                      ...mockContext,
+                      locale: {
+                        ...mockContext.locale,
+                        current: e.target.value,
+                      },
+                    };
+                    setMockContext(updated);
+                    fetch("/api/context", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(updated),
+                    });
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: "8px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    color: "#666",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Enabled languages (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={(mockContext.locale?.enabled || ["en"]).join(", ")}
+                  onChange={(e) => {
+                    const langs = e.target.value
+                      .split(",")
+                      .map((s: string) => s.trim())
+                      .filter(Boolean);
+                    const updated = {
+                      ...mockContext,
+                      locale: { ...mockContext.locale, enabled: langs },
+                    };
+                    setMockContext(updated);
+                    fetch("/api/context", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(updated),
+                    });
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Auth */}
+            <div style={{ marginBottom: "20px" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!mockContext.auth?.isAuthenticated}
+                  onChange={(e) => {
+                    const updated = e.target.checked
+                      ? {
+                          ...mockContext,
+                          auth: {
+                            isAuthenticated: true,
+                            member: mockContext.auth?.member || {
+                              id: "dev-member-1",
+                              email: "user@example.com",
+                              profile: {
+                                firstName: "Jane",
+                                lastName: "Doe",
+                                displayName: "Jane Doe",
+                                avatarUrl: "",
+                              },
+                              role: "member",
+                              verified: true,
+                            },
+                          },
+                        }
+                      : { ...mockContext, auth: null };
+                    setMockContext(updated);
+                    fetch("/api/context", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(updated),
+                    });
+                  }}
+                />
+                Authenticated
+              </label>
+              {mockContext.auth?.isAuthenticated && (
+                <div style={{ paddingLeft: "4px" }}>
+                  {(["email", "role"] as const).map((field) => (
+                    <div key={field} style={{ marginBottom: "6px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: "12px",
+                          color: "#666",
+                          marginBottom: "2px",
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {field}
+                      </label>
+                      <input
+                        type="text"
+                        value={
+                          field === "email"
+                            ? mockContext.auth?.member?.email || ""
+                            : mockContext.auth?.member?.role || ""
+                        }
+                        onChange={(e) => {
+                          const updated = {
+                            ...mockContext,
+                            auth: {
+                              ...mockContext.auth,
+                              member: {
+                                ...mockContext.auth?.member,
+                                [field]: e.target.value,
+                              },
+                            },
+                          };
+                          setMockContext(updated);
+                          fetch("/api/context", {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(updated),
+                          });
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "4px 8px",
+                          border: "1px solid #ddd",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          )}
-        </div>
+
+            {/* Raw JSON editor */}
+            <div style={{ marginBottom: "20px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                }}
+              >
+                Full context (JSON)
+              </label>
+              <textarea
+                value={JSON.stringify(mockContext, null, 2)}
+                onChange={(e) => {
+                  try {
+                    const parsed = JSON.parse(e.target.value);
+                    setMockContext(parsed);
+                    fetch("/api/context", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(parsed),
+                    });
+                  } catch {
+                    // Invalid JSON, don't update
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  minHeight: "200px",
+                  padding: "8px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  fontFamily: "monospace",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Settings Panel (slide-over) */}
