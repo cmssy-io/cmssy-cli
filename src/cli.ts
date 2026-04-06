@@ -202,7 +202,7 @@ program.addCommand(
     .description(
       "Configure Cmssy API credentials (deprecated: use `cmssy link`)",
     )
-    .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
+    .option("--api-url <url>", "Cmssy API URL")
     .action((options) => {
       console.log(
         chalk.yellow(

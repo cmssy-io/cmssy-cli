@@ -103,10 +103,10 @@ export async function doctorCommand() {
 
   const config = loadConfig();
 
-  if (config.apiUrl) {
-    pass(`CMSSY_API_URL set`);
+  if (process.env.CMSSY_API_URL) {
+    pass(`CMSSY_API_URL set (${config.apiUrl})`);
   } else {
-    warn("CMSSY_API_URL not set");
+    warn(`CMSSY_API_URL not set, using default (${config.apiUrl})`);
   }
 
   if (config.apiToken) {

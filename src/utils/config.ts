@@ -46,13 +46,13 @@ export function saveConfig(config: Partial<CmssyConfig>): void {
   }
 
   if (config.apiToken !== undefined) {
-    appendKey("CMSSY_API_TOKEN", config.apiToken!);
+    appendKey("CMSSY_API_TOKEN", config.apiToken ?? "");
   }
   if (config.apiUrl !== undefined) {
     appendKey("CMSSY_API_URL", config.apiUrl);
   }
   if (config.workspaceId !== undefined) {
-    appendKey("CMSSY_WORKSPACE_ID", config.workspaceId!);
+    appendKey("CMSSY_WORKSPACE_ID", config.workspaceId ?? "");
   }
 
   fs.writeFileSync(envPath, newEnv.trim() + "\n");
