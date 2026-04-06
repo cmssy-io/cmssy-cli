@@ -7,6 +7,7 @@ import path from "path";
 import semver from "semver";
 import { hasConfig, loadConfig } from "../utils/config.js";
 import {
+  GET_WORKSPACE_BLOCKS_QUERY,
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
@@ -22,7 +23,6 @@ import {
 import { packageResource } from "./package.js";
 import { uploadPackage } from "./upload.js";
 import { uploadBlockSource } from "./add-source.js";
-import { GET_WORKSPACE_BLOCKS_QUERY } from "../utils/graphql.js";
 
 interface PublishOptions {
   workspace?: string;
