@@ -39,6 +39,8 @@
     "src/dev-app",
     "config.js",
     "config.d.ts",
+    "test.js",
+    "test.d.ts",
     "README.md",
     "LICENSE"
   ],
