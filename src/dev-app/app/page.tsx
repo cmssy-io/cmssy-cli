@@ -67,7 +67,10 @@ export default function DevHome() {
   const [viewport, setViewport] = useState<number | null>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("cmssy-dev-viewport");
-      return saved ? parseInt(saved, 10) : null;
+      if (!saved) return null;
+      const parsed = parseInt(saved, 10);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      localStorage.removeItem("cmssy-dev-viewport");
     }
     return null;
   });
@@ -869,12 +872,13 @@ export default function DevHome() {
               <input
                 type="number"
                 value={viewport ?? ""}
+                aria-label="Viewport width in pixels"
                 onChange={(e) => {
-                  const v = e.target.value
-                    ? parseInt(e.target.value, 10)
-                    : null;
+                  const parsed = parseInt(e.target.value, 10);
+                  const v =
+                    Number.isFinite(parsed) && parsed > 0 ? parsed : null;
                   setViewport(v);
-                  if (v) {
+                  if (v !== null) {
                     localStorage.setItem("cmssy-dev-viewport", String(v));
                   } else {
                     localStorage.removeItem("cmssy-dev-viewport");
@@ -907,7 +911,8 @@ export default function DevHome() {
           {previewUrl ? (
             <div
               style={{
-                width: viewport ? `${viewport}px` : "100%",
+                width:
+                  viewport !== null && viewport > 0 ? `${viewport}px` : "100%",
                 maxWidth: "100%",
                 height: "100%",
                 background: "white",
