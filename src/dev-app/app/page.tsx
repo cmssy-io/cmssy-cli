@@ -46,6 +46,13 @@ function getSyncStatus(
   return "outdated";
 }
 
+const VIEWPORT_PRESETS = [
+  { label: "Desktop", width: 1440 },
+  { label: "Laptop", width: 1024 },
+  { label: "Tablet", width: 768 },
+  { label: "Mobile", width: 375 },
+] as const;
+
 export default function DevHome() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selected, setSelected] = useState<Block | null>(null);
@@ -57,6 +64,13 @@ export default function DevHome() {
   const [isDirty, setIsDirty] = useState(false);
   const [showBlockList, setShowBlockList] = useState(true);
   const [showEditor, setShowEditor] = useState(true);
+  const [viewport, setViewport] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("cmssy-dev-viewport");
+      return saved ? parseInt(saved, 10) : null;
+    }
+    return null;
+  });
   const [wsInfo, setWsInfo] = useState<WorkspaceInfo | null>(null);
   const [wsLoading, setWsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -787,6 +801,99 @@ export default function DevHome() {
             {"\u2699"}
           </button>
         </div>
+        {/* Responsive viewport toolbar */}
+        {previewUrl && (
+          <div
+            style={{
+              padding: "6px 16px",
+              background: "#f8f8f8",
+              borderBottom: "1px solid #e0e0e0",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setViewport(null);
+                localStorage.removeItem("cmssy-dev-viewport");
+              }}
+              style={{
+                padding: "4px 10px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                background: viewport === null ? "#667eea" : "#fff",
+                color: viewport === null ? "#fff" : "#333",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
+              Full
+            </button>
+            {VIEWPORT_PRESETS.map((preset) => (
+              <button
+                key={preset.width}
+                type="button"
+                onClick={() => {
+                  setViewport(preset.width);
+                  localStorage.setItem(
+                    "cmssy-dev-viewport",
+                    String(preset.width),
+                  );
+                }}
+                style={{
+                  padding: "4px 10px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  background: viewport === preset.width ? "#667eea" : "#fff",
+                  color: viewport === preset.width ? "#fff" : "#333",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                {preset.label} {preset.width}
+              </button>
+            ))}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                marginLeft: "8px",
+              }}
+            >
+              <input
+                type="number"
+                value={viewport ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value
+                    ? parseInt(e.target.value, 10)
+                    : null;
+                  setViewport(v);
+                  if (v) {
+                    localStorage.setItem("cmssy-dev-viewport", String(v));
+                  } else {
+                    localStorage.removeItem("cmssy-dev-viewport");
+                  }
+                }}
+                placeholder="Custom"
+                style={{
+                  width: "72px",
+                  padding: "4px 6px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  textAlign: "center",
+                }}
+              />
+              <span style={{ color: "#999" }}>px</span>
+            </div>
+          </div>
+        )}
         <div
           style={{
             flex: 1,
@@ -794,17 +901,20 @@ export default function DevHome() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "auto",
           }}
         >
           {previewUrl ? (
             <div
               style={{
-                width: "100%",
+                width: viewport ? `${viewport}px` : "100%",
+                maxWidth: "100%",
                 height: "100%",
                 background: "white",
                 borderRadius: "12px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                 overflow: "hidden",
+                transition: "width 0.2s ease",
               }}
             >
               <iframe
