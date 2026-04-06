@@ -33,8 +33,9 @@ export function saveConfig(config: Partial<CmssyConfig>): void {
 
   // Helper: append a key=value, ensuring a leading newline
   function appendKey(key: string, value: string) {
-    if (newEnv.includes(`${key}=`)) {
-      newEnv = newEnv.replace(new RegExp(`${key}=.*`), `${key}=${value}`);
+    const regex = new RegExp(`^${key}=.*$`, "m");
+    if (regex.test(newEnv)) {
+      newEnv = newEnv.replace(regex, `${key}=${value}`);
     } else {
       // Ensure newline before appending to avoid concatenation with last line
       if (newEnv.length > 0 && !newEnv.endsWith("\n")) {

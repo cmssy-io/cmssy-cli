@@ -7,6 +7,7 @@ import path from "path";
 import semver from "semver";
 import { hasConfig, loadConfig } from "../utils/config.js";
 import {
+  GET_WORKSPACE_BLOCKS_QUERY,
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
 } from "../utils/graphql.js";
@@ -22,7 +23,6 @@ import {
 import { packageResource } from "./package.js";
 import { uploadPackage } from "./upload.js";
 import { uploadBlockSource } from "./add-source.js";
-import { GET_WORKSPACE_BLOCKS_QUERY } from "../utils/graphql.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -350,7 +350,8 @@ export async function publishCommand(
   // Publish each package
   let successCount = 0;
   let errorCount = 0;
-  const publishedBlocks: { name: string; path: string }[] = [];
+  const publishedBlocks: { name: string; blockType: string; path: string }[] =
+    [];
 
   for (const pkg of packages) {
     const spinner = ora(
@@ -370,7 +371,11 @@ export async function publishCommand(
       );
       successCount++;
       if (pkg.type === "block") {
-        publishedBlocks.push({ name: pkg.name, path: pkg.path });
+        // Derive blockType same way as publishToWorkspace
+        const blockType = pkg.packageJson.name
+          .replace(/@[^/]+\//, "")
+          .replace(/^blocks\./, "");
+        publishedBlocks.push({ name: pkg.name, blockType, path: pkg.path });
       }
     } catch (error: any) {
       spinner.fail(chalk.red(`✖ ${pkg.packageJson.name} failed`));
@@ -474,7 +479,9 @@ export async function publishCommand(
     let sourceFail = 0;
 
     for (const block of publishedBlocks) {
-      const wsBlock = workspaceBlocks.find((b) => b.blockType === block.name);
+      const wsBlock = workspaceBlocks.find(
+        (b) => b.blockType === block.blockType || b.blockType === block.name,
+      );
       if (!wsBlock) {
         console.warn(
           chalk.yellow(

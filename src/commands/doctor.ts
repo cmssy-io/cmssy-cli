@@ -5,29 +5,6 @@ import { GraphQLClient } from "graphql-request";
 import path from "path";
 import { loadConfig } from "../utils/config.js";
 
-let errors = 0;
-let warnings = 0;
-let passed = 0;
-
-function pass(msg: string) {
-  console.log(chalk.green(`  ✓ ${msg}`));
-  passed++;
-}
-
-function fail(msg: string) {
-  console.log(chalk.red(`  ✗ ${msg}`));
-  errors++;
-}
-
-function warn(msg: string) {
-  console.log(chalk.yellow(`  ⚠ ${msg}`));
-  warnings++;
-}
-
-function skip(msg: string) {
-  console.log(chalk.gray(`  - ${msg} (skipped)`));
-}
-
 function getVersion(cmd: string): string | null {
   try {
     return execSync(cmd, { encoding: "utf-8" }).trim();
@@ -50,6 +27,26 @@ function getPackageVersion(name: string): string | null {
 }
 
 export async function doctorCommand() {
+  let errors = 0;
+  let warnings = 0;
+  let passed = 0;
+
+  function pass(msg: string) {
+    console.log(chalk.green(`  ✓ ${msg}`));
+    passed++;
+  }
+  function fail(msg: string) {
+    console.log(chalk.red(`  ✗ ${msg}`));
+    errors++;
+  }
+  function warn(msg: string) {
+    console.log(chalk.yellow(`  ⚠ ${msg}`));
+    warnings++;
+  }
+  function skip(msg: string) {
+    console.log(chalk.gray(`  - ${msg} (skipped)`));
+  }
+
   console.log(chalk.blue.bold("\n🩺 Cmssy Doctor\n"));
 
   // --- Environment ---

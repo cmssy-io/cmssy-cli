@@ -174,7 +174,10 @@ Features:
 program
   .command("link")
   .description("Connect project to a Cmssy workspace")
-  .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
+  .option(
+    "--api-url <url>",
+    "Cmssy API URL (default: existing or https://api.cmssy.io/graphql)",
+  )
   .option("--token <token>", "API token (skip interactive prompt)")
   .option(
     "-w, --workspace <id>",
