@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
+import chalk from "chalk";
 import { Command } from "commander";
 import { addSourceCommand } from "./commands/add-source.js";
 import { buildCommand } from "./commands/build.js";
 import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
+import { linkCommand } from "./commands/link.js";
 import { createCommand } from "./commands/create.js";
 import { devCommand } from "./commands/dev.js";
 import { initCommand } from "./commands/init.js";
@@ -45,10 +47,11 @@ Examples:
 
 Workflow:
   1. init     → Create project with example block
-  2. create   → Add more blocks/templates
-  3. dev      → Develop with live preview
-  4. build    → Bundle for production
-  5. publish  → Deploy to workspace
+  2. link     → Connect to your workspace
+  3. create   → Add more blocks/templates
+  4. dev      → Develop with live preview
+  5. build    → Bundle for production
+  6. publish  → Deploy to workspace
 
 Documentation: https://cmssy.io/docs/cli
 `,
@@ -166,22 +169,46 @@ Features:
   )
   .action(devCommand);
 
-// cmssy configure
+// cmssy link
 program
-  .command("configure")
-  .description("Configure Cmssy API credentials")
+  .command("link")
+  .description("Connect project to a Cmssy workspace")
   .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
+  .option("--token <token>", "API token (skip interactive prompt)")
+  .option(
+    "-w, --workspace <id>",
+    "Workspace ID or slug (skip interactive picker)",
+  )
   .addHelpText(
     "after",
     `
-Stores credentials in .env file:
-  CMSSY_API_TOKEN=your-token
-  CMSSY_API_URL=https://api.cmssy.io/graphql
+Examples:
+  $ cmssy link                                    Interactive setup
+  $ cmssy link --token bf_xxx --workspace abc123   Non-interactive (CI)
 
+Saves credentials and workspace ID to .env file.
 Get your API token at: https://cmssy.io/settings/tokens
 `,
   )
-  .action(configureCommand);
+  .action(linkCommand);
+
+// cmssy configure (hidden - deprecated, use `cmssy link`)
+program.addCommand(
+  new Command("configure")
+    .description(
+      "Configure Cmssy API credentials (deprecated: use `cmssy link`)",
+    )
+    .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
+    .action((options) => {
+      console.log(
+        chalk.yellow(
+          "\n⚠ `cmssy configure` is deprecated. Use `cmssy link` instead.\n",
+        ),
+      );
+      return configureCommand(options);
+    }),
+  { hidden: true },
+);
 
 // cmssy publish
 program

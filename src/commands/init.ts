@@ -233,7 +233,7 @@ function writeEnvExample(projectPath: string): void {
   fs.writeFileSync(
     path.join(projectPath, ".env.example"),
     `# Cmssy API Configuration
-# Run 'cmssy configure' to set these values
+# Run 'cmssy link' to set these values
 
 # Cmssy GraphQL API URL
 CMSSY_API_URL=https://api.cmssy.io/graphql
@@ -377,13 +377,10 @@ async function initNewProject(
     console.log(chalk.green.bold("\n✓ Project created successfully!\n"));
     console.log(chalk.cyan("Next steps:\n"));
     console.log(chalk.white(`  cd ${name}`));
-    console.log(chalk.white("  npm run cmssy:dev\n"));
-    console.log(chalk.gray("Commands:"));
-    console.log(chalk.gray("  cmssy create block <name>   Add a new block"));
-    console.log(chalk.gray("  cmssy dev                   Start dev server"));
     console.log(
-      chalk.gray("  cmssy publish --all -w ID   Publish to workspace\n"),
+      chalk.white("  cmssy link              Connect to your workspace"),
     );
+    console.log(chalk.white("  cmssy dev               Start developing\n"));
   } catch (error) {
     spinner.fail("Failed to set up Cmssy");
     console.error(chalk.red("\nError:"), error);
@@ -485,14 +482,10 @@ async function initExistingProject(options: InitOptions): Promise<void> {
 
     console.log(chalk.green.bold("\n✓ Cmssy initialized successfully!\n"));
     console.log(chalk.cyan("Next steps:\n"));
-    console.log(chalk.white("  npm run cmssy:dev\n"));
-    console.log(chalk.gray("New files:"));
-    console.log(chalk.gray("  cmssy.config.js        Project configuration"));
-    console.log(chalk.gray("  blocks/hero/            Example block"));
-    console.log(chalk.gray("  styles/main.css         Tailwind source paths"));
     console.log(
-      chalk.gray("  .env.example            API credentials template\n"),
+      chalk.white("  cmssy link              Connect to your workspace"),
     );
+    console.log(chalk.white("  cmssy dev               Start developing\n"));
   } catch (error) {
     spinner.fail("Failed to initialize Cmssy");
     console.error(chalk.red("\nError:"), error);

@@ -36,7 +36,7 @@ export function saveConfig(config: Partial<CmssyConfig>): void {
     if (existingEnv.includes("CMSSY_API_TOKEN=")) {
       newEnv = newEnv.replace(
         /CMSSY_API_TOKEN=.*/,
-        `CMSSY_API_TOKEN=${config.apiToken}`
+        `CMSSY_API_TOKEN=${config.apiToken}`,
       );
     } else {
       newEnv += `\nCMSSY_API_TOKEN=${config.apiToken}\n`;
@@ -48,10 +48,22 @@ export function saveConfig(config: Partial<CmssyConfig>): void {
     if (existingEnv.includes("CMSSY_API_URL=")) {
       newEnv = newEnv.replace(
         /CMSSY_API_URL=.*/,
-        `CMSSY_API_URL=${config.apiUrl}`
+        `CMSSY_API_URL=${config.apiUrl}`,
       );
     } else {
       newEnv += `CMSSY_API_URL=${config.apiUrl}\n`;
+    }
+  }
+
+  // Update or add CMSSY_WORKSPACE_ID
+  if (config.workspaceId !== undefined) {
+    if (existingEnv.includes("CMSSY_WORKSPACE_ID=")) {
+      newEnv = newEnv.replace(
+        /CMSSY_WORKSPACE_ID=.*/,
+        `CMSSY_WORKSPACE_ID=${config.workspaceId}`,
+      );
+    } else {
+      newEnv += `CMSSY_WORKSPACE_ID=${config.workspaceId}\n`;
     }
   }
 
