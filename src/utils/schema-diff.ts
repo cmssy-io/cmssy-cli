@@ -48,7 +48,7 @@ export function diffSchema(local: Schema, remote: Schema): SchemaChange[] {
             : "";
         changes.push({
           kind: "info",
-          message: `Field "${key}" added${field.required ? " (required)" : " (optional)"}${defaultInfo}`,
+          message: `Field "${key}" added (optional)${defaultInfo}`,
         });
       }
     }
