@@ -77,9 +77,13 @@ export function field<T extends FieldType>(
 export function defineBlock(
   config: Omit<TypedBlockConfig, "schema"> & {
     schema: Record<string, FieldDef>;
+    /** External package dependencies (e.g., { "framer-motion": "^11.0.0" }) */
+    dependencies?: Record<string, string>;
   },
-): BlockConfig {
-  return config as unknown as BlockConfig;
+): BlockConfig & { dependencies?: Record<string, string> } {
+  return config as unknown as BlockConfig & {
+    dependencies?: Record<string, string>;
+  };
 }
 
 // defineTemplate requires branded FieldDef in schema (if present)
