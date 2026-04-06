@@ -1,24 +1,71 @@
 import fs from "fs-extra";
 import path from "path";
+import { fileURLToPath } from "url";
 import type { ScannedResource } from "../scanner.js";
 import { generateNextConfig, generateTsConfig } from "./next-config.js";
-import { generateRootLayout, generateGlobalsCss } from "./layout.js";
-import { generateHomePage } from "./home-page.js";
-import {
-  generateBlocksApiRoute,
-  generateBlockConfigApiRoute,
-} from "./api-routes/blocks.js";
-import { generatePreviewApiRoute } from "./api-routes/preview.js";
-import { generateWorkspacesApiRoute } from "./api-routes/workspaces.js";
-import { generateConfigApiRoute } from "./api-routes/config.js";
+import { generateGlobalsCss } from "./layout.js";
 import { generatePreviewPages } from "./preview-pages.js";
 
 const DEV_DIR = ".cmssy/dev";
 
 /**
+ * Resolve the dev-app source directory.
+ * In development: src/dev-app/ (from src/utils/dev-generator/)
+ * When published: <packageRoot>/src/dev-app (shipped in npm package files)
+ */
+function getDevAppSourceDir(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // Dev mode: src/utils/dev-generator/ -> ../../dev-app = src/dev-app/
+  const srcDevApp = path.resolve(__dirname, "../../dev-app");
+  if (fs.existsSync(srcDevApp)) return srcDevApp;
+
+  // Published: dist/utils/dev-generator/ -> ../../../src/dev-app
+  const pkgRoot = path.resolve(__dirname, "../../..");
+  const publishedDevApp = path.join(pkgRoot, "src/dev-app");
+  if (fs.existsSync(publishedDevApp)) return publishedDevApp;
+
+  throw new Error(
+    "Could not find dev-app source directory. Ensure src/dev-app/ exists in @cmssy/cli.",
+  );
+}
+
+/**
+ * Copy static dev-app files to the target directory.
+ * Only copies files that aren't dynamically generated.
+ */
+function copyDevAppFiles(devRoot: string): void {
+  const sourceDir = getDevAppSourceDir();
+
+  // Copy all files from dev-app to devRoot
+  const filesToCopy = [
+    "app/page.tsx",
+    "app/layout.tsx",
+    "app/api/blocks/route.ts",
+    "app/api/blocks/[name]/config/route.ts",
+    "app/api/preview/[name]/route.ts",
+    "app/api/config/route.ts",
+    "app/api/workspaces/route.ts",
+  ];
+
+  for (const file of filesToCopy) {
+    const src = path.join(sourceDir, file);
+    const dest = path.join(devRoot, file);
+
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `Missing required dev-app file: ${file} (expected at ${src})`,
+      );
+    }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+  }
+}
+
+/**
  * Generate the .cmssy/dev/ Next.js app structure for cmssy dev.
- * This creates a minimal Next.js app that imports blocks directly,
- * enabling "use client" boundaries, next/image, and SSR in dev preview.
+ * Copies static UI files from dev-app/ and generates dynamic config files.
  */
 export function generateDevApp(
   projectRoot: string,
@@ -28,23 +75,15 @@ export function generateDevApp(
 
   // Clean and recreate
   fs.removeSync(devRoot);
-  fs.mkdirSync(path.join(devRoot, "app/preview"), { recursive: true });
-  fs.mkdirSync(path.join(devRoot, "app/api/blocks"), { recursive: true });
-  fs.mkdirSync(path.join(devRoot, "app/api/preview"), { recursive: true });
-  fs.mkdirSync(path.join(devRoot, "app/api/workspaces"), { recursive: true });
-  fs.mkdirSync(path.join(devRoot, "app/api/config"), { recursive: true });
+  fs.mkdirSync(devRoot, { recursive: true });
 
-  // Generate all files
+  // Copy static files (page.tsx, layout.tsx, API routes)
+  copyDevAppFiles(devRoot);
+
+  // Generate dynamic files (project-specific)
   generateNextConfig(devRoot, projectRoot);
   generateTsConfig(devRoot, projectRoot);
-  generateRootLayout(devRoot);
   generateGlobalsCss(devRoot, projectRoot);
-  generateHomePage(devRoot);
-  generateBlocksApiRoute(devRoot);
-  generateBlockConfigApiRoute(devRoot);
-  generatePreviewApiRoute(devRoot);
-  generateWorkspacesApiRoute(devRoot);
-  generateConfigApiRoute(devRoot);
   generatePreviewPages(devRoot, projectRoot, resources);
 
   return devRoot;
