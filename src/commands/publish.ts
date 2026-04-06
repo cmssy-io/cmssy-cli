@@ -23,6 +23,11 @@ import {
 import { packageResource } from "./package.js";
 import { uploadPackage } from "./upload.js";
 import { uploadBlockSource } from "./add-source.js";
+import {
+  diffSchema,
+  hasBreakingChanges,
+  type Schema,
+} from "../utils/schema-diff.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -35,6 +40,7 @@ interface PublishOptions {
   overwriteContent?: boolean;
   zip?: boolean;
   withSource?: boolean;
+  force?: boolean;
 }
 
 interface PackageInfo {
@@ -267,6 +273,105 @@ export async function publishCommand(
     );
   });
   console.log("");
+
+  // Schema diff: compare local vs remote and warn about breaking changes
+  {
+    const blocksWithConfig = packages.filter(
+      (p) => p.type === "block" && p.blockConfig?.schema,
+    );
+    if (blocksWithConfig.length > 0) {
+      // Fetch remote blocks for schema comparison
+      let remoteBlocks: Array<{
+        blockType: string;
+        schemaFields: Array<{
+          key: string;
+          type: string;
+          label?: string;
+          required?: boolean;
+          defaultValue?: unknown;
+        }>;
+      }> = [];
+      try {
+        const client = new GraphQLClient(config.apiUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiToken}`,
+            "X-Workspace-ID": workspaceId as string,
+          },
+        });
+        const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
+        remoteBlocks = result.workspaceBlocks || [];
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            "  ⚠ Could not fetch remote blocks; schema diff skipped.",
+          ),
+        );
+        if (error instanceof Error) {
+          console.warn(chalk.gray(`    ${error.message}`));
+        }
+        console.log("");
+      }
+
+      let hasAnyBreaking = false;
+      for (const pkg of blocksWithConfig) {
+        const blockType = convertBlockTypeToSimple(pkg.packageJson.name);
+        const remote = remoteBlocks.find((b) => b.blockType === blockType);
+        if (!remote || !remote.schemaFields?.length) continue;
+
+        // Convert remote schemaFields array to Schema object
+        const remoteSchema: Schema = {};
+        for (const f of remote.schemaFields) {
+          remoteSchema[f.key] = {
+            type: f.type,
+            label: f.label,
+            required: f.required,
+            defaultValue: f.defaultValue,
+          };
+        }
+
+        const changes = diffSchema(pkg.blockConfig.schema, remoteSchema);
+        if (changes.length === 0) continue;
+
+        console.log(chalk.bold(`  Schema changes for ${pkg.name}:\n`));
+        for (const c of changes) {
+          if (c.kind === "breaking") {
+            console.log(chalk.red(`  ⚠ BREAKING: ${c.message}`));
+          } else {
+            console.log(chalk.gray(`  ℹ ${c.message}`));
+          }
+        }
+        console.log("");
+
+        if (hasBreakingChanges(changes)) {
+          hasAnyBreaking = true;
+        }
+      }
+
+      if (hasAnyBreaking && !options.dryRun && !options.force) {
+        const answer = await inquirer.prompt([
+          {
+            type: "confirm",
+            name: "proceed",
+            message: "Breaking schema changes detected. Continue publishing?",
+            default: false,
+          },
+        ]);
+        if (!answer.proceed) {
+          console.log(chalk.yellow("\nPublish cancelled.\n"));
+          return;
+        }
+      }
+    }
+  }
+
+  if (options.overwriteContent) {
+    console.log(
+      chalk.yellow(
+        "  ⚠ --overwrite-content will reset all page content to defaults\n",
+      ),
+    );
+  }
 
   if (options.dryRun) {
     console.log(chalk.yellow("🔍 Dry run mode - nothing will be published\n"));
