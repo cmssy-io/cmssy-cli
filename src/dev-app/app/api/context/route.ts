@@ -120,6 +120,7 @@ export async function PUT(request: Request) {
     fs.writeFileSync(CONTEXT_PATH, JSON.stringify(body, null, 2));
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const status = error?.message?.includes("JSON") ? 400 : 500;
+    return NextResponse.json({ error: error.message }, { status });
   }
 }

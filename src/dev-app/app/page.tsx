@@ -166,6 +166,24 @@ export default function DevHome() {
       .catch(() => {});
   }, []);
 
+  // Debounced context persistence
+  const contextInitRef = useRef(false);
+  useEffect(() => {
+    // Skip initial render (context loaded from API)
+    if (!contextInitRef.current) {
+      contextInitRef.current = true;
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch("/api/context", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mockContext),
+      }).catch(() => {});
+    }, 500);
+    return () => clearTimeout(t);
+  }, [mockContext]);
+
   // Load blocks list
   useEffect(() => {
     fetch("/api/blocks")
@@ -1189,11 +1207,6 @@ export default function DevHome() {
                       );
                       const data = await res.json();
                       setMockContext(data);
-                      fetch("/api/context", {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(data),
-                      });
                     }}
                     style={{
                       padding: "4px 10px",
@@ -1245,11 +1258,6 @@ export default function DevHome() {
                       },
                     };
                     setMockContext(updated);
-                    fetch("/api/context", {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(updated),
-                    });
                   }}
                   style={{
                     width: "100%",
@@ -1285,11 +1293,6 @@ export default function DevHome() {
                       locale: { ...mockContext.locale, enabled: langs },
                     };
                     setMockContext(updated);
-                    fetch("/api/context", {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(updated),
-                    });
                   }}
                   style={{
                     width: "100%",
@@ -1341,11 +1344,6 @@ export default function DevHome() {
                         }
                       : { ...mockContext, auth: null };
                     setMockContext(updated);
-                    fetch("/api/context", {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(updated),
-                    });
                   }}
                 />
                 Authenticated
@@ -1384,11 +1382,6 @@ export default function DevHome() {
                             },
                           };
                           setMockContext(updated);
-                          fetch("/api/context", {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(updated),
-                          });
                         }}
                         style={{
                           width: "100%",
@@ -1423,11 +1416,6 @@ export default function DevHome() {
                   try {
                     const parsed = JSON.parse(e.target.value);
                     setMockContext(parsed);
-                    fetch("/api/context", {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(parsed),
-                    });
                   } catch {
                     // Invalid JSON, don't update
                   }
