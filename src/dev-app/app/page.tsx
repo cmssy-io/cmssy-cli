@@ -164,7 +164,9 @@ export default function DevHome() {
     if (!selected || selected.type === "template") return;
     setConfigLoading(true);
 
-    const variantParam = currentVariant ? `?variant=${currentVariant}` : "";
+    const variantParam = currentVariant
+      ? `?variant=${encodeURIComponent(currentVariant)}`
+      : "";
 
     Promise.all([
       fetch(`/api/blocks/${selected.name}/config`).then((r) => r.json()),
@@ -220,7 +222,9 @@ export default function DevHome() {
       return;
     const t = setTimeout(async () => {
       const dataToSave = { ...configDataRef.current, ...previewData };
-      const variantParam = currentVariant ? `?variant=${currentVariant}` : "";
+      const variantParam = currentVariant
+        ? `?variant=${encodeURIComponent(currentVariant)}`
+        : "";
       await fetch(`/api/preview/${selected.name}${variantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -979,7 +983,7 @@ export default function DevHome() {
           </h2>
         </div>
         {/* Variant picker */}
-        {selected && variants.length > 0 && (
+        {selected && (
           <div
             style={{
               padding: "8px 16px",

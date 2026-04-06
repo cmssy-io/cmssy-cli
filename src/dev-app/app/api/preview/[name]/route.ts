@@ -4,14 +4,17 @@ import path from "path";
 
 const projectRoot = process.env.CMSSY_PROJECT_ROOT || process.cwd();
 
+const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+
+function isValidName(name: string): boolean {
+  return SAFE_NAME_RE.test(name);
+}
+
 function resolveBlockPath(name: string): string | null {
-  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-    return null;
-  }
+  if (!isValidName(name)) return null;
   let blockPath = path.join(projectRoot, "blocks", name);
-  if (!fs.existsSync(blockPath)) {
-    blockPath = path.join(projectRoot, "templates", name);
-  }
+  if (fs.existsSync(blockPath)) return blockPath;
+  blockPath = path.join(projectRoot, "templates", name);
   return fs.existsSync(blockPath) ? blockPath : null;
 }
 
@@ -21,11 +24,12 @@ function getVariants(blockPath: string): string[] {
   return fs
     .readdirSync(previewsDir)
     .filter((f) => f.endsWith(".json"))
-    .map((f) => f.replace(/\.json$/, ""));
+    .map((f) => f.replace(/\.json$/, ""))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 function getPreviewPath(blockPath: string, variant?: string): string {
-  if (variant) {
+  if (variant && isValidName(variant)) {
     const variantPath = path.join(blockPath, "previews", `${variant}.json`);
     if (fs.existsSync(variantPath)) return variantPath;
   }
@@ -37,19 +41,20 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
+  if (!isValidName(name)) {
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  }
+
   const blockPath = resolveBlockPath(name);
   if (!blockPath) {
-    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const url = new URL(request.url);
   const variant = url.searchParams.get("variant") || undefined;
 
-  // If requesting variant list
   if (url.searchParams.get("list") === "variants") {
-    return NextResponse.json({
-      variants: getVariants(blockPath),
-    });
+    return NextResponse.json({ variants: getVariants(blockPath) });
   }
 
   const previewPath = getPreviewPath(blockPath, variant);
@@ -74,33 +79,42 @@ export async function POST(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
+  if (!isValidName(name)) {
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  }
+
   const blockPath = resolveBlockPath(name);
   if (!blockPath) {
-    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const url = new URL(request.url);
   const variant = url.searchParams.get("variant") || undefined;
   const action = url.searchParams.get("action");
 
+  // Validate variant param if present
+  if (variant && !isValidName(variant)) {
+    return NextResponse.json({ error: "Invalid variant" }, { status: 400 });
+  }
+
   // Save as new variant
   if (action === "save-variant") {
     const body = await request.json();
     const variantName = body.variantName;
-    if (
-      !variantName ||
-      variantName.includes("..") ||
-      variantName.includes("/")
-    ) {
+    if (!variantName || !isValidName(variantName)) {
       return NextResponse.json(
-        { error: "Invalid variant name" },
+        {
+          error:
+            "Invalid variant name (use alphanumeric, hyphens, underscores)",
+        },
         { status: 400 },
       );
     }
     const previewsDir = path.join(blockPath, "previews");
     fs.mkdirSync(previewsDir, { recursive: true });
     const variantPath = path.join(previewsDir, `${variantName}.json`);
-    fs.writeFileSync(variantPath, JSON.stringify(body.data, null, 2));
+    const dataToWrite = body.data ?? {};
+    fs.writeFileSync(variantPath, JSON.stringify(dataToWrite, null, 2));
     return NextResponse.json({ success: true, variant: variantName });
   }
 
