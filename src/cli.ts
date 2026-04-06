@@ -9,6 +9,7 @@ import { configureCommand } from "./commands/configure.js";
 import { linkCommand } from "./commands/link.js";
 import { createCommand } from "./commands/create.js";
 import { devCommand } from "./commands/dev.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
@@ -209,6 +210,23 @@ program.addCommand(
     }),
   { hidden: true },
 );
+
+// cmssy doctor
+program
+  .command("doctor")
+  .description("Check project setup, API connection, and block health")
+  .addHelpText(
+    "after",
+    `
+Runs diagnostic checks:
+  • Environment (Node.js, npm, next, react)
+  • Configuration (.env, API token, workspace ID)
+  • API connection and workspace access
+  • Block structure validation
+  • Dependency versions
+`,
+  )
+  .action(doctorCommand);
 
 // cmssy publish
 program
