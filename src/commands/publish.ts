@@ -19,6 +19,10 @@ import {
   convertConfigToPagesData,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
+import { packageResource } from "./package.js";
+import { uploadPackage } from "./upload.js";
+import { uploadBlockSource } from "./add-source.js";
+import { GET_WORKSPACE_BLOCKS_QUERY } from "../utils/graphql.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -29,6 +33,8 @@ interface PublishOptions {
   dryRun?: boolean;
   all?: boolean;
   overwriteContent?: boolean;
+  zip?: boolean;
+  withSource?: boolean;
 }
 
 interface PackageInfo {
@@ -267,7 +273,66 @@ export async function publishCommand(
     return;
   }
 
-  // Show target info
+  // --zip mode: package into ZIPs and upload
+  if (options.zip) {
+    console.log(
+      chalk.cyan(
+        `🏢 Target: Workspace (${workspaceId})\n` +
+          "   Mode: ZIP package + upload\n",
+      ),
+    );
+
+    const outputDir = path.join(process.cwd(), "packages");
+    await fs.ensureDir(outputDir);
+
+    // Package all blocks into ZIPs
+    for (const pkg of packages) {
+      await packageResource(
+        {
+          name: pkg.name,
+          type: pkg.type,
+          dir: pkg.path,
+          packageJson: pkg.packageJson,
+        },
+        outputDir,
+      );
+    }
+
+    // Upload all ZIPs
+    let successCount = 0;
+    let failCount = 0;
+    for (const pkg of packages) {
+      const version = pkg.packageJson.version || "1.0.0";
+      const zipPath = path.join(outputDir, `${pkg.name}-${version}.zip`);
+      const result = await uploadPackage(
+        zipPath,
+        workspaceId as string,
+        config.apiUrl,
+        config.apiToken!,
+      );
+      if (result.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    console.log("");
+    if (failCount === 0) {
+      console.log(
+        chalk.green.bold(
+          `✓ ${successCount} package(s) uploaded successfully\n`,
+        ),
+      );
+    } else {
+      console.log(
+        chalk.yellow(`⚠ ${successCount} succeeded, ${failCount} failed\n`),
+      );
+    }
+    return;
+  }
+
+  // Default: direct GraphQL publish
   console.log(
     chalk.cyan(
       `🏢 Target: Workspace (${workspaceId})\n` +
@@ -278,6 +343,7 @@ export async function publishCommand(
   // Publish each package
   let successCount = 0;
   let errorCount = 0;
+  const publishedBlocks: { name: string; path: string }[] = [];
 
   for (const pkg of packages) {
     const spinner = ora(
@@ -296,6 +362,9 @@ export async function publishCommand(
         chalk.green(`${pkg.packageJson.name} published to workspace`),
       );
       successCount++;
+      if (pkg.type === "block") {
+        publishedBlocks.push({ name: pkg.name, path: pkg.path });
+      }
     } catch (error: any) {
       spinner.fail(chalk.red(`✖ ${pkg.packageJson.name} failed`));
 
@@ -366,6 +435,77 @@ export async function publishCommand(
     console.log(
       chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`),
     );
+  }
+
+  // --with-source: upload source code for AI Block Builder
+  if (options.withSource && publishedBlocks.length > 0) {
+    console.log(
+      chalk.cyan("📝 Uploading source code for AI Block Builder...\n"),
+    );
+
+    const client = new GraphQLClient(config.apiUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiToken}`,
+        "X-Workspace-ID": workspaceId as string,
+      },
+    });
+
+    // Fetch workspace blocks to get block IDs
+    let workspaceBlocks: { id: string; blockType: string }[] = [];
+    try {
+      const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
+      workspaceBlocks = result.workspaceBlocks;
+    } catch {
+      console.warn(
+        chalk.yellow("⚠ Could not fetch workspace blocks for source upload\n"),
+      );
+      return;
+    }
+
+    let sourceSuccess = 0;
+    let sourceFail = 0;
+
+    for (const block of publishedBlocks) {
+      const wsBlock = workspaceBlocks.find((b) => b.blockType === block.name);
+      if (!wsBlock) {
+        console.warn(
+          chalk.yellow(
+            `  ⚠ ${block.name}: not found in workspace, skipping source`,
+          ),
+        );
+        continue;
+      }
+
+      const spinner = ora(`Uploading source for ${block.name}...`).start();
+      try {
+        const uploaded = await uploadBlockSource(
+          block.name,
+          block.path,
+          wsBlock.id,
+          client,
+        );
+        if (uploaded) {
+          spinner.succeed(chalk.green(`${block.name}: source uploaded`));
+          sourceSuccess++;
+        } else {
+          spinner.warn(`${block.name}: no source code found`);
+        }
+      } catch (error: any) {
+        spinner.fail(chalk.red(`${block.name}: source upload failed`));
+        console.error(chalk.red(`  Error: ${error.message}`));
+        sourceFail++;
+      }
+    }
+
+    console.log("");
+    if (sourceFail === 0) {
+      console.log(chalk.green.bold(`✓ ${sourceSuccess} source(s) uploaded\n`));
+    } else {
+      console.log(
+        chalk.yellow(`⚠ ${sourceSuccess} succeeded, ${sourceFail} failed\n`),
+      );
+    }
   }
 }
 
@@ -765,7 +905,11 @@ function detectServerActionFiles(packagePath: string): string[] {
     const lines = content.split("\n");
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed === "" || trimmed.startsWith("//") || trimmed.startsWith("/*"))
+      if (
+        trimmed === "" ||
+        trimmed.startsWith("//") ||
+        trimmed.startsWith("/*")
+      )
         continue;
       if (
         trimmed === '"use server"' ||
@@ -837,24 +981,21 @@ function createServerActionStubPlugin(
   return {
     name: "server-action-stub",
     setup(build: { onLoad: Function }) {
-      build.onLoad(
-        { filter: /\.(ts|tsx)$/ },
-        (args: { path: string }) => {
-          if (!actionFileSet.has(path.resolve(args.path))) return null;
+      build.onLoad({ filter: /\.(ts|tsx)$/ }, (args: { path: string }) => {
+        if (!actionFileSet.has(path.resolve(args.path))) return null;
 
-          const stubs = actionNames
-            .map(
-              (name) =>
-                `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
-            )
-            .join("\n");
+        const stubs = actionNames
+          .map(
+            (name) =>
+              `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
+          )
+          .join("\n");
 
-          return {
-            contents: `"use strict";\n${stubs}`,
-            loader: "js",
-          };
-        },
-      );
+        return {
+          contents: `"use strict";\n${stubs}`,
+          loader: "js",
+        };
+      });
     },
   };
 }
@@ -1090,8 +1231,7 @@ async function publishToWorkspace(
       Object.keys(dependencies).length > 0 ? dependencies : undefined,
     // Server action support (CMS-224)
     serverActionCode: serverActionCode || undefined,
-    serverActions:
-      serverActionNames.length > 0 ? serverActionNames : undefined,
+    serverActions: serverActionNames.length > 0 ? serverActionNames : undefined,
   };
 
   // Add layoutPosition if defined (for layout blocks)

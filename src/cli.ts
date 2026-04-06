@@ -204,12 +204,22 @@ program
     "--overwrite-content",
     "Overwrite existing defaultContent and schemaFields on republish",
   )
+  .option(
+    "--zip",
+    "Package into ZIP files and upload (instead of direct GraphQL)",
+  )
+  .option(
+    "--with-source",
+    "Upload source code for AI Block Builder after publish",
+  )
   .addHelpText(
     "after",
     `
 Examples:
   $ cmssy publish --all -w abc123              Publish all, preserve content
   $ cmssy publish hero -w abc123 --patch       Publish hero with patch bump
+  $ cmssy publish --all --zip -w abc123        Package as ZIP and upload
+  $ cmssy publish --all --with-source -w abc   Publish + upload source for AI
   $ cmssy publish --all -w abc123 --overwrite-content
                                                Force overwrite content/schema
 
@@ -237,13 +247,14 @@ Examples:
   )
   .action(syncCommand);
 
-// cmssy migrate
-program
-  .command("migrate [block-name]")
-  .description("Migrate legacy package.json config to config.ts")
-  .addHelpText(
-    "after",
-    `
+// cmssy migrate (hidden - legacy command, all projects already migrated)
+program.addCommand(
+  new Command("migrate")
+    .argument("[block-name]")
+    .description("Migrate legacy package.json config to config.ts")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy migrate hero     Migrate specific block
   $ cmssy migrate          Migrate all blocks/templates
@@ -251,18 +262,21 @@ Examples:
 Converts:
   package.json { cmssy: {...} }  →  config.ts
 `,
-  )
-  .action(migrateCommand);
+    )
+    .action(migrateCommand),
+  { hidden: true },
+);
 
-// cmssy package
-program
-  .command("package [packages...]")
-  .description("Package blocks/templates into ZIP files for manual upload")
-  .option("--all", "Package all blocks and templates")
-  .option("-o, --output <dir>", "Output directory", "packages")
-  .addHelpText(
-    "after",
-    `
+// cmssy package (hidden - use `cmssy publish --zip` instead)
+program.addCommand(
+  new Command("package")
+    .argument("[packages...]")
+    .description("Package blocks/templates into ZIP files for manual upload")
+    .option("--all", "Package all blocks and templates")
+    .option("-o, --output <dir>", "Output directory", "packages")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy package hero faq         Package specific blocks
   $ cmssy package --all            Package everything
@@ -270,24 +284,29 @@ Examples:
 
 Use with 'upload' for two-step deployment.
 `,
-  )
-  .action(packageCommand);
+    )
+    .action(packageCommand),
+  { hidden: true },
+);
 
-// cmssy upload
-program
-  .command("upload [files...]")
-  .description("Upload ZIP packages to workspace")
-  .option("-w, --workspace <id>", "Target workspace ID")
-  .option("--all", "Upload all from packages directory")
-  .addHelpText(
-    "after",
-    `
+// cmssy upload (hidden - use `cmssy publish --zip` instead)
+program.addCommand(
+  new Command("upload")
+    .argument("[files...]")
+    .description("Upload ZIP packages to workspace")
+    .option("-w, --workspace <id>", "Target workspace ID")
+    .option("--all", "Upload all from packages directory")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy upload hero.zip -w abc123     Upload single package
   $ cmssy upload --all -w abc123        Upload all packages
 `,
-  )
-  .action(uploadCommand);
+    )
+    .action(uploadCommand),
+  { hidden: true },
+);
 
 // cmssy workspaces
 program
@@ -304,43 +323,50 @@ Use workspace IDs with:
   )
   .action(workspacesCommand);
 
-// cmssy add-source
-program
-  .command("add-source [blocks...]")
-  .description("Upload source code to workspace for AI Block Builder")
-  .option("-w, --workspace <id>", "Target workspace ID")
-  .option("--all", "Add source for all local blocks")
-  .addHelpText(
-    "after",
-    `
+// cmssy add-source (hidden - use `cmssy publish --with-source` instead)
+program.addCommand(
+  new Command("add-source")
+    .argument("[blocks...]")
+    .description("Upload source code to workspace for AI Block Builder")
+    .option("-w, --workspace <id>", "Target workspace ID")
+    .option("--all", "Add source for all local blocks")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy add-source hero pricing -w abc123
   $ cmssy add-source --all -w abc123
 
 Enables AI Block Builder to edit your blocks in the Cmssy editor.
 `,
-  )
-  .action(addSourceCommand);
+    )
+    .action(addSourceCommand),
+  { hidden: true },
+);
 
-// cmssy codegen
-program
-  .command("codegen")
-  .description("Generate TypeScript types from workspace public GraphQL schema")
-  .option("-w, --workspace <slug>", "Workspace slug")
-  .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
-  .option(
-    "--init",
-    "Generate codegen.ts config file instead of running codegen",
-  )
-  .addHelpText(
-    "after",
-    `
+// cmssy codegen (hidden - use `cmssy init --graphql` for setup)
+program.addCommand(
+  new Command("codegen")
+    .description(
+      "Generate TypeScript types from workspace public GraphQL schema",
+    )
+    .option("-w, --workspace <slug>", "Workspace slug")
+    .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
+    .option(
+      "--init",
+      "Generate codegen.ts config file instead of running codegen",
+    )
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy codegen --workspace my-workspace
   $ cmssy codegen --init
   $ cmssy codegen -o src/types/api.ts
 `,
-  )
-  .action(codegenCommand);
+    )
+    .action(codegenCommand),
+  { hidden: true },
+);
 
 program.parse();
