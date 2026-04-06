@@ -64,16 +64,29 @@ export default function DevHome() {
   const [isDirty, setIsDirty] = useState(false);
   const [showBlockList, setShowBlockList] = useState(true);
   const [showEditor, setShowEditor] = useState(true);
-  const [viewport, setViewport] = useState<number | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("cmssy-dev-viewport");
-      if (!saved) return null;
-      const parsed = parseInt(saved, 10);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  const [viewport, setViewport] = useState<number | null>(null);
+
+  // Load saved viewport from localStorage after mount (avoid SSR mismatch)
+  useEffect(() => {
+    const saved = localStorage.getItem("cmssy-dev-viewport");
+    if (!saved) return;
+    const parsed = parseInt(saved, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setViewport(parsed);
+    } else {
       localStorage.removeItem("cmssy-dev-viewport");
     }
-    return null;
-  });
+  }, []);
+
+  // Persist viewport changes
+  useEffect(() => {
+    if (viewport === null) {
+      localStorage.removeItem("cmssy-dev-viewport");
+    } else {
+      localStorage.setItem("cmssy-dev-viewport", String(viewport));
+    }
+  }, [viewport]);
+
   const [wsInfo, setWsInfo] = useState<WorkspaceInfo | null>(null);
   const [wsLoading, setWsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -819,10 +832,8 @@ export default function DevHome() {
           >
             <button
               type="button"
-              onClick={() => {
-                setViewport(null);
-                localStorage.removeItem("cmssy-dev-viewport");
-              }}
+              aria-pressed={viewport === null}
+              onClick={() => setViewport(null)}
               style={{
                 padding: "4px 10px",
                 border: "1px solid #ddd",
@@ -840,13 +851,8 @@ export default function DevHome() {
               <button
                 key={preset.width}
                 type="button"
-                onClick={() => {
-                  setViewport(preset.width);
-                  localStorage.setItem(
-                    "cmssy-dev-viewport",
-                    String(preset.width),
-                  );
-                }}
+                aria-pressed={viewport === preset.width}
+                onClick={() => setViewport(preset.width)}
                 style={{
                   padding: "4px 10px",
                   border: "1px solid #ddd",
@@ -878,11 +884,6 @@ export default function DevHome() {
                   const v =
                     Number.isFinite(parsed) && parsed > 0 ? parsed : null;
                   setViewport(v);
-                  if (v !== null) {
-                    localStorage.setItem("cmssy-dev-viewport", String(v));
-                  } else {
-                    localStorage.removeItem("cmssy-dev-viewport");
-                  }
                 }}
                 placeholder="Custom"
                 style={{
