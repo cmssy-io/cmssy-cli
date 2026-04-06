@@ -46,6 +46,15 @@ function getSyncStatus(
   return "outdated";
 }
 
+const VIEWPORT_STORAGE_KEY = VIEWPORT_STORAGE_KEY;
+
+const VIEWPORT_PRESETS = [
+  { label: "Desktop", width: 1440 },
+  { label: "Laptop", width: 1024 },
+  { label: "Tablet", width: 768 },
+  { label: "Mobile", width: 375 },
+] as const;
+
 export default function DevHome() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selected, setSelected] = useState<Block | null>(null);
@@ -57,6 +66,29 @@ export default function DevHome() {
   const [isDirty, setIsDirty] = useState(false);
   const [showBlockList, setShowBlockList] = useState(true);
   const [showEditor, setShowEditor] = useState(true);
+  const [viewport, setViewport] = useState<number | null>(null);
+
+  // Load saved viewport from localStorage after mount (avoid SSR mismatch)
+  useEffect(() => {
+    const saved = localStorage.getItem(VIEWPORT_STORAGE_KEY);
+    if (!saved) return;
+    const parsed = parseInt(saved, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setViewport(parsed);
+    } else {
+      localStorage.removeItem(VIEWPORT_STORAGE_KEY);
+    }
+  }, []);
+
+  // Persist viewport changes
+  useEffect(() => {
+    if (viewport === null) {
+      localStorage.removeItem(VIEWPORT_STORAGE_KEY);
+    } else {
+      localStorage.setItem(VIEWPORT_STORAGE_KEY, String(viewport));
+    }
+  }, [viewport]);
+
   const [wsInfo, setWsInfo] = useState<WorkspaceInfo | null>(null);
   const [wsLoading, setWsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -787,6 +819,90 @@ export default function DevHome() {
             {"\u2699"}
           </button>
         </div>
+        {/* Responsive viewport toolbar */}
+        {previewUrl && (
+          <div
+            style={{
+              padding: "6px 16px",
+              background: "#f8f8f8",
+              borderBottom: "1px solid #e0e0e0",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "4px",
+              rowGap: "6px",
+              fontSize: "12px",
+            }}
+          >
+            <button
+              type="button"
+              aria-pressed={viewport === null}
+              onClick={() => setViewport(null)}
+              style={{
+                padding: "4px 10px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                background: viewport === null ? "#667eea" : "#fff",
+                color: viewport === null ? "#fff" : "#333",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
+              Full
+            </button>
+            {VIEWPORT_PRESETS.map((preset) => (
+              <button
+                key={preset.width}
+                type="button"
+                aria-pressed={viewport === preset.width}
+                onClick={() => setViewport(preset.width)}
+                style={{
+                  padding: "4px 10px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  background: viewport === preset.width ? "#667eea" : "#fff",
+                  color: viewport === preset.width ? "#fff" : "#333",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                {preset.label} {preset.width}
+              </button>
+            ))}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                marginLeft: "8px",
+              }}
+            >
+              <input
+                type="number"
+                value={viewport ?? ""}
+                aria-label="Viewport width in pixels"
+                onChange={(e) => {
+                  const parsed = parseInt(e.target.value, 10);
+                  const v =
+                    Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+                  setViewport(v);
+                }}
+                placeholder="Custom"
+                style={{
+                  width: "72px",
+                  padding: "4px 6px",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  textAlign: "center",
+                }}
+              />
+              <span style={{ color: "#999" }}>px</span>
+            </div>
+          </div>
+        )}
         <div
           style={{
             flex: 1,
@@ -794,17 +910,21 @@ export default function DevHome() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "auto",
           }}
         >
           {previewUrl ? (
             <div
               style={{
-                width: "100%",
+                width:
+                  viewport !== null && viewport > 0 ? `${viewport}px` : "100%",
+                maxWidth: "100%",
                 height: "100%",
                 background: "white",
                 borderRadius: "12px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                 overflow: "hidden",
+                transition: "width 0.2s ease",
               }}
             >
               <iframe
