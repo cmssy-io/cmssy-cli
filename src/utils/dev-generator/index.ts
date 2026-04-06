@@ -10,24 +10,21 @@ const DEV_DIR = ".cmssy/dev";
 
 /**
  * Resolve the dev-app source directory.
- * In development: src/dev-app/
- * When published: dist/dev-app/ (shipped in npm package)
+ * In development: src/dev-app/ (from src/utils/dev-generator/)
+ * When published: <packageRoot>/src/dev-app (shipped in npm package files)
  */
 function getDevAppSourceDir(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  // Try src/dev-app first (dev mode), then dist/dev-app (published)
+  // Dev mode: src/utils/dev-generator/ -> ../../dev-app = src/dev-app/
   const srcDevApp = path.resolve(__dirname, "../../dev-app");
   if (fs.existsSync(srcDevApp)) return srcDevApp;
 
-  const distDevApp = path.resolve(__dirname, "../dev-app");
-  if (fs.existsSync(distDevApp)) return distDevApp;
-
-  // Fallback: relative to package root
-  const pkgRoot = path.resolve(__dirname, "../..");
-  const fallback = path.join(pkgRoot, "src/dev-app");
-  if (fs.existsSync(fallback)) return fallback;
+  // Published: dist/utils/dev-generator/ -> ../../../src/dev-app
+  const pkgRoot = path.resolve(__dirname, "../../..");
+  const publishedDevApp = path.join(pkgRoot, "src/dev-app");
+  if (fs.existsSync(publishedDevApp)) return publishedDevApp;
 
   throw new Error(
     "Could not find dev-app source directory. Ensure src/dev-app/ exists in @cmssy/cli.",
@@ -56,10 +53,13 @@ function copyDevAppFiles(devRoot: string): void {
     const src = path.join(sourceDir, file);
     const dest = path.join(devRoot, file);
 
-    if (fs.existsSync(src)) {
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(src, dest);
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `Missing required dev-app file: ${file} (expected at ${src})`,
+      );
     }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
   }
 }
 
