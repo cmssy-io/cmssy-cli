@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
+import chalk from "chalk";
 import { Command } from "commander";
 import { addSourceCommand } from "./commands/add-source.js";
 import { buildCommand } from "./commands/build.js";
 import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
+import { linkCommand } from "./commands/link.js";
 import { createCommand } from "./commands/create.js";
 import { devCommand } from "./commands/dev.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
@@ -45,10 +48,11 @@ Examples:
 
 Workflow:
   1. init     → Create project with example block
-  2. create   → Add more blocks/templates
-  3. dev      → Develop with live preview
-  4. build    → Bundle for production
-  5. publish  → Deploy to workspace
+  2. link     → Connect to your workspace
+  3. create   → Add more blocks/templates
+  4. dev      → Develop with live preview
+  5. build    → Bundle for production
+  6. publish  → Deploy to workspace
 
 Documentation: https://cmssy.io/docs/cli
 `,
@@ -166,22 +170,66 @@ Features:
   )
   .action(devCommand);
 
-// cmssy configure
+// cmssy link
 program
-  .command("configure")
-  .description("Configure Cmssy API credentials")
-  .option("--api-url <url>", "Cmssy API URL", "https://api.cmssy.io/graphql")
+  .command("link")
+  .description("Connect project to a Cmssy workspace")
+  .option(
+    "--api-url <url>",
+    "Cmssy API URL (default: existing or https://api.cmssy.io/graphql)",
+  )
+  .option("--token <token>", "API token (skip interactive prompt)")
+  .option(
+    "-w, --workspace <id>",
+    "Workspace ID or slug (skip interactive picker)",
+  )
   .addHelpText(
     "after",
     `
-Stores credentials in .env file:
-  CMSSY_API_TOKEN=your-token
-  CMSSY_API_URL=https://api.cmssy.io/graphql
+Examples:
+  $ cmssy link                                    Interactive setup
+  $ cmssy link --token bf_xxx --workspace abc123   Non-interactive (CI)
 
+Saves credentials and workspace ID to .env file.
 Get your API token at: https://cmssy.io/settings/tokens
 `,
   )
-  .action(configureCommand);
+  .action(linkCommand);
+
+// cmssy configure (hidden - deprecated, use `cmssy link`)
+program.addCommand(
+  new Command("configure")
+    .description(
+      "Configure Cmssy API credentials (deprecated: use `cmssy link`)",
+    )
+    .option("--api-url <url>", "Cmssy API URL")
+    .action((options) => {
+      console.log(
+        chalk.yellow(
+          "\n⚠ `cmssy configure` is deprecated. Use `cmssy link` instead.\n",
+        ),
+      );
+      return configureCommand(options);
+    }),
+  { hidden: true },
+);
+
+// cmssy doctor
+program
+  .command("doctor")
+  .description("Check project setup, API connection, and block health")
+  .addHelpText(
+    "after",
+    `
+Runs diagnostic checks:
+  • Environment (Node.js, npm, next, react)
+  • Configuration (.env, API token, workspace ID)
+  • API connection and workspace access
+  • Block structure validation
+  • Dependency versions
+`,
+  )
+  .action(doctorCommand);
 
 // cmssy publish
 program
@@ -204,12 +252,22 @@ program
     "--overwrite-content",
     "Overwrite existing defaultContent and schemaFields on republish",
   )
+  .option(
+    "--zip",
+    "Package into ZIP files and upload (instead of direct GraphQL)",
+  )
+  .option(
+    "--with-source",
+    "Upload source code for AI Block Builder after publish",
+  )
   .addHelpText(
     "after",
     `
 Examples:
   $ cmssy publish --all -w abc123              Publish all, preserve content
   $ cmssy publish hero -w abc123 --patch       Publish hero with patch bump
+  $ cmssy publish --all --zip -w abc123        Package as ZIP and upload
+  $ cmssy publish --all --with-source -w abc   Publish + upload source for AI
   $ cmssy publish --all -w abc123 --overwrite-content
                                                Force overwrite content/schema
 
@@ -237,13 +295,14 @@ Examples:
   )
   .action(syncCommand);
 
-// cmssy migrate
-program
-  .command("migrate [block-name]")
-  .description("Migrate legacy package.json config to config.ts")
-  .addHelpText(
-    "after",
-    `
+// cmssy migrate (hidden - legacy command, all projects already migrated)
+program.addCommand(
+  new Command("migrate")
+    .argument("[block-name]")
+    .description("Migrate legacy package.json config to config.ts")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy migrate hero     Migrate specific block
   $ cmssy migrate          Migrate all blocks/templates
@@ -251,18 +310,21 @@ Examples:
 Converts:
   package.json { cmssy: {...} }  →  config.ts
 `,
-  )
-  .action(migrateCommand);
+    )
+    .action(migrateCommand),
+  { hidden: true },
+);
 
-// cmssy package
-program
-  .command("package [packages...]")
-  .description("Package blocks/templates into ZIP files for manual upload")
-  .option("--all", "Package all blocks and templates")
-  .option("-o, --output <dir>", "Output directory", "packages")
-  .addHelpText(
-    "after",
-    `
+// cmssy package (hidden - use `cmssy publish --zip` instead)
+program.addCommand(
+  new Command("package")
+    .argument("[packages...]")
+    .description("Package blocks/templates into ZIP files for manual upload")
+    .option("--all", "Package all blocks and templates")
+    .option("-o, --output <dir>", "Output directory", "packages")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy package hero faq         Package specific blocks
   $ cmssy package --all            Package everything
@@ -270,24 +332,29 @@ Examples:
 
 Use with 'upload' for two-step deployment.
 `,
-  )
-  .action(packageCommand);
+    )
+    .action(packageCommand),
+  { hidden: true },
+);
 
-// cmssy upload
-program
-  .command("upload [files...]")
-  .description("Upload ZIP packages to workspace")
-  .option("-w, --workspace <id>", "Target workspace ID")
-  .option("--all", "Upload all from packages directory")
-  .addHelpText(
-    "after",
-    `
+// cmssy upload (hidden - use `cmssy publish --zip` instead)
+program.addCommand(
+  new Command("upload")
+    .argument("[files...]")
+    .description("Upload ZIP packages to workspace")
+    .option("-w, --workspace <id>", "Target workspace ID")
+    .option("--all", "Upload all from packages directory")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy upload hero.zip -w abc123     Upload single package
   $ cmssy upload --all -w abc123        Upload all packages
 `,
-  )
-  .action(uploadCommand);
+    )
+    .action(uploadCommand),
+  { hidden: true },
+);
 
 // cmssy workspaces
 program
@@ -304,43 +371,50 @@ Use workspace IDs with:
   )
   .action(workspacesCommand);
 
-// cmssy add-source
-program
-  .command("add-source [blocks...]")
-  .description("Upload source code to workspace for AI Block Builder")
-  .option("-w, --workspace <id>", "Target workspace ID")
-  .option("--all", "Add source for all local blocks")
-  .addHelpText(
-    "after",
-    `
+// cmssy add-source (hidden - use `cmssy publish --with-source` instead)
+program.addCommand(
+  new Command("add-source")
+    .argument("[blocks...]")
+    .description("Upload source code to workspace for AI Block Builder")
+    .option("-w, --workspace <id>", "Target workspace ID")
+    .option("--all", "Add source for all local blocks")
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy add-source hero pricing -w abc123
   $ cmssy add-source --all -w abc123
 
 Enables AI Block Builder to edit your blocks in the Cmssy editor.
 `,
-  )
-  .action(addSourceCommand);
+    )
+    .action(addSourceCommand),
+  { hidden: true },
+);
 
-// cmssy codegen
-program
-  .command("codegen")
-  .description("Generate TypeScript types from workspace public GraphQL schema")
-  .option("-w, --workspace <slug>", "Workspace slug")
-  .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
-  .option(
-    "--init",
-    "Generate codegen.ts config file instead of running codegen",
-  )
-  .addHelpText(
-    "after",
-    `
+// cmssy codegen (hidden - use `cmssy init --graphql` for setup)
+program.addCommand(
+  new Command("codegen")
+    .description(
+      "Generate TypeScript types from workspace public GraphQL schema",
+    )
+    .option("-w, --workspace <slug>", "Workspace slug")
+    .option("-o, --output <path>", "Output file path", "src/graphql/types.ts")
+    .option(
+      "--init",
+      "Generate codegen.ts config file instead of running codegen",
+    )
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ cmssy codegen --workspace my-workspace
   $ cmssy codegen --init
   $ cmssy codegen -o src/types/api.ts
 `,
-  )
-  .action(codegenCommand);
+    )
+    .action(codegenCommand),
+  { hidden: true },
+);
 
 program.parse();
