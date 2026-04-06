@@ -45,7 +45,7 @@ export async function uploadCommand(
   if (!(await fs.pathExists(packagesDir))) {
     console.error(
       chalk.red("✖ No packages directory found. Run:") +
-        chalk.white("\n  cmssy package --all"),
+        chalk.white("\n  cmssy publish --zip --all"),
     );
     process.exit(1);
   }

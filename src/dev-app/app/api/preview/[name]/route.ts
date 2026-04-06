@@ -19,9 +19,14 @@ export async function GET(
   }
 
   const previewPath = path.join(blockPath, "preview.json");
-  const data = fs.existsSync(previewPath)
-    ? JSON.parse(fs.readFileSync(previewPath, "utf-8"))
-    : {};
+  let data = {};
+  if (fs.existsSync(previewPath)) {
+    try {
+      data = JSON.parse(fs.readFileSync(previewPath, "utf-8"));
+    } catch {
+      data = {};
+    }
+  }
 
   return NextResponse.json(data);
 }
@@ -40,6 +45,10 @@ export async function POST(
   let blockPath = path.join(projectRoot, "blocks", name);
   if (!fs.existsSync(blockPath)) {
     blockPath = path.join(projectRoot, "templates", name);
+  }
+
+  if (!fs.existsSync(blockPath)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const previewPath = path.join(blockPath, "preview.json");
