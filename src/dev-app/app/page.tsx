@@ -162,7 +162,7 @@ export default function DevHome() {
     if (!previewData || Object.keys(previewData).length === 0) return;
     iframeRef.current.contentWindow.postMessage(
       { type: "UPDATE_PROPS", props: previewData },
-      "*",
+      window.location.origin,
     );
   }, [previewData]);
 

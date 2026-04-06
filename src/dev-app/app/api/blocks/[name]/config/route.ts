@@ -26,41 +26,41 @@ function loadBlockConfig(blockPath: string): Record<string, unknown> | null {
     const cacheDir = path.join(projectRoot, ".cmssy", "cache");
     fs.mkdirSync(cacheDir, { recursive: true });
 
-    const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
-    fs.writeFileSync(
-      mockConfigPath,
-      "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;",
-    );
-
-    const configContent = fs.readFileSync(configPath, "utf-8");
-    const modified = configContent.replace(
-      /from\s+['"](?:@cmssy\/cli\/config|cmssy-cli\/config)['"]/g,
-      `from '${mockConfigPath.replace(/\\\\/g, "/")}'`,
-    );
-
-    const tempPath = path.join(cacheDir, "temp-block-config.ts");
-    fs.writeFileSync(tempPath, modified);
-
-    const evalCode = `import cfg from '${tempPath.replace(/\\\\/g, "/")}'; console.log(JSON.stringify(cfg.default || cfg));`;
-    const cmd = tsxBinary.includes("npx")
-      ? `${tsxBinary} --eval "${evalCode}"`
-      : `"${tsxBinary}" --eval "${evalCode}"`;
-
-    const output = execSync(cmd, {
-      encoding: "utf-8",
-      cwd: projectRoot,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
+    const tempDir = fs.mkdtempSync(path.join(cacheDir, "block-config-"));
     try {
-      fs.unlinkSync(tempPath);
-    } catch {}
-    try {
-      fs.unlinkSync(mockConfigPath);
-    } catch {}
+      const mockConfigPath = path.join(tempDir, "cmssy-cli-config.mjs");
+      fs.writeFileSync(
+        mockConfigPath,
+        "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;",
+      );
 
-    const lines = output.trim().split("\n");
-    return JSON.parse(lines[lines.length - 1]);
+      const configContent = fs.readFileSync(configPath, "utf-8");
+      const modified = configContent.replace(
+        /from\s+['"](?:@cmssy\/cli\/config|cmssy-cli\/config)['"]/g,
+        `from '${mockConfigPath.replace(/\\\\/g, "/")}'`,
+      );
+
+      const tempPath = path.join(tempDir, "temp-block-config.ts");
+      fs.writeFileSync(tempPath, modified);
+
+      const evalCode = `import cfg from '${tempPath.replace(/\\\\/g, "/")}'; console.log(JSON.stringify(cfg.default || cfg));`;
+      const cmd = tsxBinary.includes("npx")
+        ? `${tsxBinary} --eval "${evalCode}"`
+        : `"${tsxBinary}" --eval "${evalCode}"`;
+
+      const output = execSync(cmd, {
+        encoding: "utf-8",
+        cwd: projectRoot,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      const lines = output.trim().split("\n");
+      return JSON.parse(lines[lines.length - 1]);
+    } finally {
+      try {
+        fs.rmSync(tempDir, { recursive: true });
+      } catch {}
+    }
   } catch {
     return null;
   }
@@ -71,12 +71,13 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> },
 ) {
   const { name } = await params;
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  }
 
   let blockPath = path.join(projectRoot, "blocks", name);
-  let resourceType: "block" | "template" = "block";
   if (!fs.existsSync(blockPath)) {
     blockPath = path.join(projectRoot, "templates", name);
-    resourceType = "template";
   }
 
   if (!fs.existsSync(blockPath)) {
