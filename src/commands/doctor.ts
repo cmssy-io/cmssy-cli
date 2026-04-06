@@ -192,8 +192,8 @@ export async function doctorCommand() {
       const hasPkg = fs.existsSync(path.join(blockPath, "package.json"));
       const hasPreview = fs.existsSync(path.join(blockPath, "preview.json"));
 
-      if (!hasIndex) fail(`Block "${dir.name}" missing src/index.tsx`);
-      if (!hasConfig) fail(`Block "${dir.name}" missing config.ts`);
+      if (!hasIndex) fail(`Block "${dir.name}" missing src/index.ts(x)`);
+      if (!hasConfig) fail(`Block "${dir.name}" missing config.ts/js`);
       if (!hasPkg) fail(`Block "${dir.name}" missing package.json`);
       if (!hasPreview) warn(`Block "${dir.name}" has no preview.json`);
     }

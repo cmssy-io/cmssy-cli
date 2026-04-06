@@ -450,6 +450,13 @@ export async function publishCommand(
   }
 
   // --with-source: upload source code for AI Block Builder
+  if (options.withSource && publishedBlocks.length === 0) {
+    console.log(
+      chalk.gray(
+        "ℹ --with-source: no blocks published, skipping source upload\n",
+      ),
+    );
+  }
   if (options.withSource && publishedBlocks.length > 0) {
     console.log(
       chalk.cyan("📝 Uploading source code for AI Block Builder...\n"),
