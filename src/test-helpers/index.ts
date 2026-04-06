@@ -17,12 +17,10 @@ const DEFAULT_CONTEXT = {
  * Render a block component with content and optional context.
  * Wraps @testing-library/react render with block-specific props.
  */
-export function renderBlock(Component: any, options: RenderBlockOptions) {
-  // Dynamic import to avoid requiring @testing-library/react at CLI level
+export async function renderBlock(Component: any, options: RenderBlockOptions) {
   let render: any;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const rtl = require("@testing-library/react");
+    const rtl = await import("@testing-library/react");
     render = rtl.render;
   } catch {
     throw new Error(
@@ -32,8 +30,7 @@ export function renderBlock(Component: any, options: RenderBlockOptions) {
 
   let React: any;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    React = require("react");
+    React = await import("react");
   } catch {
     throw new Error("Missing react. Install it:\n  npm install react");
   }
@@ -48,8 +45,8 @@ export function renderBlock(Component: any, options: RenderBlockOptions) {
 }
 
 /**
- * Validate that preview data matches a block schema.
- * Checks required fields are present and types match expectations.
+ * Validate that preview data has required fields present.
+ * Does not check value types - only presence of required fields.
  */
 export function validatePreviewData(
   schema: Record<string, any>,

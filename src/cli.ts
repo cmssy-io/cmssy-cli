@@ -189,6 +189,7 @@ Examples:
   $ cmssy test --coverage         With coverage
 
 Test files: blocks/*/src/**/*.{test,spec}.{ts,tsx}
+             templates/*/src/**/*.{test,spec}.{ts,tsx}
 `,
   )
   .action(testCommand);

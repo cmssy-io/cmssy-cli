@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { execSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import fs from "fs-extra";
 import path from "path";
 
