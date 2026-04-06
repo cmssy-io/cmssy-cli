@@ -486,9 +486,9 @@ export async function publishCommand(
     let sourceFail = 0;
 
     for (const block of publishedBlocks) {
-      const wsBlock = workspaceBlocks.find(
-        (b) => b.blockType === block.blockType || b.blockType === block.name,
-      );
+      const wsBlock =
+        workspaceBlocks.find((b) => b.blockType === block.blockType) ??
+        workspaceBlocks.find((b) => b.blockType === block.name);
       if (!wsBlock) {
         console.warn(
           chalk.yellow(

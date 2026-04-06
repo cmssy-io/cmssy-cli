@@ -134,8 +134,17 @@ export async function uploadBlockSource(
   blockId: string,
   client: GraphQLClient,
 ): Promise<boolean> {
-  const { sourceCode, sourceCss, dependencies } =
-    await readOriginalSourceCode(blockPath);
+  let sourceCode: string | undefined;
+  let sourceCss: string | undefined;
+  let dependencies: Record<string, string> | undefined;
+  try {
+    const result = await readOriginalSourceCode(blockPath);
+    sourceCode = result.sourceCode;
+    sourceCss = result.sourceCss;
+    dependencies = result.dependencies;
+  } catch (error: any) {
+    throw new Error(`Failed to read source for ${blockName}: ${error.message}`);
+  }
 
   if (!sourceCode) {
     return false;
