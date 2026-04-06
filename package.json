@@ -36,6 +36,7 @@
   },
   "files": [
     "dist",
+    "src/dev-app",
     "config.js",
     "config.d.ts",
     "README.md",

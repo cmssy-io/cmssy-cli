@@ -17,5 +17,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/dev-ui-react"]
+  "exclude": ["node_modules", "dist", "src/dev-ui-react", "src/dev-app"]
 }
