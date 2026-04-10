@@ -306,13 +306,13 @@ export default function DevHome() {
         </div>
       );
     }
-    // singleLine, link, numeric, color, form, emailTemplate, emailConfiguration, pageSelector
+    // singleLine, link, numeric, color, form, pageSelector
     return (
       <input
         type={field.type === "numeric" ? "number" : field.type === "color" ? "color" : field.type === "link" ? "url" : "text"}
         value={(value as string) || ""}
         onChange={(e) => onChange(field.type === "numeric" ? Number(e.target.value) : e.target.value)}
-        placeholder={field.placeholder || (field.type === "link" ? "https://..." : field.type === "form" || field.type === "emailTemplate" || field.type === "emailConfiguration" || field.type === "pageSelector" ? "Enter ID..." : "")}
+        placeholder={field.placeholder || (field.type === "link" ? "https://..." : field.type === "form" || field.type === "pageSelector" ? "Enter ID..." : "")}
         style={{ width: "100%", padding: "8px", border: "1px solid #ddd", borderRadius: "4px", fontSize: "13px" }}
       />
     );

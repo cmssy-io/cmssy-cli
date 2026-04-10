@@ -219,8 +219,6 @@ export function validateDefaultValues(schema: Record<string, FieldConfig>): {
       case "select":
       case "color":
       case "form":
-      case "emailTemplate":
-      case "emailConfiguration":
         if (typeof val !== "string") {
           errors.push(
             `"${fullPath}": type "${field.type}" expects string defaultValue, got ${typeof val}`,
