@@ -637,7 +637,7 @@ export async function publishCommand(
     }
   }
 
-  // Publish theme if present (with --all or when explicitly requested)
+  // Publish theme if present when using --all
   if (options.all) {
     const themeConfig = await scanTheme();
     if (themeConfig) {

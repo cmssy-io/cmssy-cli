@@ -159,7 +159,7 @@ export function loadTemplateConfig(
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
     fs.writeFileSync(
       mockConfigPath,
-      "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const defineTheme = (config) => config;\n",
+      "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const defineTheme = (config) => config;\nexport const field = (config) => config;\n",
     );
 
     const configContent = fs.readFileSync(configPath, "utf-8");
