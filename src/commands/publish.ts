@@ -10,6 +10,7 @@ import {
   GET_WORKSPACE_BLOCKS_QUERY,
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
+  UPDATE_THEME_MUTATION,
 } from "../utils/graphql.js";
 import {
   loadBlockConfig,
@@ -20,6 +21,8 @@ import {
   convertConfigToPagesData,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
+import { scanTheme } from "../utils/scanner.js";
+import { convertThemeToInput } from "../utils/theme-builder.js";
 import { packageResource } from "./package.js";
 import { uploadPackage } from "./upload.js";
 import { uploadBlockSource } from "./add-source.js";
@@ -631,6 +634,40 @@ export async function publishCommand(
       console.log(
         chalk.yellow(`⚠ ${sourceSuccess} succeeded, ${sourceFail} failed\n`),
       );
+    }
+  }
+
+  // Publish theme if present when using --all
+  if (options.all) {
+    const themeConfig = await scanTheme();
+    if (themeConfig) {
+      const spinner = ora("Publishing theme to workspace...").start();
+      try {
+        const themeClient = new GraphQLClient(config.apiUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiToken}`,
+            "X-Workspace-ID": workspaceId as string,
+          },
+        });
+
+        const themeInput = convertThemeToInput(themeConfig);
+        await themeClient.request(UPDATE_THEME_MUTATION, { input: themeInput });
+        spinner.succeed(
+          chalk.green(`Theme "${themeConfig.name}" published to workspace`),
+        );
+      } catch (error: any) {
+        const msg = error?.response?.errors?.[0]?.message ?? error.message;
+        if (msg?.includes("paid plan") || msg?.includes("PLAN_LIMIT")) {
+          spinner.warn(
+            chalk.yellow(
+              "Theme publish skipped: theme customization requires a paid plan",
+            ),
+          );
+        } else {
+          spinner.fail(chalk.red(`Theme publish failed: ${msg}`));
+        }
+      }
     }
   }
 }

@@ -1,8 +1,9 @@
 import chalk from "chalk";
+import fs from "fs-extra";
 import ora from "ora";
 import path from "path";
 import { loadConfig } from "../utils/cmssy-config.js";
-import { scanResources } from "../utils/scanner.js";
+import { scanResources, scanTheme } from "../utils/scanner.js";
 import { buildResource } from "../utils/builder.js";
 import { updateBlockInCache } from "../utils/blocks-meta-cache.js";
 import { getFieldTypes } from "../utils/field-schema.js";
@@ -10,6 +11,7 @@ import {
   checkBlockDependencies,
   printMissingDeps,
 } from "../utils/dependency-check.js";
+import { buildThemeCSS } from "../utils/theme-builder.js";
 
 interface BuildOptions {
   framework?: string;
@@ -133,6 +135,16 @@ export async function buildCommand(options: BuildOptions) {
         errorCount++;
         console.error(chalk.red(`  ✖ ${resource.name}:`), error);
       }
+    }
+
+    // Build theme CSS if theme/config.ts exists
+    const themeConfig = await scanTheme();
+    if (themeConfig) {
+      const css = buildThemeCSS(themeConfig);
+      const themeCssPath = path.join(outDir, "theme.css");
+      fs.ensureDirSync(path.dirname(themeCssPath));
+      fs.writeFileSync(themeCssPath, css);
+      console.log(chalk.green(`  ✓ theme.css (${themeConfig.name})`));
     }
 
     if (errorCount === 0) {

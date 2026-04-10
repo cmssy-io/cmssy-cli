@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@cmssy/types':
-        specifier: ^0.9.5
-        version: 0.9.5
+        specifier: ^0.9.6
+        version: 0.9.6
       '@tailwindcss/postcss':
         specifier: ^4.1.18
         version: 4.1.18
@@ -143,8 +143,8 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@cmssy/types@0.9.5':
-    resolution: {integrity: sha512-X6d09xBgvEVEfkNl/bSguJTCA/BZPQr07Zpo70SnuTaOyHAS01gDDPouSJf0adkGkwDl+7c+KX9ONASXbxzAvA==}
+  '@cmssy/types@0.9.6':
+    resolution: {integrity: sha512-arxd1Y4UelW7fKTbzvMeg5jjfOC2oyTsUHLaJrDvhdTXrBMxiw2ES50DdlMwV5WdTQOSZJcc62gXcq81LIuT7g==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -2131,7 +2131,7 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@cmssy/types@0.9.5': {}
+  '@cmssy/types@0.9.6': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:

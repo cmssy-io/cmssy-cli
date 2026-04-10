@@ -123,22 +123,6 @@ export const FALLBACK_FIELD_TYPES: FieldTypeDefinition[] = [
     supportsValidation: false,
   },
   {
-    type: "emailTemplate",
-    label: "Email Template",
-    description: "Email template picker",
-    valueType: "string",
-    allowsDefaultValue: true,
-    supportsValidation: false,
-  },
-  {
-    type: "emailConfiguration",
-    label: "Email Configuration",
-    description: "Email configuration picker",
-    valueType: "string",
-    allowsDefaultValue: true,
-    supportsValidation: false,
-  },
-  {
     type: "pageSelector",
     label: "Page Selector",
     description: "Page picker for collection blocks",

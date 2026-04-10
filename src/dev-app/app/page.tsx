@@ -542,7 +542,7 @@ export default function DevHome() {
         </div>
       );
     }
-    // singleLine, link, numeric, color, form, emailTemplate, emailConfiguration, pageSelector
+    // singleLine, link, numeric, color, form, pageSelector
     return (
       <input
         type={
@@ -564,10 +564,7 @@ export default function DevHome() {
           field.placeholder ||
           (field.type === "link"
             ? "https://..."
-            : field.type === "form" ||
-                field.type === "emailTemplate" ||
-                field.type === "emailConfiguration" ||
-                field.type === "pageSelector"
+            : field.type === "form" || field.type === "pageSelector"
               ? "Enter ID..."
               : "")
         }
