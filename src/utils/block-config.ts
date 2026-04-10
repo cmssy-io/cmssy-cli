@@ -9,6 +9,7 @@ import type {
   ShowWhenCondition,
   TypedFieldConfig,
 } from "@cmssy/types";
+import type { DefineThemeConfig } from "@cmssy/types";
 import {
   BlockConfig,
   FieldConfig,
@@ -95,6 +96,11 @@ export function defineTemplate(
   return config as unknown as TemplateConfig;
 }
 
+// defineTheme for theme/config.ts authoring
+export function defineTheme(config: DefineThemeConfig): DefineThemeConfig {
+  return config;
+}
+
 /**
  * Resolve the config file for a block or template.
  * Both use a unified `config.ts` file.
@@ -139,7 +145,7 @@ export async function loadBlockConfig(
 
     // Create a mock cmssy-cli/config module in cache
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
-    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const field = (config) => config;`;
+    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const defineTheme = (config) => config;\nexport const field = (config) => config;`;
     fs.writeFileSync(mockConfigPath, mockConfig);
 
     // Read original config and replace import path to point to mock

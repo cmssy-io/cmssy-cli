@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import fs from "fs-extra";
 import path from "path";
+import type { DefineThemeConfig } from "@cmssy/types";
 import { loadBlockConfig, validateSchema } from "./block-config.js";
 import { getPackageJson } from "./cmssy-config.js";
 
@@ -230,4 +231,20 @@ async function scanDirectory(opts: ScanDirectoryOptions) {
 
     resources.push(resource);
   }
+}
+
+/**
+ * Scan for a theme config at `theme/config.ts` in the project root.
+ * Returns the DefineThemeConfig or null if no theme directory exists.
+ */
+export async function scanTheme(
+  cwd = process.cwd(),
+): Promise<DefineThemeConfig | null> {
+  const themePath = path.join(cwd, "theme");
+  if (!fs.existsSync(themePath)) return null;
+
+  const config = await loadBlockConfig(themePath);
+  if (!config) return null;
+
+  return config as unknown as DefineThemeConfig;
 }
