@@ -420,6 +420,27 @@ Team Project
 
 - API token must be configured (run `cmssy configure` first)
 
+### Install AI Assistant Skills
+
+```bash
+cmssy skills install              # Claude Code skill, global (~/.claude/skills/)
+cmssy skills install --local      # Install into current project (./.claude/skills/)
+cmssy skills install --force      # Overwrite existing skill
+```
+
+Drops the `cmssy-block` skill into your Claude Code config so the assistant knows
+the full cmssy CLI lifecycle (init, link, create, dev, test, build, publish, sync)
+and how to scaffold/edit blocks and templates correctly.
+
+After installing, restart Claude Code (or start a new session) and ask it anything
+about cmssy blocks, e.g. _"scaffold a pricing block and publish as patch"_.
+
+**Options:**
+
+- `--local` - install into `./.claude/skills/` in the current project (default: `~/.claude/skills/`)
+- `--force` - overwrite an existing skill without prompting
+- `-y, --yes` - non-interactive mode (fails instead of prompting on conflict)
+
 ---
 
 ## Project Structure
