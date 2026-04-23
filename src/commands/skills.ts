@@ -61,9 +61,9 @@ export async function skillsInstallCommand(
   rawTarget: string | undefined,
   options: SkillsInstallOptions,
 ): Promise<void> {
-  const target = (rawTarget ?? "claude").toLowerCase() as SkillTarget;
+  const target = (rawTarget ?? "claude").toLowerCase();
 
-  if (!(target in SKILLS)) {
+  if (!Object.hasOwn(SKILLS, target)) {
     console.error(
       chalk.red(`✖ Unknown skill target: ${rawTarget}`) +
         chalk.gray(`\n  Supported: ${Object.keys(SKILLS).join(", ")}`),
@@ -71,7 +71,7 @@ export async function skillsInstallCommand(
     process.exit(1);
   }
 
-  const skill = SKILLS[target];
+  const skill = SKILLS[target as SkillTarget];
 
   if (!(await fs.pathExists(skill.sourcePath))) {
     console.error(

@@ -16,6 +16,7 @@ for (const { from, to } of assets) {
     process.exit(1);
   }
 
-  fs.copySync(src, dest, { overwrite: true });
+  fs.removeSync(dest);
+  fs.copySync(src, dest);
   console.log(`✔ Copied ${from} → ${to}`);
 }

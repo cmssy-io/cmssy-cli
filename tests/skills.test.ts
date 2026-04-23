@@ -7,22 +7,23 @@ import { skillsInstallCommand } from "../src/commands/skills.js";
 describe("skills install", () => {
   let tmpDir: string;
   let originalCwd: string;
-  const exitSpy = vi
-    .spyOn(process, "exit")
-    .mockImplementation((code?: string | number | null) => {
-      throw new Error(`process.exit(${code})`);
-    });
+  let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cmssy-skills-test-"));
     originalCwd = process.cwd();
     process.chdir(tmpDir);
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((code?: string | number | null) => {
+        throw new Error(`process.exit(${code})`);
+      });
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
     fs.removeSync(tmpDir);
-    exitSpy.mockClear();
+    exitSpy.mockRestore();
   });
 
   it("installs the claude skill into ./.claude/skills when --local", async () => {
@@ -55,6 +56,15 @@ describe("skills install", () => {
   it("rejects unknown targets", async () => {
     await expect(
       skillsInstallCommand("vscode", { local: true }),
+    ).rejects.toThrow("process.exit(1)");
+  });
+
+  it("rejects Object.prototype keys (prototype pollution)", async () => {
+    await expect(
+      skillsInstallCommand("constructor", { local: true }),
+    ).rejects.toThrow("process.exit(1)");
+    await expect(
+      skillsInstallCommand("toString", { local: true }),
     ).rejects.toThrow("process.exit(1)");
   });
 
