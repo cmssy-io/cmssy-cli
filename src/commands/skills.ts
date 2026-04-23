@@ -61,7 +61,7 @@ export async function skillsInstallCommand(
   rawTarget: string | undefined,
   options: SkillsInstallOptions,
 ): Promise<void> {
-  const target = (rawTarget ?? "claude").toLowerCase();
+  const target = (rawTarget ?? "claude").trim().toLowerCase();
 
   if (!Object.hasOwn(SKILLS, target)) {
     console.error(

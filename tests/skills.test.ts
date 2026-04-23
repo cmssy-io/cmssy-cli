@@ -1,4 +1,5 @@
 import fs from "fs-extra";
+import inquirer from "inquirer";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,5 +92,42 @@ describe("skills install", () => {
     await skillsInstallCommand("claude", { local: true, force: true });
 
     expect(fs.readFileSync(installed, "utf8")).toContain("name: cmssy-block");
+  });
+
+  it("trims whitespace around target name", async () => {
+    await skillsInstallCommand("  claude  ", { local: true });
+
+    const installed = path.join(
+      tmpDir,
+      ".claude",
+      "skills",
+      "cmssy-block",
+      "SKILL.md",
+    );
+    expect(fs.existsSync(installed)).toBe(true);
+  });
+
+  it("aborts interactive overwrite without touching existing SKILL.md", async () => {
+    await skillsInstallCommand("claude", { local: true });
+
+    const installed = path.join(
+      tmpDir,
+      ".claude",
+      "skills",
+      "cmssy-block",
+      "SKILL.md",
+    );
+    fs.writeFileSync(installed, "user-modified-content");
+
+    const promptSpy = vi
+      .spyOn(inquirer, "prompt")
+      .mockResolvedValue({ overwrite: false } as never);
+
+    await skillsInstallCommand("claude", { local: true });
+
+    expect(promptSpy).toHaveBeenCalledOnce();
+    expect(fs.readFileSync(installed, "utf8")).toBe("user-modified-content");
+
+    promptSpy.mockRestore();
   });
 });
