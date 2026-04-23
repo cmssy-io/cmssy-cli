@@ -1,6 +1,6 @@
 {
   "name": "@cmssy/cli",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "description": "Unified CLI for building and publishing blocks to Cmssy design library",
   "type": "module",
   "bin": {
@@ -12,7 +12,7 @@
     "./test": "./test.js"
   },
   "scripts": {
-    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler",
+    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler && node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",

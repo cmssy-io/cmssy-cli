@@ -16,6 +16,7 @@ import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
 import { packageCommand } from "./commands/package.js";
+import { skillsInstallCommand } from "./commands/skills.js";
 import { uploadCommand } from "./commands/upload.js";
 import { workspacesCommand } from "./commands/workspaces.js";
 import { readFileSync } from "fs";
@@ -395,6 +396,36 @@ Use workspace IDs with:
 `,
   )
   .action(workspacesCommand);
+
+// cmssy skills
+const skills = program
+  .command("skills")
+  .description("Install AI coding-assistant skills for cmssy");
+
+skills
+  .command("install")
+  .description("Install a skill into your AI assistant's config directory")
+  .argument("[target]", "Target assistant: claude", "claude")
+  .option(
+    "--local",
+    "Install into ./.claude/skills (default: ~/.claude/skills)",
+  )
+  .option("--force", "Overwrite existing skill without prompting")
+  .option("-y, --yes", "Non-interactive mode (fail instead of prompting)")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy skills install              Install Claude Code skill globally
+  $ cmssy skills install claude       Same as above (explicit)
+  $ cmssy skills install --local      Install into current project's .claude/
+  $ cmssy skills install --force      Overwrite existing skill
+
+The Claude Code skill teaches the assistant the full cmssy CLI lifecycle
+(init, link, create, dev, test, build, publish, sync).
+`,
+  )
+  .action((target, options) => skillsInstallCommand(target, options));
 
 // cmssy add-source (hidden - use `cmssy publish --with-source` instead)
 program.addCommand(
