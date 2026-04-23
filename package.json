@@ -1,6 +1,6 @@
 {
   "name": "@cmssy/cli",
-  "version": "0.9.0",
+  "version": "0.13.0",
   "description": "Unified CLI for building and publishing blocks to Cmssy design library",
   "type": "module",
   "bin": {
@@ -8,10 +8,11 @@
   },
   "exports": {
     ".": "./dist/cli.js",
-    "./config": "./config.js"
+    "./config": "./config.js",
+    "./test": "./test.js"
   },
   "scripts": {
-    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler",
+    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler && node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -36,8 +37,11 @@
   },
   "files": [
     "dist",
+    "src/dev-app",
     "config.js",
     "config.d.ts",
+    "test.js",
+    "test.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -48,7 +52,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cmssy/types": "^0.8.0",
+    "@cmssy/types": "^0.10.0",
     "@tailwindcss/postcss": "^4.1.18",
     "archiver": "^7.0.1",
     "chalk": "^5.3.0",

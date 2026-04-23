@@ -37,3 +37,7 @@ coverage/
 # Claude Code
 CLAUDE.md
 .mcp.json
+.claude/
+
+# npm (this repo uses pnpm)
+package-lock.json

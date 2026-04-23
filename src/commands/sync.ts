@@ -38,13 +38,13 @@ const INSTALLED_PACKAGES_QUERY = `
 
 export async function syncCommand(
   packageSlug: string | undefined,
-  options: SyncOptions
+  options: SyncOptions,
 ) {
   console.log(chalk.blue.bold("\n🔨 Cmssy - Sync Blocks\n"));
 
   // Check configuration
   if (!hasConfig()) {
-    console.error(chalk.red("✖ Not configured. Run: cmssy configure\n"));
+    console.error(chalk.red("✖ Not configured. Run: cmssy link\n"));
     process.exit(1);
   }
 
@@ -54,7 +54,7 @@ export async function syncCommand(
   const configPath = path.join(process.cwd(), "cmssy.config.js");
   if (!fs.existsSync(configPath)) {
     console.error(
-      chalk.red("✖ Not a cmssy project (missing cmssy.config.js)\n")
+      chalk.red("✖ Not a cmssy project (missing cmssy.config.js)\n"),
     );
     process.exit(1);
   }
@@ -106,25 +106,25 @@ export async function syncCommand(
     let packagesToSync = installedPackages;
     if (packageSlug) {
       packagesToSync = installedPackages.filter(
-        (ip: any) => ip.package.slug === packageSlug
+        (ip: any) => ip.package.slug === packageSlug,
       );
 
       if (packagesToSync.length === 0) {
         console.error(
-          chalk.red(`✖ Package "${packageSlug}" not found in workspace\n`)
+          chalk.red(`✖ Package "${packageSlug}" not found in workspace\n`),
         );
         process.exit(1);
       }
     }
 
     console.log(
-      chalk.cyan(`\nFound ${packagesToSync.length} package(s) to sync:\n`)
+      chalk.cyan(`\nFound ${packagesToSync.length} package(s) to sync:\n`),
     );
     packagesToSync.forEach((ip: any) => {
       console.log(
         chalk.white(
-          `  • ${ip.package.slug} v${ip.package.currentVersion.version} (${ip.package.packageType})`
-        )
+          `  • ${ip.package.slug} v${ip.package.currentVersion.version} (${ip.package.packageType})`,
+        ),
       );
     });
     console.log("");
@@ -153,7 +153,7 @@ export async function syncCommand(
       console.log(chalk.green.bold(`✓ ${successCount} package(s) synced\n`));
     } else {
       console.log(
-        chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`)
+        chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`),
       );
     }
   } catch (error: any) {
@@ -202,15 +202,15 @@ async function syncPackage(pkg: any): Promise<void> {
   if (currentVersion.packageJsonUrl) {
     try {
       const packageJsonContent = await downloadFile(
-        currentVersion.packageJsonUrl
+        currentVersion.packageJsonUrl,
       );
       packageJsonData = JSON.parse(packageJsonContent);
     } catch (error) {
       // If package.json fetch fails, use defaults
       console.warn(
         chalk.yellow(
-          `  Warning: Could not fetch package.json for ${slug}, using defaults`
-        )
+          `  Warning: Could not fetch package.json for ${slug}, using defaults`,
+        ),
       );
     }
   }
@@ -226,7 +226,7 @@ async function syncPackage(pkg: any): Promise<void> {
   // Write package.json
   fs.writeFileSync(
     path.join(targetDir, "package.json"),
-    JSON.stringify(packageJsonData, null, 2)
+    JSON.stringify(packageJsonData, null, 2),
   );
 
   // Create README.md

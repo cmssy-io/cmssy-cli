@@ -6,7 +6,7 @@ export function createClient(): GraphQLClient {
   const config = loadConfig();
 
   if (!config.apiToken) {
-    throw new Error("CMSSY_API_TOKEN not configured. Run: cmssy configure");
+    throw new Error("CMSSY_API_TOKEN not configured. Run: cmssy link");
   }
 
   return new GraphQLClient(config.apiUrl, {
@@ -42,6 +42,8 @@ export const IMPORT_BLOCK_MUTATION = `
         permissions
         features
       }
+      serverActionUrl
+      serverActions
       version
       createdAt
     }
@@ -82,6 +84,53 @@ export const ADD_BLOCK_SOURCE_CODE_MUTATION = `
   }
 `;
 
+export const UPDATE_THEME_MUTATION = `
+  mutation UpdateTheme($input: ThemeConfigInput!) {
+    updateTheme(input: $input) {
+      id
+      theme {
+        fonts {
+          heading { family source weights customFontUrl }
+          body { family source weights customFontUrl }
+        }
+        colors {
+          primary primaryForeground secondary secondaryForeground
+          accent accentForeground background foreground
+          muted mutedForeground card cardForeground
+          border input ring destructive
+        }
+        typography { h1 h2 h3 h4 h5 h6 body small }
+        spacing
+        borderRadius
+        customCSS
+      }
+    }
+  }
+`;
+
+export const GET_SITE_CONFIG_THEME_QUERY = `
+  query GetSiteConfigTheme {
+    siteConfig {
+      theme {
+        fonts {
+          heading { family source weights customFontUrl }
+          body { family source weights customFontUrl }
+        }
+        colors {
+          primary primaryForeground secondary secondaryForeground
+          accent accentForeground background foreground
+          muted mutedForeground card cardForeground
+          border input ring destructive
+        }
+        typography { h1 h2 h3 h4 h5 h6 body small }
+        spacing
+        borderRadius
+        customCSS
+      }
+    }
+  }
+`;
+
 export const GET_WORKSPACE_BLOCKS_QUERY = `
   query GetWorkspaceBlocks {
     workspaceBlocks {
@@ -89,6 +138,10 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
       blockType
       name
       sourceUrl
+      version
+      schemaFields {
+        ${SCHEMA_FIELDS_FRAGMENT}
+      }
     }
   }
 `;

@@ -9,6 +9,7 @@ import type {
   ShowWhenCondition,
   TypedFieldConfig,
 } from "@cmssy/types";
+import type { DefineThemeConfig } from "@cmssy/types";
 import {
   BlockConfig,
   FieldConfig,
@@ -77,9 +78,13 @@ export function field<T extends FieldType>(
 export function defineBlock(
   config: Omit<TypedBlockConfig, "schema"> & {
     schema: Record<string, FieldDef>;
+    /** External package dependencies (e.g., { "framer-motion": "^11.0.0" }) */
+    dependencies?: Record<string, string>;
   },
-): BlockConfig {
-  return config as unknown as BlockConfig;
+): BlockConfig & { dependencies?: Record<string, string> } {
+  return config as unknown as BlockConfig & {
+    dependencies?: Record<string, string>;
+  };
 }
 
 // defineTemplate requires branded FieldDef in schema (if present)
@@ -89,6 +94,11 @@ export function defineTemplate(
   },
 ): TemplateConfig {
   return config as unknown as TemplateConfig;
+}
+
+// defineTheme for theme/config.ts authoring
+export function defineTheme(config: DefineThemeConfig): DefineThemeConfig {
+  return config;
 }
 
 /**
@@ -135,7 +145,7 @@ export async function loadBlockConfig(
 
     // Create a mock cmssy-cli/config module in cache
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
-    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const field = (config) => config;`;
+    const mockConfig = `export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\nexport const defineTheme = (config) => config;\nexport const field = (config) => config;`;
     fs.writeFileSync(mockConfigPath, mockConfig);
 
     // Read original config and replace import path to point to mock
@@ -209,8 +219,6 @@ export function validateDefaultValues(schema: Record<string, FieldConfig>): {
       case "select":
       case "color":
       case "form":
-      case "emailTemplate":
-      case "emailConfiguration":
         if (typeof val !== "string") {
           errors.push(
             `"${fullPath}": type "${field.type}" expects string defaultValue, got ${typeof val}`,

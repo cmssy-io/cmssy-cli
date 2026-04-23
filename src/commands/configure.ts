@@ -30,9 +30,6 @@ export async function configureCommand(options: ConfigureOptions) {
         if (!input || input.length < 10) {
           return "Please enter a valid API token";
         }
-        if (!input.startsWith("bf_")) {
-          return 'Token should start with "bf_"';
-        }
         return true;
       },
     },
@@ -47,9 +44,13 @@ export async function configureCommand(options: ConfigureOptions) {
   console.log(chalk.green("\n✓ Configuration saved to .env\n"));
   console.log(chalk.cyan("Next steps:\n"));
   console.log(
-    chalk.white("  cmssy publish --all --workspace      # Publish to workspace")
+    chalk.white(
+      "  cmssy publish --all --workspace      # Publish to workspace",
+    ),
   );
   console.log(
-    chalk.white("  cmssy sync                          # Pull blocks from Cmssy\n")
+    chalk.white(
+      "  cmssy sync                          # Pull blocks from Cmssy\n",
+    ),
   );
 }

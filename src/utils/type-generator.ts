@@ -22,8 +22,6 @@ const DEFAULT_VALUE_TYPES: Record<string, string> = {
   color: "string",
   repeater: "Record<string, unknown>[]",
   form: "string",
-  emailTemplate: "string",
-  emailConfiguration: "string",
 };
 
 export interface GenerateTypesOptions {

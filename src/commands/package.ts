@@ -12,7 +12,7 @@ interface PackageOptions {
   output?: string;
 }
 
-interface Resource {
+export interface PackageResource {
   name: string;
   type: "block" | "template";
   dir: string;
@@ -49,8 +49,8 @@ export async function packageCommand(
     return;
   }
 
-  // Map ScannedResource to local Resource interface
-  const resources = scannedResources.map((r) => ({
+  // Map ScannedResource to local PackageResource interface
+  const resources = scannedResources.map((r: ScannedResource) => ({
     name: r.name,
     type: r.type,
     dir: r.path, // ScannedResource uses 'path', local uses 'dir'
@@ -100,7 +100,10 @@ export async function packageCommand(
   );
 }
 
-async function packageResource(resource: Resource, outputDir: string) {
+export async function packageResource(
+  resource: PackageResource,
+  outputDir: string,
+) {
   const spinner = ora(
     `Packaging ${resource.type} ${chalk.cyan(resource.name)}`,
   ).start();

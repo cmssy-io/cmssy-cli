@@ -5,7 +5,7 @@ import os from "os";
 import {
   generateDevApp,
   regeneratePreviewPages,
-} from "../src/utils/dev-generator.js";
+} from "../src/utils/dev-generator/index.js";
 import type { ScannedResource } from "../src/utils/scanner.js";
 
 let tmpDir: string;
@@ -139,7 +139,7 @@ describe("generateDevApp", () => {
     ).toBe(true);
     expect(
       fs.existsSync(
-        path.join(tmpDir, ".cmssy/dev/app/api/preview/[blockName]/route.ts"),
+        path.join(tmpDir, ".cmssy/dev/app/api/preview/[name]/route.ts"),
       ),
     ).toBe(true);
     expect(
@@ -455,7 +455,7 @@ describe("generated API routes", () => {
     generateDevApp(tmpDir, resources);
 
     const content = fs.readFileSync(
-      path.join(tmpDir, ".cmssy/dev/app/api/preview/[blockName]/route.ts"),
+      path.join(tmpDir, ".cmssy/dev/app/api/preview/[name]/route.ts"),
       "utf-8",
     );
 

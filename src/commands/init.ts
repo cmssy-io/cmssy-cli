@@ -11,346 +11,41 @@ interface InitAnswers {
   projectName: string;
   authorName: string;
   authorEmail: string;
-  initGit: boolean;
 }
 
 interface InitOptions {
   yes?: boolean;
-  framework?: string;
 }
 
-export async function initCommand(name?: string, options: InitOptions = {}) {
-  console.log(chalk.blue.bold("\n🔨 Cmssy - Initialize Project\n"));
+// ---------------------------------------------------------------------------
+// Detect existing Next.js project in cwd
+// ---------------------------------------------------------------------------
 
-  let answers: InitAnswers;
-
-  if (options.yes) {
-    // Skip prompts, use defaults
-    answers = {
-      projectName: name || "my-blocks",
-      authorName: "",
-      authorEmail: "",
-      initGit: true,
-    };
-    console.log(chalk.gray(`Using defaults: ${answers.projectName}\n`));
-  } else {
-    answers = await inquirer.prompt<InitAnswers>([
-      {
-        type: "input",
-        name: "projectName",
-        message: "Project name:",
-        default: name || "my-blocks",
-        validate: (input) => {
-          if (/^[a-z0-9-_]+$/.test(input)) return true;
-          return "Project name must contain only lowercase letters, numbers, hyphens, and underscores";
-        },
-      },
-      {
-        type: "input",
-        name: "authorName",
-        message: "Author name:",
-        default: "",
-      },
-      {
-        type: "input",
-        name: "authorEmail",
-        message: "Author email:",
-        default: "",
-      },
-      {
-        type: "confirm",
-        name: "initGit",
-        message: "Initialize git repository?",
-        default: true,
-      },
-    ]);
-  }
-
-  const projectPath = path.join(process.cwd(), answers.projectName);
-
-  if (fs.existsSync(projectPath)) {
-    console.error(
-      chalk.red(`\n✖ Directory "${answers.projectName}" already exists\n`),
-    );
-    process.exit(1);
-  }
-
-  const spinner = ora("Creating project structure...").start();
-
-  try {
-    // Create project directory
-    fs.mkdirSync(projectPath, { recursive: true });
-
-    // Create directory structure
-    const dirs = ["blocks", "templates", "public", "styles", ".cmssy"];
-    dirs.forEach((dir) => {
-      fs.mkdirSync(path.join(projectPath, dir), { recursive: true });
-    });
-
-    // Create cmssy.config.js
-    const config = {
-      framework: "react",
-      projectName: answers.projectName,
-      author: {
-        name: answers.authorName,
-        email: answers.authorEmail,
-      },
-      build: {
-        outDir: "public",
-        minify: true,
-        sourcemap: true,
-      },
-    };
-
-    fs.writeFileSync(
-      path.join(projectPath, "cmssy.config.js"),
-      `export default ${JSON.stringify(config, null, 2)};\n`,
-    );
-
-    // Create package.json (versions match cmssy platform)
-    const packageJson = {
-      name: answers.projectName,
-      version: "1.0.0",
-      type: "module",
-      scripts: {
-        dev: "cmssy dev",
-        build: "cmssy build",
-      },
-      dependencies: {
-        react: "^19.2.0",
-        "react-dom": "^19.2.0",
-        next: "^16.0.10",
-      },
-      devDependencies: {
-        "@types/node": "^22.0.0",
-        "@types/react": "^19.0.0",
-        "@types/react-dom": "^19.0.0",
-        typescript: "^5.7.2",
-        tailwindcss: "^4.1.18",
-        "@tailwindcss/postcss": "^4.1.18",
-      },
-    };
-
-    fs.writeFileSync(
-      path.join(projectPath, "package.json"),
-      JSON.stringify(packageJson, null, 2) + "\n",
-    );
-
-    // Create tsconfig.json (jsx: "preserve" for Next.js compatibility)
-    const tsConfig = {
-      compilerOptions: {
-        target: "ES2020",
-        module: "ESNext",
-        lib: ["ES2020", "DOM", "DOM.Iterable"],
-        jsx: "preserve",
-        moduleResolution: "bundler",
-        allowImportingTsExtensions: true,
-        resolveJsonModule: true,
-        isolatedModules: true,
-        noEmit: true,
-        strict: true,
-        skipLibCheck: true,
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        forceConsistentCasingInFileNames: true,
-        plugins: [{ name: "next" }],
-        paths: {
-          "cmssy-cli/config": ["./node_modules/cmssy-cli/config"],
-        },
-      },
-      include: [
-        "blocks/**/*.ts",
-        "blocks/**/*.tsx",
-        "templates/**/*.ts",
-        "templates/**/*.tsx",
-        "components/**/*.ts",
-        "components/**/*.tsx",
-        "lib/**/*.ts",
-      ],
-      exclude: ["node_modules", "dist", "public", ".cmssy"],
-    };
-    fs.writeFileSync(
-      path.join(projectPath, "tsconfig.json"),
-      JSON.stringify(tsConfig, null, 2) + "\n",
-    );
-
-    // Create .gitignore
-    const gitignore = `node_modules/
-dist/
-public/
-.env
-.DS_Store
-*.log
-.cmssy/
-.next/
-`;
-    fs.writeFileSync(path.join(projectPath, ".gitignore"), gitignore);
-
-    // Create next.config.mjs (enables Next.js dev mode in cmssy dev)
-    const nextConfig = `/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Cmssy blocks are built with esbuild on publish, this config is only for dev
-  images: {
-    remotePatterns: [{ protocol: 'https', hostname: '**' }],
-  },
-};
-
-export default nextConfig;
-`;
-    fs.writeFileSync(path.join(projectPath, "next.config.mjs"), nextConfig);
-
-    // Create postcss.config.js
-    const postcssConfig = `export default {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
-`;
-    fs.writeFileSync(
-      path.join(projectPath, "postcss.config.js"),
-      postcssConfig,
-    );
-
-    // Create styles/main.css
-    const mainCss = `@import "tailwindcss";
-@source "../blocks";
-@source "../templates";
-@source "../components";
-
-/* Set default border color (Tailwind v4 reset uses currentColor) */
-@layer base {
-  *,
-  ::after,
-  ::before {
-    border-color: var(--border, currentColor);
-  }
+function detectNextProject(cwd: string): boolean {
+  return ["next.config.js", "next.config.mjs", "next.config.ts"].some((f) =>
+    fs.existsSync(path.join(cwd, f)),
+  );
 }
 
-/* Custom theme - customize your design system here */
-/* @theme inline {
-  --color-primary: var(--primary);
-  --color-border: var(--border);
-} */
+function detectCmssyProject(cwd: string): boolean {
+  return fs.existsSync(path.join(cwd, "cmssy.config.js"));
+}
 
-/* CSS variables for theming */
-/* :root {
-  --primary: oklch(0.6 0.25 292);
-  --border: oklch(0.9 0 0);
-} */
-`;
-    fs.writeFileSync(path.join(projectPath, "styles", "main.css"), mainCss);
+// ---------------------------------------------------------------------------
+// Scaffold example hero block (shared between both modes)
+// ---------------------------------------------------------------------------
 
-    // Create .env.example
-    const envExample = `# Cmssy API Configuration
-# Run 'cmssy configure' to set these values
+async function scaffoldExampleBlock(
+  projectPath: string,
+  answers: InitAnswers,
+): Promise<void> {
+  const heroBlockPath = path.join(projectPath, "blocks", "hero");
+  fs.mkdirSync(path.join(heroBlockPath, "src"), { recursive: true });
 
-# Cmssy GraphQL API URL
-CMSSY_API_URL=https://api.cmssy.io/graphql
-
-# Cmssy API Token (get from Dashboard → API Tokens)
-CMSSY_API_TOKEN=
-
-# Workspace ID (for workspace publish)
-CMSSY_WORKSPACE_ID=
-`;
-    fs.writeFileSync(path.join(projectPath, ".env.example"), envExample);
-
-    // Create .vscode/settings.json (VS Code performance + DX)
-    fs.mkdirSync(path.join(projectPath, ".vscode"), { recursive: true });
-
-    const vscodeSettings = {
-      "files.watcherExclude": {
-        "**/public/**": true,
-        "**/.cmssy/**": true,
-        "**/node_modules/**": true,
-        "**/.git/objects/**": true,
-        "**/.git/subtree-cache/**": true,
-        "**/.next/**": true,
-        "**/dist/**": true,
-      },
-      "search.exclude": {
-        "**/public": true,
-        "**/.cmssy": true,
-        "**/node_modules": true,
-        "**/.next": true,
-        "**/dist": true,
-        "**/pnpm-lock.yaml": true,
-      },
-      "files.exclude": {
-        "**/.cmssy": true,
-        "**/public": true,
-      },
-      "eslint.enable": false,
-      "typescript.tsdk": "node_modules/typescript/lib",
-      "typescript.tsserver.maxTsServerMemory": 2048,
-      "typescript.tsserver.experimental.enableProjectDiagnostics": false,
-      "tailwindCSS.files.exclude": [
-        "**/node_modules/**",
-        "**/.cmssy/**",
-        "**/public/**",
-        "**/.next/**",
-        "**/dist/**",
-      ],
-    };
-    fs.writeFileSync(
-      path.join(projectPath, ".vscode", "settings.json"),
-      JSON.stringify(vscodeSettings, null, 2) + "\n",
-    );
-
-    // Create .vscode/extensions.json (recommended extensions)
-    const vscodeExtensions = {
-      recommendations: ["bradlc.vscode-tailwindcss", "csstools.postcss"],
-      unwantedRecommendations: ["dbaeumer.vscode-eslint"],
-    };
-    fs.writeFileSync(
-      path.join(projectPath, ".vscode", "extensions.json"),
-      JSON.stringify(vscodeExtensions, null, 2) + "\n",
-    );
-
-    // Create README.md
-    const readme = `# ${answers.projectName}
-
-Cmssy project for building reusable UI blocks.
-
-## Getting Started
-
-\`\`\`bash
-npm install
-npm run dev
-\`\`\`
-
-## Commands
-
-\`\`\`bash
-cmssy dev                    # Start dev server
-cmssy create block <name>    # Create new block
-cmssy build                  # Build for production
-cmssy publish --workspace    # Publish to workspace
-\`\`\`
-
-## Project Structure
-
-\`\`\`
-${answers.projectName}/
-├── blocks/           # Your UI blocks
-├── styles/
-│   └── main.css      # Global Tailwind styles
-├── public/           # Build output
-└── cmssy.config.js
-\`\`\`
-`;
-    fs.writeFileSync(path.join(projectPath, "README.md"), readme);
-
-    spinner.succeed("Project structure created");
-
-    // Create example hero block
-    spinner.start("Creating example hero block...");
-
-    const heroBlockPath = path.join(projectPath, "blocks", "hero");
-    fs.mkdirSync(path.join(heroBlockPath, "src"), { recursive: true });
-
-    // Hero.tsx
-    const heroComponent = `import { BlockContent } from "./block";
+  // Hero.tsx
+  fs.writeFileSync(
+    path.join(heroBlockPath, "src", "Hero.tsx"),
+    `import { BlockContent } from "./block";
 
 export default function Hero({ content }: { content: BlockContent }) {
   const {
@@ -375,41 +70,42 @@ export default function Hero({ content }: { content: BlockContent }) {
     </section>
   );
 }
-`;
-    fs.writeFileSync(
-      path.join(heroBlockPath, "src", "Hero.tsx"),
-      heroComponent,
-    );
+`,
+  );
 
-    // index.tsx - simplified format (standard React export)
-    const indexFile = `export { default } from "./Hero";
+  // index.tsx
+  fs.writeFileSync(
+    path.join(heroBlockPath, "src", "index.tsx"),
+    `export { default } from "./Hero";
 import "./index.css";
-`;
-    fs.writeFileSync(path.join(heroBlockPath, "src", "index.tsx"), indexFile);
+`,
+  );
 
-    // index.css
-    fs.writeFileSync(
-      path.join(heroBlockPath, "src", "index.css"),
-      `@import "../../../styles/main.css";\n`,
-    );
+  // index.css
+  fs.writeFileSync(
+    path.join(heroBlockPath, "src", "index.css"),
+    `@import "../../../styles/main.css";\n`,
+  );
 
-    // package.json
-    const blockPackageJson = {
-      name: `@${answers.projectName}/blocks.hero`,
-      version: "1.0.0",
-      description: "Hero section block",
-      author: {
-        name: answers.authorName,
-        email: answers.authorEmail,
+  // package.json
+  fs.writeFileSync(
+    path.join(heroBlockPath, "package.json"),
+    JSON.stringify(
+      {
+        name: `@${answers.projectName}/blocks.hero`,
+        version: "1.0.0",
+        description: "Hero section block",
+        author: { name: answers.authorName, email: answers.authorEmail },
       },
-    };
-    fs.writeFileSync(
-      path.join(heroBlockPath, "package.json"),
-      JSON.stringify(blockPackageJson, null, 2) + "\n",
-    );
+      null,
+      2,
+    ) + "\n",
+  );
 
-    // config.ts
-    const blockConfig = `import { defineBlock, field } from "@cmssy/cli/config";
+  // config.ts
+  fs.writeFileSync(
+    path.join(heroBlockPath, "config.ts"),
+    `import { defineBlock, field } from "@cmssy/cli/config";
 
 export default defineBlock({
   name: "Hero Section",
@@ -440,66 +136,400 @@ export default defineBlock({
     }),
   },
 });
-`;
-    fs.writeFileSync(path.join(heroBlockPath, "config.ts"), blockConfig);
+`,
+  );
 
-    // preview.json
-    const previewData = {
-      heading: "Welcome to Cmssy",
-      subheading: "Build reusable UI blocks with React & Tailwind",
-      ctaText: "Get Started",
-      ctaUrl: "#",
-    };
-    fs.writeFileSync(
-      path.join(heroBlockPath, "preview.json"),
-      JSON.stringify(previewData, null, 2) + "\n",
+  // preview.json
+  fs.writeFileSync(
+    path.join(heroBlockPath, "preview.json"),
+    JSON.stringify(
+      {
+        heading: "Welcome to Cmssy",
+        subheading: "Build reusable UI blocks with React & Tailwind",
+        ctaText: "Get Started",
+        ctaUrl: "#",
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  // Generate types
+  const heroSchema = {
+    heading: {
+      type: "singleLine" as const,
+      label: "Heading",
+      defaultValue: "Welcome to Cmssy",
+    },
+    subheading: {
+      type: "singleLine" as const,
+      label: "Subheading",
+      defaultValue: "Build reusable UI blocks",
+    },
+    ctaText: {
+      type: "singleLine" as const,
+      label: "CTA Text",
+      defaultValue: "Get Started",
+    },
+    ctaUrl: { type: "link" as const, label: "CTA URL", defaultValue: "#" },
+  };
+  const fieldTypes = await getFieldTypes();
+  await generateTypes({
+    blockPath: heroBlockPath,
+    schema: heroSchema,
+    fieldTypes,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Write cmssy.config.js
+// ---------------------------------------------------------------------------
+
+function writeCmssyConfig(projectPath: string, answers: InitAnswers): void {
+  const config = {
+    framework: "react",
+    projectName: answers.projectName,
+    author: { name: answers.authorName, email: answers.authorEmail },
+    build: { outDir: "public", minify: true, sourcemap: true },
+  };
+  fs.writeFileSync(
+    path.join(projectPath, "cmssy.config.js"),
+    `export default ${JSON.stringify(config, null, 2)};\n`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Write styles/main.css
+// ---------------------------------------------------------------------------
+
+function writeMainCss(projectPath: string): void {
+  const stylesDir = path.join(projectPath, "styles");
+  fs.mkdirSync(stylesDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(stylesDir, "main.css"),
+    `@import "tailwindcss";
+@source "../blocks";
+@source "../templates";
+@source "../components";
+
+/* Set default border color (Tailwind v4 reset uses currentColor) */
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border, currentColor);
+  }
+}
+`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Write .env.example
+// ---------------------------------------------------------------------------
+
+function writeEnvExample(projectPath: string): void {
+  fs.writeFileSync(
+    path.join(projectPath, ".env.example"),
+    `# Cmssy API Configuration
+# Run 'cmssy link' to set these values
+
+# Cmssy GraphQL API URL
+CMSSY_API_URL=https://api.cmssy.io/graphql
+
+# Cmssy API Token (get from Dashboard → API Tokens)
+CMSSY_API_TOKEN=
+
+# Workspace ID (for workspace publish)
+CMSSY_WORKSPACE_ID=
+`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Merge cmssy scripts into existing package.json
+// ---------------------------------------------------------------------------
+
+function mergeCmssyScripts(projectPath: string): void {
+  const pkgPath = path.join(projectPath, "package.json");
+  if (!fs.existsSync(pkgPath)) return;
+
+  const pkg = fs.readJsonSync(pkgPath);
+  pkg.scripts = pkg.scripts || {};
+
+  if (!pkg.scripts["cmssy:dev"]) {
+    pkg.scripts["cmssy:dev"] = "cmssy dev";
+  }
+  if (!pkg.scripts["cmssy:build"]) {
+    pkg.scripts["cmssy:build"] = "cmssy build";
+  }
+  if (!pkg.scripts["cmssy:publish"]) {
+    pkg.scripts["cmssy:publish"] = "cmssy publish --all";
+  }
+
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// New project mode: create-next-app + cmssy layer
+// ---------------------------------------------------------------------------
+
+async function initNewProject(
+  name: string,
+  options: InitOptions,
+): Promise<void> {
+  console.log(chalk.blue.bold("\n🔨 Cmssy - Create New Project\n"));
+
+  let answers: InitAnswers;
+
+  if (options.yes) {
+    answers = { projectName: name, authorName: "", authorEmail: "" };
+    console.log(chalk.gray(`Using defaults: ${name}\n`));
+  } else {
+    answers = await inquirer.prompt<InitAnswers>([
+      {
+        type: "input",
+        name: "projectName",
+        message: "Project name:",
+        default: name,
+        validate: (input) => {
+          if (/^[a-z0-9-_]+$/.test(input)) return true;
+          return "Must contain only lowercase letters, numbers, hyphens, underscores";
+        },
+      },
+      {
+        type: "input",
+        name: "authorName",
+        message: "Author name:",
+        default: "",
+      },
+      {
+        type: "input",
+        name: "authorEmail",
+        message: "Author email:",
+        default: "",
+      },
+    ]);
+    name = answers.projectName;
+  }
+
+  const projectPath = path.join(process.cwd(), name);
+
+  if (fs.existsSync(projectPath)) {
+    console.error(chalk.red(`\n✖ Directory "${name}" already exists\n`));
+    process.exit(1);
+  }
+
+  // Step 1: Run create-next-app
+  const spinner = ora("Running create-next-app...").start();
+  try {
+    execSync(
+      `npx create-next-app@latest ${name} --typescript --tailwind --app --src-dir --no-eslint --import-alias "@/*"`,
+      { cwd: process.cwd(), stdio: "pipe" },
     );
+    spinner.succeed("Next.js project created");
+  } catch (error) {
+    spinner.fail("Failed to run create-next-app");
+    console.error(
+      chalk.red("\nMake sure npx is available and you have internet access.\n"),
+    );
+    process.exit(1);
+  }
 
-    // Generate types
-    const heroSchema = {
-      heading: {
-        type: "singleLine" as const,
-        label: "Heading",
-        defaultValue: "Welcome to Cmssy",
-      },
-      subheading: {
-        type: "singleLine" as const,
-        label: "Subheading",
-        defaultValue: "Build reusable UI blocks",
-      },
-      ctaText: {
-        type: "singleLine" as const,
-        label: "CTA Text",
-        defaultValue: "Get Started",
-      },
-      ctaUrl: { type: "link" as const, label: "CTA URL", defaultValue: "#" },
-    };
-    const fieldTypes = await getFieldTypes();
-    await generateTypes({
-      blockPath: heroBlockPath,
-      schema: heroSchema,
-      fieldTypes,
-    });
+  // Step 2: Add cmssy layer
+  spinner.start("Adding Cmssy configuration...");
+  try {
+    // Create directories
+    fs.mkdirSync(path.join(projectPath, "blocks"), { recursive: true });
+    fs.mkdirSync(path.join(projectPath, "templates"), { recursive: true });
+    fs.mkdirSync(path.join(projectPath, ".cmssy"), { recursive: true });
 
-    spinner.succeed("Example hero block created");
+    writeCmssyConfig(projectPath, answers);
+    writeMainCss(projectPath);
+    writeEnvExample(projectPath);
+    mergeCmssyScripts(projectPath);
 
-    // Initialize git
-    if (answers.initGit) {
-      spinner.start("Initializing git repository...");
-      process.chdir(projectPath);
-      execSync("git init", { stdio: "ignore" });
-      execSync("git branch -m main", { stdio: "ignore" });
-      spinner.succeed("Git repository initialized");
+    // Add .cmssy/ to gitignore
+    const gitignorePath = path.join(projectPath, ".gitignore");
+    if (fs.existsSync(gitignorePath)) {
+      const content = fs.readFileSync(gitignorePath, "utf-8");
+      if (!content.includes(".cmssy")) {
+        fs.appendFileSync(gitignorePath, "\n# Cmssy\n.cmssy/\npublic/\n");
+      }
     }
+
+    spinner.succeed("Cmssy configuration added");
+
+    // Step 3: Install @cmssy/types
+    spinner.start("Installing @cmssy/types...");
+    execSync("npm install --save-dev @cmssy/types @cmssy/cli", {
+      cwd: projectPath,
+      stdio: "pipe",
+    });
+    spinner.succeed("Dependencies installed");
+
+    // Step 4: Create example block
+    spinner.start("Creating example hero block...");
+    await scaffoldExampleBlock(projectPath, answers);
+    spinner.succeed("Example hero block created");
 
     console.log(chalk.green.bold("\n✓ Project created successfully!\n"));
     console.log(chalk.cyan("Next steps:\n"));
-    console.log(chalk.white(`  cd ${answers.projectName}`));
-    console.log(chalk.white("  npm install"));
-    console.log(chalk.white("  npm run dev\n"));
+    console.log(chalk.white(`  cd ${name}`));
+    console.log(
+      chalk.white("  cmssy link              Connect to your workspace"),
+    );
+    console.log(chalk.white("  cmssy dev               Start developing\n"));
   } catch (error) {
-    spinner.fail("Failed to create project");
+    spinner.fail("Failed to set up Cmssy");
     console.error(chalk.red("\nError:"), error);
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Existing project mode: add cmssy to current Next.js project
+// ---------------------------------------------------------------------------
+
+async function initExistingProject(options: InitOptions): Promise<void> {
+  const cwd = process.cwd();
+
+  console.log(chalk.blue.bold("\n🔨 Cmssy - Initialize in Existing Project\n"));
+  console.log(
+    chalk.gray(`Detected Next.js project in ${path.basename(cwd)}\n`),
+  );
+
+  if (detectCmssyProject(cwd)) {
+    console.error(
+      chalk.red("✖ This project already has cmssy.config.js. Nothing to do.\n"),
+    );
+    process.exit(1);
+  }
+
+  // Read project name from existing package.json
+  const pkgPath = path.join(cwd, "package.json");
+  const pkg = fs.existsSync(pkgPath) ? fs.readJsonSync(pkgPath) : {};
+  const defaultName = pkg.name || path.basename(cwd);
+
+  let answers: InitAnswers;
+
+  if (options.yes) {
+    answers = { projectName: defaultName, authorName: "", authorEmail: "" };
+    console.log(chalk.gray(`Using defaults: ${defaultName}\n`));
+  } else {
+    answers = await inquirer.prompt<InitAnswers>([
+      {
+        type: "input",
+        name: "projectName",
+        message: "Cmssy project name:",
+        default: defaultName,
+      },
+      {
+        type: "input",
+        name: "authorName",
+        message: "Author name:",
+        default: pkg.author?.name || "",
+      },
+      {
+        type: "input",
+        name: "authorEmail",
+        message: "Author email:",
+        default: pkg.author?.email || "",
+      },
+    ]);
+  }
+
+  const spinner = ora("Adding Cmssy configuration...").start();
+  try {
+    // Create directories
+    fs.mkdirSync(path.join(cwd, "blocks"), { recursive: true });
+    fs.mkdirSync(path.join(cwd, "templates"), { recursive: true });
+    fs.mkdirSync(path.join(cwd, ".cmssy"), { recursive: true });
+
+    writeCmssyConfig(cwd, answers);
+    writeMainCss(cwd);
+    writeEnvExample(cwd);
+    mergeCmssyScripts(cwd);
+
+    // Add .cmssy/ to gitignore
+    const gitignorePath = path.join(cwd, ".gitignore");
+    if (fs.existsSync(gitignorePath)) {
+      const content = fs.readFileSync(gitignorePath, "utf-8");
+      if (!content.includes(".cmssy")) {
+        fs.appendFileSync(gitignorePath, "\n# Cmssy\n.cmssy/\n");
+      }
+    }
+
+    spinner.succeed("Cmssy configuration added");
+
+    // Install dependencies
+    spinner.start("Installing @cmssy/types...");
+    const packageManager = detectPackageManager(cwd);
+    const installCmd =
+      packageManager === "pnpm"
+        ? "pnpm add -D @cmssy/types @cmssy/cli"
+        : packageManager === "yarn"
+          ? "yarn add -D @cmssy/types @cmssy/cli"
+          : "npm install --save-dev @cmssy/types @cmssy/cli";
+    execSync(installCmd, { cwd, stdio: "pipe" });
+    spinner.succeed("Dependencies installed");
+
+    // Create example block
+    spinner.start("Creating example hero block...");
+    await scaffoldExampleBlock(cwd, answers);
+    spinner.succeed("Example hero block created");
+
+    console.log(chalk.green.bold("\n✓ Cmssy initialized successfully!\n"));
+    console.log(chalk.cyan("Next steps:\n"));
+    console.log(
+      chalk.white("  cmssy link              Connect to your workspace"),
+    );
+    console.log(chalk.white("  cmssy dev               Start developing\n"));
+  } catch (error) {
+    spinner.fail("Failed to initialize Cmssy");
+    console.error(chalk.red("\nError:"), error);
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Detect package manager from lockfile
+// ---------------------------------------------------------------------------
+
+function detectPackageManager(cwd: string): "npm" | "pnpm" | "yarn" {
+  if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (fs.existsSync(path.join(cwd, "yarn.lock"))) return "yarn";
+  return "npm";
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+export async function initCommand(
+  name?: string,
+  options: InitOptions = {},
+): Promise<void> {
+  if (name) {
+    // Explicit name → create new project
+    await initNewProject(name, options);
+  } else if (detectNextProject(process.cwd())) {
+    // No name, but in Next.js project → existing mode
+    await initExistingProject(options);
+  } else {
+    console.error(
+      chalk.red(
+        "\n✖ No project name provided and no Next.js project detected.\n",
+      ),
+    );
+    console.log(chalk.cyan("Usage:\n"));
+    console.log(chalk.white("  cmssy init my-blocks     Create a new project"));
+    console.log(
+      chalk.white(
+        "  cmssy init               Initialize in existing Next.js project\n",
+      ),
+    );
     process.exit(1);
   }
 }

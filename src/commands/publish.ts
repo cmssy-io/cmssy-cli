@@ -7,8 +7,10 @@ import path from "path";
 import semver from "semver";
 import { hasConfig, loadConfig } from "../utils/config.js";
 import {
+  GET_WORKSPACE_BLOCKS_QUERY,
   IMPORT_BLOCK_MUTATION,
   IMPORT_TEMPLATE_MUTATION,
+  UPDATE_THEME_MUTATION,
 } from "../utils/graphql.js";
 import {
   loadBlockConfig,
@@ -19,6 +21,16 @@ import {
   convertConfigToPagesData,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
+import { scanTheme } from "../utils/scanner.js";
+import { convertThemeToInput } from "../utils/theme-builder.js";
+import { packageResource } from "./package.js";
+import { uploadPackage } from "./upload.js";
+import { uploadBlockSource } from "./add-source.js";
+import {
+  diffSchema,
+  hasBreakingChanges,
+  type Schema,
+} from "../utils/schema-diff.js";
 
 interface PublishOptions {
   workspace?: string;
@@ -29,6 +41,9 @@ interface PublishOptions {
   dryRun?: boolean;
   all?: boolean;
   overwriteContent?: boolean;
+  zip?: boolean;
+  withSource?: boolean;
+  force?: boolean;
 }
 
 interface PackageInfo {
@@ -57,7 +72,7 @@ export async function publishCommand(
 
   // Check configuration
   if (!hasConfig()) {
-    console.error(chalk.red("✖ Not configured. Run: cmssy configure\n"));
+    console.error(chalk.red("✖ Not configured. Run: cmssy link\n"));
     process.exit(1);
   }
 
@@ -262,12 +277,177 @@ export async function publishCommand(
   });
   console.log("");
 
+  // Schema diff: compare local vs remote and warn about breaking changes
+  {
+    const blocksWithConfig = packages.filter(
+      (p) => p.type === "block" && p.blockConfig?.schema,
+    );
+    if (blocksWithConfig.length > 0) {
+      // Fetch remote blocks for schema comparison
+      let remoteBlocks: Array<{
+        blockType: string;
+        schemaFields: Array<{
+          key: string;
+          type: string;
+          label?: string;
+          required?: boolean;
+          defaultValue?: unknown;
+        }>;
+      }> = [];
+      try {
+        const client = new GraphQLClient(config.apiUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiToken}`,
+            "X-Workspace-ID": workspaceId as string,
+          },
+        });
+        const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
+        remoteBlocks = result.workspaceBlocks || [];
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            "  ⚠ Could not fetch remote blocks; schema diff skipped.",
+          ),
+        );
+        if (error instanceof Error) {
+          console.warn(chalk.gray(`    ${error.message}`));
+        }
+        console.log("");
+      }
+
+      let hasAnyBreaking = false;
+      for (const pkg of blocksWithConfig) {
+        const blockType = convertBlockTypeToSimple(pkg.packageJson.name);
+        const remote = remoteBlocks.find((b) => b.blockType === blockType);
+        if (!remote || !remote.schemaFields?.length) continue;
+
+        // Convert remote schemaFields array to Schema object
+        const remoteSchema: Schema = {};
+        for (const f of remote.schemaFields) {
+          remoteSchema[f.key] = {
+            type: f.type,
+            label: f.label,
+            required: f.required,
+            defaultValue: f.defaultValue,
+          };
+        }
+
+        const changes = diffSchema(pkg.blockConfig.schema, remoteSchema);
+        if (changes.length === 0) continue;
+
+        console.log(chalk.bold(`  Schema changes for ${pkg.name}:\n`));
+        for (const c of changes) {
+          if (c.kind === "breaking") {
+            console.log(chalk.red(`  ⚠ BREAKING: ${c.message}`));
+          } else {
+            console.log(chalk.gray(`  ℹ ${c.message}`));
+          }
+        }
+        console.log("");
+
+        if (hasBreakingChanges(changes)) {
+          hasAnyBreaking = true;
+        }
+      }
+
+      if (hasAnyBreaking && !options.dryRun && !options.force) {
+        const answer = await inquirer.prompt([
+          {
+            type: "confirm",
+            name: "proceed",
+            message: "Breaking schema changes detected. Continue publishing?",
+            default: false,
+          },
+        ]);
+        if (!answer.proceed) {
+          console.log(chalk.yellow("\nPublish cancelled.\n"));
+          return;
+        }
+      }
+    }
+  }
+
+  if (options.overwriteContent) {
+    console.log(
+      chalk.yellow(
+        "  ⚠ --overwrite-content will reset all page content to defaults\n",
+      ),
+    );
+  }
+
   if (options.dryRun) {
     console.log(chalk.yellow("🔍 Dry run mode - nothing will be published\n"));
     return;
   }
 
-  // Show target info
+  // --zip mode: package into ZIPs and upload
+  if (options.zip) {
+    if (options.withSource) {
+      console.log(
+        chalk.yellow(
+          "⚠ --with-source is not supported with --zip mode, ignoring\n",
+        ),
+      );
+    }
+    console.log(
+      chalk.cyan(
+        `🏢 Target: Workspace (${workspaceId})\n` +
+          "   Mode: ZIP package + upload\n",
+      ),
+    );
+
+    const outputDir = path.join(process.cwd(), "packages");
+    await fs.ensureDir(outputDir);
+
+    // Package all blocks into ZIPs
+    for (const pkg of packages) {
+      await packageResource(
+        {
+          name: pkg.name,
+          type: pkg.type,
+          dir: pkg.path,
+          packageJson: pkg.packageJson,
+        },
+        outputDir,
+      );
+    }
+
+    // Upload all ZIPs
+    let successCount = 0;
+    let failCount = 0;
+    for (const pkg of packages) {
+      const version = pkg.packageJson.version || "1.0.0";
+      const zipPath = path.join(outputDir, `${pkg.name}-${version}.zip`);
+      const result = await uploadPackage(
+        zipPath,
+        workspaceId as string,
+        config.apiUrl,
+        config.apiToken!,
+      );
+      if (result.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    console.log("");
+    if (failCount === 0) {
+      console.log(
+        chalk.green.bold(
+          `✓ ${successCount} package(s) uploaded successfully\n`,
+        ),
+      );
+    } else {
+      console.log(
+        chalk.yellow(`⚠ ${successCount} succeeded, ${failCount} failed\n`),
+      );
+    }
+    return;
+  }
+
+  // Default: direct GraphQL publish
   console.log(
     chalk.cyan(
       `🏢 Target: Workspace (${workspaceId})\n` +
@@ -278,6 +458,8 @@ export async function publishCommand(
   // Publish each package
   let successCount = 0;
   let errorCount = 0;
+  const publishedBlocks: { name: string; blockType: string; path: string }[] =
+    [];
 
   for (const pkg of packages) {
     const spinner = ora(
@@ -296,6 +478,13 @@ export async function publishCommand(
         chalk.green(`${pkg.packageJson.name} published to workspace`),
       );
       successCount++;
+      if (pkg.type === "block") {
+        // Derive blockType same way as publishToWorkspace
+        const blockType = pkg.packageJson.name
+          .replace(/@[^/]+\//, "")
+          .replace(/^blocks\./, "");
+        publishedBlocks.push({ name: pkg.name, blockType, path: pkg.path });
+      }
     } catch (error: any) {
       spinner.fail(chalk.red(`✖ ${pkg.packageJson.name} failed`));
 
@@ -366,6 +555,120 @@ export async function publishCommand(
     console.log(
       chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`),
     );
+  }
+
+  // --with-source: upload source code for AI Block Builder
+  if (options.withSource && publishedBlocks.length === 0) {
+    console.log(
+      chalk.gray(
+        "ℹ --with-source: no blocks published, skipping source upload\n",
+      ),
+    );
+  }
+  if (options.withSource && publishedBlocks.length > 0) {
+    console.log(
+      chalk.cyan("📝 Uploading source code for AI Block Builder...\n"),
+    );
+
+    const client = new GraphQLClient(config.apiUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiToken}`,
+        "X-Workspace-ID": workspaceId as string,
+      },
+    });
+
+    // Fetch workspace blocks to get block IDs
+    let workspaceBlocks: { id: string; blockType: string }[] = [];
+    try {
+      const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
+      workspaceBlocks = result.workspaceBlocks;
+    } catch {
+      console.warn(
+        chalk.yellow("⚠ Could not fetch workspace blocks for source upload\n"),
+      );
+      return;
+    }
+
+    let sourceSuccess = 0;
+    let sourceFail = 0;
+
+    for (const block of publishedBlocks) {
+      const wsBlock =
+        workspaceBlocks.find((b) => b.blockType === block.blockType) ??
+        workspaceBlocks.find((b) => b.blockType === block.name);
+      if (!wsBlock) {
+        console.warn(
+          chalk.yellow(
+            `  ⚠ ${block.name}: not found in workspace, skipping source`,
+          ),
+        );
+        continue;
+      }
+
+      const spinner = ora(`Uploading source for ${block.name}...`).start();
+      try {
+        const uploaded = await uploadBlockSource(
+          block.name,
+          block.path,
+          wsBlock.id,
+          client,
+        );
+        if (uploaded) {
+          spinner.succeed(chalk.green(`${block.name}: source uploaded`));
+          sourceSuccess++;
+        } else {
+          spinner.warn(`${block.name}: no source code found`);
+        }
+      } catch (error: any) {
+        spinner.fail(chalk.red(`${block.name}: source upload failed`));
+        console.error(chalk.red(`  Error: ${error.message}`));
+        sourceFail++;
+      }
+    }
+
+    console.log("");
+    if (sourceFail === 0) {
+      console.log(chalk.green.bold(`✓ ${sourceSuccess} source(s) uploaded\n`));
+    } else {
+      console.log(
+        chalk.yellow(`⚠ ${sourceSuccess} succeeded, ${sourceFail} failed\n`),
+      );
+    }
+  }
+
+  // Publish theme if present when using --all
+  if (options.all) {
+    const themeConfig = await scanTheme();
+    if (themeConfig) {
+      const spinner = ora("Publishing theme to workspace...").start();
+      try {
+        const themeClient = new GraphQLClient(config.apiUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiToken}`,
+            "X-Workspace-ID": workspaceId as string,
+          },
+        });
+
+        const themeInput = convertThemeToInput(themeConfig);
+        await themeClient.request(UPDATE_THEME_MUTATION, { input: themeInput });
+        spinner.succeed(
+          chalk.green(`Theme "${themeConfig.name}" published to workspace`),
+        );
+      } catch (error: any) {
+        const msg = error?.response?.errors?.[0]?.message ?? error.message;
+        if (msg?.includes("paid plan") || msg?.includes("PLAN_LIMIT")) {
+          spinner.warn(
+            chalk.yellow(
+              "Theme publish skipped: theme customization requires a paid plan",
+            ),
+          );
+        } else {
+          spinner.fail(chalk.red(`Theme publish failed: ${msg}`));
+        }
+      }
+    }
   }
 }
 
@@ -691,7 +994,11 @@ async function readOriginalSourceCode(packagePath: string): Promise<{
 // Bundle source code with esbuild (combines all local imports into single file)
 // Bundle source code with esbuild (combines all local imports into single file)
 // UPDATED: Use CommonJS format to avoid ES module export statements
-async function bundleSourceCode(packagePath: string): Promise<string> {
+async function bundleSourceCode(
+  packagePath: string,
+  serverActionFiles?: string[],
+  serverActionNames?: string[],
+): Promise<string> {
   const { build } = await import("esbuild");
 
   const srcDir = path.join(packagePath, "src");
@@ -706,6 +1013,13 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
   } else {
     throw new Error(`Source code not found. Expected ${tsxPath} or ${tsPath}`);
   }
+
+  // If server action files exist, use esbuild plugin to replace their
+  // contents with stubs that call globalThis.__cmssyCallAction (CMS-224)
+  const plugins =
+    serverActionFiles?.length && serverActionNames?.length
+      ? [createServerActionStubPlugin(serverActionFiles, serverActionNames)]
+      : [];
 
   const result = await build({
     entryPoints: [entryPoint],
@@ -729,11 +1043,124 @@ async function bundleSourceCode(packagePath: string): Promise<string> {
       // Replace process.env references with static values
       "process.env.NODE_ENV": '"production"',
     },
+    plugins,
   });
 
-  let bundledCode = result.outputFiles[0].text;
+  const bundledCode = result.outputFiles![0].text;
 
   return bundledCode;
+}
+
+/**
+ * Detect files with "use server" directive in block's src/ directory.
+ * Only file-level directives are detected (top of file).
+ */
+function detectServerActionFiles(packagePath: string): string[] {
+  const srcDir = path.join(packagePath, "src");
+  if (!fs.existsSync(srcDir)) return [];
+
+  const actionFiles: string[] = [];
+  const files = fs.readdirSync(srcDir).filter((f) => /\.(ts|tsx)$/.test(f));
+
+  for (const file of files) {
+    const filePath = path.join(srcDir, file);
+    const content = fs.readFileSync(filePath, "utf-8");
+    const lines = content.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (
+        trimmed === "" ||
+        trimmed.startsWith("//") ||
+        trimmed.startsWith("/*")
+      )
+        continue;
+      if (
+        trimmed === '"use server"' ||
+        trimmed === "'use server'" ||
+        trimmed === '"use server";' ||
+        trimmed === "'use server';"
+      ) {
+        actionFiles.push(filePath);
+      }
+      break;
+    }
+  }
+
+  return actionFiles;
+}
+
+/**
+ * Bundle server action files separately for server-side execution.
+ * Returns the bundled code and list of exported action function names.
+ */
+async function bundleServerActions(
+  actionFiles: string[],
+): Promise<{ code: string; actionNames: string[] }> {
+  const { build } = await import("esbuild");
+
+  const result = await build({
+    entryPoints: actionFiles,
+    bundle: true,
+    write: false,
+    format: "cjs",
+    platform: "node",
+    loader: { ".tsx": "tsx", ".ts": "ts" },
+    external: ["react", "react-dom", "react/jsx-runtime"],
+    minify: true,
+    metafile: true,
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+  });
+
+  const code = result.outputFiles![0].text;
+
+  const actionNames: string[] = [];
+  if (result.metafile) {
+    for (const output of Object.values(result.metafile.outputs)) {
+      if (output.exports) {
+        actionNames.push(
+          ...output.exports.filter(
+            (e) => e !== "default" && e !== "__esModule",
+          ),
+        );
+      }
+    }
+  }
+
+  return { code, actionNames };
+}
+
+/**
+ * Create an esbuild plugin that replaces "use server" file contents
+ * with client-side stubs that call globalThis.__cmssyCallAction.
+ */
+function createServerActionStubPlugin(
+  actionFiles: string[],
+  actionNames: string[],
+) {
+  const actionFileSet = new Set(actionFiles.map((f) => path.resolve(f)));
+
+  return {
+    name: "server-action-stub",
+    setup(build: { onLoad: Function }) {
+      build.onLoad({ filter: /\.(ts|tsx)$/ }, (args: { path: string }) => {
+        if (!actionFileSet.has(path.resolve(args.path))) return null;
+
+        const stubs = actionNames
+          .map(
+            (name) =>
+              `module.exports.${name} = function() { return globalThis.__cmssyCallAction("${name}", Array.prototype.slice.call(arguments)); };`,
+          )
+          .join("\n");
+
+        return {
+          contents: `"use strict";\n${stubs}`,
+          loader: "js",
+        };
+      });
+    },
+  };
 }
 
 // Compile CSS with optional Tailwind support
@@ -898,10 +1325,32 @@ async function publishToWorkspace(
   let rawSourceCode: string | undefined;
   let rawSourceCss: string | undefined;
   let dependencies: Record<string, string> = {};
+  let serverActionCode: string | undefined;
+  let serverActionNames: string[] = [];
 
   if (packageType !== "template") {
+    // Detect "use server" files (CMS-224)
+    const actionFiles = detectServerActionFiles(packagePath);
+
+    if (actionFiles.length > 0) {
+      const actionBundle = await bundleServerActions(actionFiles);
+      serverActionCode = actionBundle.code;
+      serverActionNames = actionBundle.actionNames;
+
+      console.log(
+        chalk.cyan(
+          `  ⚡ Server actions detected: ${serverActionNames.join(", ")}`,
+        ),
+      );
+    }
+
     // Bundle source code (combines all local imports into single CJS file)
-    bundledSourceCode = await bundleSourceCode(packagePath);
+    // If server actions exist, stubs replace "use server" file contents
+    bundledSourceCode = await bundleSourceCode(
+      packagePath,
+      actionFiles.length > 0 ? actionFiles : undefined,
+      serverActionNames.length > 0 ? serverActionNames : undefined,
+    );
 
     // Compile CSS (with Tailwind if needed)
     compiledCss = await compileCss(packagePath, bundledSourceCode);
@@ -943,6 +1392,9 @@ async function publishToWorkspace(
     rawSourceCss,
     dependencies:
       Object.keys(dependencies).length > 0 ? dependencies : undefined,
+    // Server action support (CMS-224)
+    serverActionCode: serverActionCode || undefined,
+    serverActions: serverActionNames.length > 0 ? serverActionNames : undefined,
   };
 
   // Add layoutPosition if defined (for layout blocks)
@@ -1124,7 +1576,9 @@ async function publishToWorkspace(
       throw error;
     }
   } else {
-    // Standard block import
+    // Standard block import — remove fields not in ImportBlockInput
+    delete input.preserveContent;
+    delete input.packageType;
     const requestPromise = client.request(IMPORT_BLOCK_MUTATION, { input });
 
     try {

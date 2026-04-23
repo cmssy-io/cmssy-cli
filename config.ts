@@ -2,6 +2,7 @@
 export {
   defineBlock,
   defineTemplate,
+  defineTheme,
   field,
   type FieldDef,
 } from "./dist/utils/block-config.js";
@@ -31,7 +32,7 @@ export type {
   PlatformContext,
   BlockProps,
   BlockAuthContext,
-  BlockI18nContext,
+  BlockLocaleContext,
   BlockMember,
   BlockMemberProfile,
   // Template types
@@ -42,6 +43,13 @@ export type {
   TemplateLayoutPosition,
   TemplateTheme,
   ResourceConfig,
+  // Theme authoring
+  DefineThemeConfig,
+  ThemeFontConfig,
+  ThemeColorsConfig,
+  ThemeTypographyConfig,
+  FontSource,
+  BorderRadiusPreset,
 } from "@cmssy/types";
 
 // Export const enums, functions, and runtime values
