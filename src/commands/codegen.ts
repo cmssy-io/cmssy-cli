@@ -93,7 +93,7 @@ export async function codegenCommand(options: CodegenOptions) {
   if (!workspaceSlug) {
     const hint = config.workspaceId
       ? chalk.gray(
-          "\n  Tip: your .env has CMSSY_WORKSPACE_ID (an ID, not a slug). Pass the slug from `cmssy workspaces` via --workspace.",
+          "\n  Tip: CMSSY_WORKSPACE_ID is set (an ID, not a slug). Pass the slug from `cmssy workspaces` via --workspace.",
         )
       : "";
     console.error(

@@ -32,6 +32,10 @@ export function loadTemplateConfigSync(
   const configPath = path.join(templateDir, "config.ts");
   if (!fs.existsSync(configPath)) return null;
 
+  const cacheDir = path.join(projectRoot, ".cmssy", "cache");
+  let mockConfigPath: string | null = null;
+  let tempPath: string | null = null;
+
   try {
     const cliPath = path.dirname(
       path.dirname(new URL(import.meta.url).pathname),
@@ -44,10 +48,9 @@ export function loadTemplateConfigSync(
     let tsxBinary = possibleTsxPaths.find((p) => fs.existsSync(p));
     if (!tsxBinary) tsxBinary = "npx -y tsx";
 
-    const cacheDir = path.join(projectRoot, ".cmssy", "cache");
     fs.ensureDirSync(cacheDir);
 
-    const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
+    mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
     // Match block-config.ts:148 - cover every export a user config might
     // import, otherwise the dynamic import throws and preview silently
     // falls back to null.
@@ -65,10 +68,7 @@ export function loadTemplateConfigSync(
       `from '${mockConfigPath.replace(/\\/g, "/")}'`,
     );
 
-    const tempPath = path.join(
-      cacheDir,
-      `temp-template-config-${Date.now()}.ts`,
-    );
+    tempPath = path.join(cacheDir, `temp-template-config-${Date.now()}.ts`);
     fs.writeFileSync(tempPath, modified);
 
     const evalCode = `import cfg from '${tempPath.replace(/\\/g, "/")}'; console.log(JSON.stringify(cfg.default || cfg));`;
@@ -82,17 +82,23 @@ export function loadTemplateConfigSync(
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    try {
-      fs.removeSync(tempPath);
-    } catch {}
-    try {
-      fs.removeSync(mockConfigPath);
-    } catch {}
-
     const lines = output.trim().split("\n");
     return JSON.parse(lines[lines.length - 1]);
   } catch {
     return null;
+  } finally {
+    // Always clean up temp files - a throw in execSync / JSON.parse used
+    // to leave them lingering in .cmssy/cache which could affect later runs.
+    if (tempPath) {
+      try {
+        fs.removeSync(tempPath);
+      } catch {}
+    }
+    if (mockConfigPath) {
+      try {
+        fs.removeSync(mockConfigPath);
+      } catch {}
+    }
   }
 }
 
