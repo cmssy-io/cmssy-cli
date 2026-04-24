@@ -15,9 +15,12 @@ const nextConfig = {
     root: resolve(__dirname, "${rel}"),
   },
 
-  // Local dev server: allow loopback + LAN addresses a user might hit the dev
-  // server from (phone on the same Wi-Fi, VM, etc). Explicit list instead of
-  // '*' so a stray request from another origin doesn't succeed silently.
+  // Dev server origin allowlist. Covers loopback + mDNS (*.local) only -
+  // a wildcard ('*') was the previous value and accepted any origin.
+  // If you need access from a LAN IP (phone on the same Wi-Fi, etc),
+  // add it explicitly here, e.g. '192.168.1.23'. Next's parser matches
+  // exact strings / hostname wildcards; it does not match IP subnet
+  // patterns, so '192.168.*.*' would not work.
   allowedDevOrigins: ['localhost', '127.0.0.1', '[::1]', '*.local'],
 
   images: {

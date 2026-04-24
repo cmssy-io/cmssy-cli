@@ -48,6 +48,41 @@ export default config;
 
 export async function codegenCommand(options: CodegenOptions) {
   const config = loadConfig();
+  const output = options.output || DEFAULT_OUTPUT;
+
+  // --init: generate a codegen.ts with a placeholder schema URL.
+  // No --workspace required - the user can fill in the slug themselves
+  // before running `cmssy codegen`. Keeps `cmssy codegen --init` working
+  // on a fresh project before the user has run `cmssy link`.
+  if (options.init) {
+    const configPath = path.join(process.cwd(), CODEGEN_CONFIG_FILE);
+    if (fs.existsSync(configPath)) {
+      console.error(
+        chalk.yellow(`⚠ ${CODEGEN_CONFIG_FILE} already exists. Skipping.`),
+      );
+    } else {
+      const placeholderUrl = options.workspace
+        ? getWorkspaceApiUrl(config.apiUrl, options.workspace)
+        : getWorkspaceApiUrl(config.apiUrl, "<your-workspace-slug>");
+      const configContent = generateCodegenConfig(placeholderUrl, output);
+      fs.writeFileSync(configPath, configContent);
+      console.warn(chalk.green(`✔ Created ${CODEGEN_CONFIG_FILE}`));
+      if (!options.workspace) {
+        console.warn(
+          chalk.dim(
+            `  Replace <your-workspace-slug> in ${CODEGEN_CONFIG_FILE} with your slug (see \`cmssy workspaces\`).`,
+          ),
+        );
+      }
+    }
+
+    console.warn(
+      chalk.dim(
+        `\nInstall codegen dependencies:\n  npm install -D @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-operations\n\nThen run:\n  cmssy codegen --workspace <slug>`,
+      ),
+    );
+    return;
+  }
 
   // The public schema URL is keyed by workspace *slug*, not ID. `cmssy link`
   // stores the workspace ObjectId in CMSSY_WORKSPACE_ID, so we can't use it
@@ -70,28 +105,6 @@ export async function codegenCommand(options: CodegenOptions) {
   }
 
   const schemaUrl = getWorkspaceApiUrl(config.apiUrl, workspaceSlug);
-  const output = options.output || DEFAULT_OUTPUT;
-
-  // --init: generate codegen.ts config file
-  if (options.init) {
-    const configPath = path.join(process.cwd(), CODEGEN_CONFIG_FILE);
-    if (fs.existsSync(configPath)) {
-      console.error(
-        chalk.yellow(`⚠ ${CODEGEN_CONFIG_FILE} already exists. Skipping.`),
-      );
-    } else {
-      const configContent = generateCodegenConfig(schemaUrl, output);
-      fs.writeFileSync(configPath, configContent);
-      console.warn(chalk.green(`✔ Created ${CODEGEN_CONFIG_FILE}`));
-    }
-
-    console.warn(
-      chalk.dim(
-        `\nInstall codegen dependencies:\n  npm install -D @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-operations\n\nThen run:\n  cmssy codegen`,
-      ),
-    );
-    return;
-  }
 
   // Check if codegen.ts exists
   const configPath = path.join(process.cwd(), CODEGEN_CONFIG_FILE);
