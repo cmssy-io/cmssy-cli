@@ -14,64 +14,52 @@ npm install -g cmssy-cli
 # 1. Create a new project
 npx cmssy init my-blocks
 
-# 2. Navigate to project
+# 2. Navigate to project + install deps
 cd my-blocks
-
-# 3. Install dependencies
 npm install
 
-# 4. Start development server
+# 3. Link the project to your Cmssy workspace (interactive - pick workspace, paste token)
+cmssy link
+
+# 4. Verify the setup is healthy
+cmssy doctor
+
+# 5. Start the dev server with hot reload
 cmssy dev
 
-# 5. Create a new block
+# 6. Create a new block
 cmssy create block my-block
 
-# 6. Build for production
+# 7. Test your blocks
+cmssy test
+
+# 8. Build for production
 cmssy build
 
-# 7. Configure Cmssy API (for publishing)
-cmssy configure
-
-# 8. Publish to workspace
-cmssy publish --all --workspace
+# 9. Publish to your workspace
+cmssy publish --all --workspace <slug>
 ```
 
 ## Environment Configuration
 
-Create a `.env` file in your project root with the following variables:
+`cmssy link` (see below) writes these for you into `.env`. Manual setup:
 
 ```env
 # Required for publishing
 CMSSY_API_URL=https://api.cmssy.io/graphql
 CMSSY_API_TOKEN=your_api_token_here
 
-# Optional - default workspace ID for publishing (MongoDB ObjectId)
+# Optional - default workspace ID for publishing commands that accept -w
 CMSSY_WORKSPACE_ID=507f1f77bcf86cd799439011
 ```
 
-**How to get API Token:**
+**Recommended:** run `cmssy link` - interactive prompt that picks the workspace,
+accepts the API token, and writes all three values to `.env`.
 
-1. Go to your Cmssy workspace settings
-2. Navigate to "API Tokens"
-3. Create a new token with `blocks:write` scope
-4. Copy the token to your `.env` file
+**Manual:**
 
-**How to get Workspace ID:**
-
-**Option 1: From Cmssy UI (Easiest)**
-
-1. Go to your workspace Settings → General
-2. Find "Workspace Information" section at the top
-3. Click the copy button next to Workspace ID
-4. Add to `.env` as `CMSSY_WORKSPACE_ID`
-
-**Option 2: Using CLI**
-
-1. Run `cmssy workspaces` to list all your workspaces
-2. Copy the ID (MongoDB ObjectId format: 24-character hex string)
-3. Add to `.env` as `CMSSY_WORKSPACE_ID`
-
-Run `cmssy configure` for interactive setup.
+- **API Token**: Cmssy workspace Settings → API Tokens → new token with `blocks:write`
+- **Workspace ID**: `cmssy workspaces` (lists all accessible workspaces with their IDs)
 
 ## Commands
 
@@ -177,30 +165,148 @@ cmssy dev --port 4000
 
 ---
 
-### Configure API
+### Link to a Workspace
 
 ```bash
-cmssy configure [options]
+cmssy link [options]
 ```
 
-Configure Cmssy API credentials for publishing.
+Connect the current project to a Cmssy workspace. Interactive prompt by default:
+picks the workspace, accepts an API token, and writes `CMSSY_API_URL` /
+`CMSSY_API_TOKEN` / `CMSSY_WORKSPACE_ID` to `.env`.
 
 **Options:**
 
-- `--api-url <url>` - Cmssy API URL. Default: https://api.cmssy.io/graphql
+- `--token <token>` - API token (non-interactive)
+- `--workspace <id|slug>` - Workspace to link to (non-interactive)
+- `--api-url <url>` - Override API endpoint (default: `https://api.cmssy.io/graphql`)
 
-**Example:**
+**Examples:**
 
 ```bash
-cmssy configure
+# Interactive (recommended for first-time setup)
+cmssy link
+
+# CI / scripted setup
+cmssy link --token cs_xxx --workspace my-workspace-slug
+
+# Custom API
+cmssy link --api-url https://api.cmssy.dev/graphql
 ```
 
-You'll be prompted for:
+Tokens come from https://cmssy.io/settings/tokens. List existing workspaces with
+`cmssy workspaces`.
 
-- **Cmssy API URL**: `https://api.cmssy.io/graphql` (or your local dev URL)
-- **API Token**: Get this from your Cmssy workspace settings → API Tokens
+---
 
-Creates/updates `.env` file with your credentials.
+### Health Check
+
+```bash
+cmssy doctor
+```
+
+All-in-one preflight check. Verifies:
+
+- Node ≥ 18, npm, Next.js, React versions
+- `cmssy.config.js` exists
+- `.env` has `CMSSY_API_URL`, `CMSSY_API_TOKEN`, `CMSSY_WORKSPACE_ID`
+- API reachable, token valid, workspace accessible
+
+Run it before any non-trivial operation (publish, sync). If something fails, fix
+that first - don't proceed.
+
+---
+
+### Test Blocks
+
+```bash
+cmssy test [options]
+```
+
+Run the vitest test suite against your blocks and templates. Test files live
+at `blocks/*/src/**/*.{test,spec}.{ts,tsx}` (same for templates).
+
+**Options:**
+
+- `--block <names...>` - Test only the listed blocks (space-separated)
+- `--watch` - Watch mode (re-run on file change)
+- `--coverage` - Generate coverage report
+
+**Examples:**
+
+```bash
+# All tests
+cmssy test
+
+# Subset
+cmssy test --block hero faq
+
+# Watch mode
+cmssy test --watch
+```
+
+**Writing block tests** - use the helpers from `@cmssy/cli/test`:
+
+```ts
+import { test, expect } from "vitest";
+import { renderBlock, validatePreviewData } from "@cmssy/cli/test";
+import Hero from "./Hero";
+import previewData from "../preview.json";
+import schema from "../block.d.ts";
+
+test("renders the heading from content", async () => {
+  const { getByText } = await renderBlock(Hero, {
+    content: { heading: "Welcome" },
+  });
+  expect(getByText("Welcome")).toBeTruthy();
+});
+
+test("preview data satisfies the block schema", () => {
+  const { valid, errors } = validatePreviewData(schema, previewData);
+  expect(valid, errors.join("\n")).toBe(true);
+});
+```
+
+`@testing-library/react` and `react` are loaded dynamically - install them in
+your project when you need `renderBlock`:
+
+```bash
+npm install -D @testing-library/react
+```
+
+---
+
+### Generate Types from Workspace Schema
+
+```bash
+cmssy codegen [options]
+```
+
+Generate TypeScript types from your workspace's public GraphQL schema (powered
+by `@graphql-codegen/cli` under the hood).
+
+**Options:**
+
+- `-w, --workspace <slug>` - Workspace slug (**required** except for `--init`)
+- `-o, --output <path>` - Output path (default: `src/graphql/types.ts`)
+- `--init` - Generate a `codegen.ts` config file instead of running codegen
+
+**First-time setup:**
+
+```bash
+# 1. Create codegen.ts (works on a fresh project, before `cmssy link`)
+cmssy codegen --init
+
+# 2. Install codegen deps
+npm install -D @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-operations
+
+# 3. Run against your workspace
+cmssy codegen --workspace my-workspace-slug
+```
+
+> **Note on `--workspace`**: this flag takes the workspace _slug_ (e.g.
+> `my-workspace-slug`), not the ObjectId stored in `CMSSY_WORKSPACE_ID`. Use
+> `cmssy workspaces` to look up the slug.
 
 ---
 
@@ -418,7 +524,7 @@ Team Project
 
 **Requirements:**
 
-- API token must be configured (run `cmssy configure` first)
+- API token must be configured (run `cmssy link` first)
 
 ### Install AI Assistant Skills
 
@@ -598,12 +704,11 @@ cmssy create block header
 cmssy create block footer
 cmssy create block cta
 
-# Configure API with workspace
-cmssy configure
+# Link to workspace (interactive - picks workspace, writes .env)
+cmssy link
 
-# List workspaces and get workspace ID
-cmssy workspaces
-# Copy workspace ID and add to .env: CMSSY_WORKSPACE_ID=507f1f77bcf86cd799439011
+# Verify credentials + API reachability
+cmssy doctor
 
 # Develop and test
 cmssy dev
@@ -635,7 +740,8 @@ cmssy upload --all --workspace 507f1f77bcf86cd799439011
 
 ### "API token not configured"
 
-Run `cmssy configure` or manually add `CMSSY_API_TOKEN` to `.env`
+Run `cmssy link` (interactive) or manually add `CMSSY_API_TOKEN` to `.env`.
+Run `cmssy doctor` to verify the full setup.
 
 ### "Workspace ID required"
 
