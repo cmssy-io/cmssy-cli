@@ -180,24 +180,27 @@ export async function skillsInstallCommand(
 ): Promise<void> {
   const editor = resolveEditorTarget(options.target);
 
+  // Normalize once - whitespace-only or empty input is treated as "no skill"
+  // so `cmssy skills install "   "` behaves like `cmssy skills install`.
+  const skill = rawSkill?.trim().toLowerCase() || undefined;
+
   // Friendly error if user passes an editor name where a skill name is expected
   // (covers the pre-0.14.0 `cmssy skills install claude` shape).
-  const trimmed = rawSkill?.trim().toLowerCase();
-  if (trimmed && (EDITOR_TARGETS as readonly string[]).includes(trimmed)) {
+  if (skill && (EDITOR_TARGETS as readonly string[]).includes(skill)) {
     console.error(
       chalk.red(`✖ "${rawSkill}" is an editor target, not a skill name.`) +
         chalk.gray(
           `\n  The first positional argument is now the skill name (e.g. "block", "mcp-content").`,
         ) +
         chalk.gray(
-          `\n  Pass editor with --target, e.g.: cmssy skills install block --target ${trimmed}`,
+          `\n  Pass editor with --target, e.g.: cmssy skills install block --target ${skill}`,
         ),
     );
     process.exit(1);
   }
 
   if (options.all) {
-    if (rawSkill) {
+    if (skill) {
       console.error(
         chalk.red(`✖ Cannot combine --all with a skill name.`) +
           chalk.gray("\n  Either pass a skill name or use --all, not both."),
@@ -205,17 +208,16 @@ export async function skillsInstallCommand(
       process.exit(1);
     }
 
-    for (const skill of Object.values(SKILLS)) {
-      await installOne(skill, editor, options);
+    for (const entry of Object.values(SKILLS)) {
+      await installOne(entry, editor, options);
     }
     return;
   }
 
   let skillName: SkillName;
 
-  if (rawSkill) {
-    const normalized = (trimmed ?? "") as SkillName;
-    if (!Object.hasOwn(SKILLS, normalized)) {
+  if (skill) {
+    if (!Object.hasOwn(SKILLS, skill)) {
       console.error(
         chalk.red(`✖ Unknown skill: ${rawSkill}`) +
           chalk.gray(
@@ -225,9 +227,9 @@ export async function skillsInstallCommand(
       );
       process.exit(1);
     }
-    skillName = normalized;
+    skillName = skill as SkillName;
   } else {
-    // No skill passed → interactive prompt (unless -y)
+    // No skill passed (or whitespace-only) → interactive prompt (unless -y)
     if (options.yes) {
       console.error(
         chalk.red(`✖ No skill specified.`) +

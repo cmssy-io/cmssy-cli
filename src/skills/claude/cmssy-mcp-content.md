@@ -1,6 +1,6 @@
 ---
 name: cmssy-mcp-content
-description: "Rules for managing CMS content via cmssy MCP tools. Use when creating/editing pages, blocks, translations, forms, or layout blocks through MCP. Trigger on words: cmssy MCP, page, block content, translation, form, header, footer, layout, publish page, add_block_to_page, update_block_content, create_page, list_pages, i18n."
+description: "Rules for managing CMS content via cmssy MCP tools. Use when creating/editing pages, blocks, translations, forms, or layout blocks through MCP. Trigger on words: cmssy MCP, page, block content, translation, form, header, footer, layout, publish page, add_block_to_page, update_block_content, create_page, list_pages, i18n, language."
 ---
 
 # cmssy-mcp-content
@@ -17,7 +17,7 @@ npm install -g @cmssy/mcp-server
 
 Then register it in `~/.claude.json` (or your project `.mcp.json`) with your workspace token and workspace ID. See https://www.npmjs.com/package/@cmssy/mcp-server for the exact config snippet.
 
-If the MCP tools (`list_pages`, `update_block_content`, etc.) aren't available in your session, this skill won't work — fall back to the Cmssy editor UI.
+If the MCP tools (`list_pages`, `update_block_content`, etc.) aren't available in your session, this skill won't work - fall back to the Cmssy editor UI.
 
 ## When to use this skill
 
@@ -29,37 +29,52 @@ If the MCP tools (`list_pages`, `update_block_content`, etc.) aren't available i
 
 ---
 
+## Rule 0: Discover the workspace's languages BEFORE editing
+
+**Cmssy is multi-tenant and language-agnostic.** Every workspace picks its own set of languages — could be `en`, `pl`, `de`, `es`, `fr`, `zh`, `ja`, `ar`, `uk`, anything. **Never assume** a workspace uses `en`/`pl` — they are examples in this doc, not a fixed set.
+
+Before any content edit:
+
+1. Call `get_site_config` and read **`enabledLanguages`** (array of ISO 639-1 codes) and **`defaultLanguage`**
+2. Use exactly those codes as keys in `content` - and every one of them when adding translations
+3. If the workspace has only one language, content is still keyed by that language code (e.g. `content: { zh: {...} }`), never flat
+
+When this rule is violated, you either silently drop a language or write under the wrong key. Both corrupt content.
+
+---
+
 ## Rule 1: Always use language-keyed content
 
-All block content MUST use language keys (`en`, `pl`, etc.) when the site has multiple languages enabled. Check `get_site_config` for `enabledLanguages` first.
+All block content MUST be keyed by the workspace's enabled language codes (see Rule 0). Examples below show `en` + `pl` purely as an illustration - substitute whatever `enabledLanguages` returns for the actual workspace.
 
 ```json
-// CORRECT - language-keyed
+// CORRECT - language-keyed, includes EVERY language the workspace enabled
+// (here en + pl; your workspace might return e.g. ["en","de","zh"] instead)
 {
   "en": { "heading": "Welcome", "subheading": "Hello world" },
-  "pl": { "heading": "Witaj", "subheading": "Witaj swiecie" }
+  "pl": { "heading": "Witaj", "subheading": "Witaj świecie" }
 }
 
-// WRONG - flat content without language key
+// WRONG - flat content, no language keys
 {
   "heading": "Welcome",
   "subheading": "Hello world"
 }
 
-// WRONG - only adding new language without existing ones
+// WRONG - adding one language without including the others the workspace enabled
+// If enabledLanguages is ["en","pl","de"], you MUST send all three, not just one
 {
   "pl": { "heading": "Witaj" }
 }
-// This leaves `en` missing if content was previously flat!
 ```
 
-**Critical**: If existing content is flat (no language keys), you MUST restructure it by providing BOTH `en` (with existing content) AND the new language in one update.
+**Critical edge case**: if existing content is flat (no language keys - legacy), you MUST restructure it by providing a key for EVERY enabled language in a single update - the default language gets the existing content, the others get the new translation (or a placeholder copy if the user didn't provide one).
 
 ---
 
 ## Rule 2: Layout blocks (header/footer) follow the same i18n rules
 
-Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`. They use the same `update_block_content` tool and the same language-keyed content structure.
+Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`. They use the same `update_block_content` tool and the same language-keyed content structure - with the exact same language codes from `enabledLanguages`.
 
 ### Header translatable fields
 
@@ -77,7 +92,7 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 - `linkColumns[].links[].name` - link labels
 - `copyrightText` - copyright notice
 
-### Non-translatable fields (keep same across languages)
+### Non-translatable fields (identical value across all languages)
 
 - URLs (`url`, `href`, `ctaUrl`, `announcementLink`)
 - Icons (`icon`)
@@ -90,22 +105,22 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 ## Rule 3: Workflow for content updates
 
 1. **Read first**: Always `get_page` or `get_site_config` before editing
-2. **Check languages**: Look at `enabledLanguages` in site config
-3. **Check existing content structure**: Is it flat or language-keyed?
-4. **Update all languages**: When adding translations, include ALL enabled languages
-5. **Verify**: After update, confirm response has correct structure
+2. **Read `enabledLanguages`**: Language codes vary per workspace - never hardcode
+3. **Inspect existing content shape**: Is it flat or language-keyed?
+4. **Write every enabled language**: When adding translations, include ALL codes returned by `enabledLanguages`, not just the ones the user mentioned
+5. **Verify**: After update, confirm the response has a key for each enabled language
 
 ---
 
 ## Rule 4: Page blocks vs Layout blocks
 
-|                | Page blocks                    | Layout blocks              |
-| -------------- | ------------------------------ | -------------------------- |
-| Location       | `blocks[]`                     | `layoutBlocks[]`           |
-| Scope          | Single page                    | Inherited across pages     |
-| Content        | `content.en`, `content.pl`     | `content.en`, `content.pl` |
-| Types          | hero, features, faq, cta, etc. | header, footer             |
-| Position field | No                             | Yes (`header`, `footer`)   |
+|                | Page blocks                        | Layout blocks                      |
+| -------------- | ---------------------------------- | ---------------------------------- |
+| Location       | `blocks[]`                         | `layoutBlocks[]`                   |
+| Scope          | Single page                        | Inherited across pages             |
+| Content        | `content[<lang>]` per enabled lang | `content[<lang>]` per enabled lang |
+| Types          | hero, features, faq, cta, etc.     | header, footer                     |
+| Position field | No                                 | Yes (`header`, `footer`)           |
 
 ---
 
@@ -114,7 +129,7 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 - `update_block_content` creates unpublished changes (draft)
 - Use `publish_page` to make changes live
 - Use `revert_to_published` to discard draft changes
-- Always inform user about unpublished state after edits
+- Always inform the user about unpublished state after edits
 
 ---
 
@@ -122,7 +137,7 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 
 | Tool                                    | Use for                                         |
 | --------------------------------------- | ----------------------------------------------- |
-| `get_site_config`                       | Languages, site name, features                  |
+| `get_site_config`                       | **Languages**, site name, features              |
 | `get_workspace_info`                    | Plan, limits, usage                             |
 | `list_pages`                            | Browse/search pages                             |
 | `get_page`                              | Full page with blocks and content               |
@@ -162,7 +177,9 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 - `newsletter` - email subscription
 - `custom` - custom webhook/processing
 
-### Form i18n fields (language-keyed like blocks)
+### Form i18n fields (language-keyed, same rules as blocks)
+
+All the following fields are keyed by the workspace's `enabledLanguages` codes - whatever the site uses (`en`, `de`, `zh`, …):
 
 - `fields[].label`, `fields[].placeholder`, `fields[].helpText`
 - `fields[].options[].label`
@@ -175,6 +192,8 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 - `archived` - disabled
 
 ### Creating a form example
+
+Below: `en` + `pl` shown for illustration. For a workspace with `enabledLanguages: ["en","de","zh"]` you'd send keys `en`, `de`, `zh` instead - always match whatever `get_site_config` returns.
 
 ```json
 {

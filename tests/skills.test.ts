@@ -107,6 +107,32 @@ describe("skills install", () => {
     ).rejects.toThrow("process.exit(1)");
   });
 
+  it("treats whitespace-only skill name as omitted (fails with -y)", async () => {
+    await expect(
+      skillsInstallCommand("   ", { local: true, yes: true }),
+    ).rejects.toThrow("process.exit(1)");
+  });
+
+  it("treats whitespace-only skill name as omitted (interactive prompt)", async () => {
+    const promptSpy = vi
+      .spyOn(inquirer, "prompt")
+      .mockResolvedValue({ chosen: "block" } as never);
+
+    await skillsInstallCommand("  \t  ", { local: true });
+
+    expect(promptSpy).toHaveBeenCalledOnce();
+    expect(fs.existsSync(blockSkillPath())).toBe(true);
+
+    promptSpy.mockRestore();
+  });
+
+  it("allows --all with whitespace-only skill name", async () => {
+    await skillsInstallCommand("   ", { local: true, all: true });
+
+    expect(fs.existsSync(blockSkillPath())).toBe(true);
+    expect(fs.existsSync(mcpSkillPath())).toBe(true);
+  });
+
   it("fails non-interactively when file exists and -y is passed", async () => {
     await skillsInstallCommand("block", { local: true });
 
