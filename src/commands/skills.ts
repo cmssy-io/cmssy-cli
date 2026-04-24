@@ -58,9 +58,12 @@ interface SkillsInstallOptions {
 function resolveEditorTarget(raw: string | undefined): EditorTarget {
   const target = (raw ?? "claude").trim().toLowerCase();
   if (!(EDITOR_TARGETS as readonly string[]).includes(target)) {
+    // JSON.stringify so whitespace-only / empty raw input is visible in
+    // the error (otherwise interpolating `"  "` gives a blank message).
     console.error(
-      chalk.red(`✖ Unknown editor target: ${raw}`) +
-        chalk.gray(`\n  Supported: ${EDITOR_TARGETS.join(", ")}`),
+      chalk.red(
+        `✖ Unknown editor target: raw=${JSON.stringify(raw)}, normalized=${JSON.stringify(target)}`,
+      ) + chalk.gray(`\n  Supported: ${EDITOR_TARGETS.join(", ")}`),
     );
     process.exit(1);
   }
