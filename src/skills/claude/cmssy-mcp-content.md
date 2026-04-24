@@ -3,7 +3,7 @@ name: cmssy-mcp-content
 description: "Rules for managing CMS content via cmssy MCP tools. Use when creating/editing pages, blocks, translations, forms, or layout blocks through MCP. Trigger on words: cmssy MCP, page, block content, translation, form, header, footer, layout, publish page, add_block_to_page, update_block_content, create_page, list_pages, i18n."
 ---
 
-# Cmssy MCP Content Rules
+# cmssy-mcp-content
 
 Rules and patterns for working with site content through cmssy MCP tools.
 
