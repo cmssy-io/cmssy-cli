@@ -49,14 +49,22 @@ export default config;
 export async function codegenCommand(options: CodegenOptions) {
   const config = loadConfig();
 
-  // Resolve workspace
-  const workspaceSlug = options.workspace || config.workspaceId;
+  // The public schema URL is keyed by workspace *slug*, not ID. `cmssy link`
+  // stores the workspace ObjectId in CMSSY_WORKSPACE_ID, so we can't use it
+  // here without an extra API round-trip. Require --workspace explicitly
+  // and tell the user exactly what's needed.
+  const workspaceSlug = options.workspace;
 
   if (!workspaceSlug) {
+    const hint = config.workspaceId
+      ? chalk.gray(
+          "\n  Tip: your .env has CMSSY_WORKSPACE_ID (an ID, not a slug). Pass the slug from `cmssy workspaces` via --workspace.",
+        )
+      : "";
     console.error(
       chalk.red(
-        "✖ No workspace specified. Use --workspace <slug> or set CMSSY_WORKSPACE_ID in .env",
-      ),
+        "✖ Missing workspace slug. Use: cmssy codegen --workspace <slug>",
+      ) + hint,
     );
     process.exit(1);
   }

@@ -2,7 +2,8 @@ import fs from "fs-extra";
 import path from "path";
 
 export function generateNextConfig(devRoot: string, projectRoot: string) {
-  const rel = path.relative(devRoot, projectRoot);
+  // Normalize to POSIX so the generated JS works on Windows.
+  const rel = path.relative(devRoot, projectRoot).replaceAll(path.sep, "/");
   const content = `import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -14,7 +15,10 @@ const nextConfig = {
     root: resolve(__dirname, "${rel}"),
   },
 
-  allowedDevOrigins: ['*'],
+  // Local dev server: allow loopback + LAN addresses a user might hit the dev
+  // server from (phone on the same Wi-Fi, VM, etc). Explicit list instead of
+  // '*' so a stray request from another origin doesn't succeed silently.
+  allowedDevOrigins: ['localhost', '127.0.0.1', '[::1]', '*.local'],
 
   images: {
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
@@ -27,8 +31,9 @@ export default nextConfig;
 }
 
 export function generateTsConfig(devRoot: string, projectRoot: string) {
-  // Paths must be relative to tsconfig location (.cmssy/dev/)
-  const rel = path.relative(devRoot, projectRoot);
+  // Paths must be relative to tsconfig location (.cmssy/dev/).
+  // Normalize to POSIX so the generated JSON works on Windows.
+  const rel = path.relative(devRoot, projectRoot).replaceAll(path.sep, "/");
 
   // Read project tsconfig to forward user-defined path aliases and includes
   const projectTsConfigPath = path.join(projectRoot, "tsconfig.json");

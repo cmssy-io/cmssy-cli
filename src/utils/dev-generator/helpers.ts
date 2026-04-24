@@ -48,9 +48,15 @@ export function loadTemplateConfigSync(
     fs.ensureDirSync(cacheDir);
 
     const mockConfigPath = path.join(cacheDir, "cmssy-cli-config.mjs");
+    // Match block-config.ts:148 - cover every export a user config might
+    // import, otherwise the dynamic import throws and preview silently
+    // falls back to null.
     fs.writeFileSync(
       mockConfigPath,
-      "export const defineBlock = (config) => config;\nexport const defineTemplate = (config) => config;\n",
+      "export const defineBlock = (config) => config;\n" +
+        "export const defineTemplate = (config) => config;\n" +
+        "export const defineTheme = (config) => config;\n" +
+        "export const field = (config) => config;\n",
     );
 
     const configContent = fs.readFileSync(configPath, "utf-8");
