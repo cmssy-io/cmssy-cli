@@ -36,8 +36,10 @@ cmssy test
 # 8. Build for production
 cmssy build
 
-# 9. Publish to your workspace
-cmssy publish --all --workspace <slug>
+# 9. Publish to your workspace (ID, or rely on CMSSY_WORKSPACE_ID from .env)
+cmssy publish --all --workspace <id>
+# or, if CMSSY_WORKSPACE_ID is set by `cmssy link`:
+cmssy publish --all --workspace
 ```
 
 ## Environment Configuration
@@ -205,15 +207,27 @@ Tokens come from https://cmssy.io/settings/tokens. List existing workspaces with
 cmssy doctor
 ```
 
-All-in-one preflight check. Verifies:
+All-in-one preflight check.
 
-- Node ≥ 18, npm, Next.js, React versions
-- `cmssy.config.js` exists
-- `.env` has `CMSSY_API_URL`, `CMSSY_API_TOKEN`, `CMSSY_WORKSPACE_ID`
-- API reachable, token valid, workspace accessible
+**Required (fails the check):**
 
-Run it before any non-trivial operation (publish, sync). If something fails, fix
-that first - don't proceed.
+- Node ≥ 18
+- `cmssy.config.js` present in project root
+- `CMSSY_API_TOKEN` set in the environment
+
+**Warnings only (run still succeeds):**
+
+- `npm`, `next`, `react` availability
+- `.env` file present
+- `CMSSY_API_URL` set (defaults to the public API if missing)
+- `CMSSY_WORKSPACE_ID` set
+
+When enough config is available, doctor also reaches out to the API to verify
+the token and workspace access.
+
+Run it before any non-trivial operation (publish, sync). Fix failures before
+proceeding; review warnings - they won't stop you but may point at missing
+setup steps.
 
 ---
 
@@ -252,7 +266,9 @@ import { test, expect } from "vitest";
 import { renderBlock, validatePreviewData } from "@cmssy/cli/test";
 import Hero from "./Hero";
 import previewData from "../preview.json";
-import schema from "../block.d.ts";
+// Pull the runtime schema from the block's config.ts (defineBlock({ schema })).
+// Don't import from block.d.ts - that's a type declaration, no runtime value.
+import heroConfig from "../config";
 
 test("renders the heading from content", async () => {
   const { getByText } = await renderBlock(Hero, {
@@ -262,7 +278,7 @@ test("renders the heading from content", async () => {
 });
 
 test("preview data satisfies the block schema", () => {
-  const { valid, errors } = validatePreviewData(schema, previewData);
+  const { valid, errors } = validatePreviewData(heroConfig.schema, previewData);
   expect(valid, errors.join("\n")).toBe(true);
 });
 ```
