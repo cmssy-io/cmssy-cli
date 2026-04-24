@@ -3,6 +3,7 @@ import path from "path";
 
 export function generateRootLayout(devRoot: string) {
   const content = `import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html lang="en">
@@ -28,7 +29,10 @@ export default function RootLayout({
 }
 
 export function generateGlobalsCss(devRoot: string, projectRoot: string) {
-  const rel = path.relative(path.join(devRoot, "app"), projectRoot);
+  // Normalize to POSIX so the @import line still works on Windows.
+  const rel = path
+    .relative(path.join(devRoot, "app"), projectRoot)
+    .replaceAll(path.sep, "/");
 
   // Check for project CSS files that contain Tailwind / theme
   const cssFiles = ["styles/main.css", "styles/globals.css", "app/globals.css"];
