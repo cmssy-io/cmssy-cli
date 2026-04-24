@@ -423,23 +423,42 @@ Team Project
 ### Install AI Assistant Skills
 
 ```bash
-cmssy skills install              # Claude Code skill, global (~/.claude/skills/)
-cmssy skills install --local      # Install into current project (./.claude/skills/)
-cmssy skills install --force      # Overwrite existing skill
+cmssy skills list                    # Show available skills
+cmssy skills install                 # Interactive prompt (pick a skill)
+cmssy skills install block           # CLI + block dev workflow skill
+cmssy skills install mcp-content     # Content editing via @cmssy/mcp-server
+cmssy skills install --all           # Install every skill
+cmssy skills install block --local   # Install into current project's .claude/
+cmssy skills install block --force   # Overwrite existing skill
 ```
 
-Drops the `cmssy-block` skill into your Claude Code config so the assistant knows
-the full cmssy CLI lifecycle (init, link, create, dev, test, build, publish, sync)
-and how to scaffold/edit blocks and templates correctly.
+Drops cmssy skills into your Claude Code config so the assistant understands how
+to work with cmssy out of the box. Two skills ship today:
 
-After installing, restart Claude Code (or start a new session) and ask it anything
-about cmssy blocks, e.g. _"scaffold a pricing block and publish as patch"_.
+- **`block`** - full CLI + block dev workflow (init, link, create, dev, test,
+  build, publish, sync, `defineBlock`/`defineTemplate` authoring)
+- **`mcp-content`** - managing workspace content through the
+  [@cmssy/mcp-server](https://www.npmjs.com/package/@cmssy/mcp-server) MCP tools
+  (i18n rules, layout blocks, forms, publish flow). Requires the MCP server to
+  be configured in your Claude Code settings first
+
+After installing, restart Claude Code (or start a new session) and try a prompt
+like _"scaffold a pricing block and publish as patch"_ or
+_"add a new testimonials block to the homepage, in English and Polish"_.
 
 **Options:**
 
+- `--target <editor>` - editor target (default: `claude`; more coming)
+- `--all` - install every available skill
 - `--local` - install into `./.claude/skills/` in the current project (default: `~/.claude/skills/`)
 - `--force` - overwrite an existing skill without prompting
 - `-y, --yes` - non-interactive mode (fails instead of prompting on conflict)
+
+> **Changed in 0.14.0:** the first positional argument is now the **skill
+> name** (`block`, `mcp-content`) rather than the editor target. If you were
+> using `cmssy skills install claude` on 0.13.x, switch to
+> `cmssy skills install block` (or `--all`). Editor target is now a flag:
+> `--target claude`.
 
 ---
 

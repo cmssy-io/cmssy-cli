@@ -16,7 +16,7 @@ import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
 import { packageCommand } from "./commands/package.js";
-import { skillsInstallCommand } from "./commands/skills.js";
+import { skillsInstallCommand, skillsListCommand } from "./commands/skills.js";
 import { uploadCommand } from "./commands/upload.js";
 import { workspacesCommand } from "./commands/workspaces.js";
 import { readFileSync } from "fs";
@@ -400,12 +400,19 @@ Use workspace IDs with:
 // cmssy skills
 const skills = program
   .command("skills")
-  .description("Install AI coding-assistant skills for cmssy");
+  .description("Manage AI coding-assistant skills for cmssy");
+
+skills
+  .command("list")
+  .description("List available skills")
+  .action(skillsListCommand);
 
 skills
   .command("install")
   .description("Install a skill into your AI assistant's config directory")
-  .argument("[target]", "Target assistant: claude", "claude")
+  .argument("[skill]", "Skill name: block, mcp-content (omit for interactive)")
+  .option("--target <editor>", "Editor target: claude (default)", "claude")
+  .option("--all", "Install every available skill")
   .option(
     "--local",
     "Install into ./.claude/skills (default: ~/.claude/skills)",
@@ -416,16 +423,19 @@ skills
     "after",
     `
 Examples:
-  $ cmssy skills install              Install Claude Code skill globally
-  $ cmssy skills install claude       Same as above (explicit)
-  $ cmssy skills install --local      Install into current project's .claude/
-  $ cmssy skills install --force      Overwrite existing skill
+  $ cmssy skills list                  Show available skills
+  $ cmssy skills install               Interactive prompt (pick a skill)
+  $ cmssy skills install block         CLI + block dev workflow skill
+  $ cmssy skills install mcp-content   Content editing via @cmssy/mcp-server
+  $ cmssy skills install --all         Install every skill
+  $ cmssy skills install block --local Install into current project's .claude/
+  $ cmssy skills install block --force Overwrite existing skill
 
-The Claude Code skill teaches the assistant the full cmssy CLI lifecycle
-(init, link, create, dev, test, build, publish, sync).
+Changed in 0.14.0: the first positional arg is now the skill name (e.g.
+'block', 'mcp-content'), not the editor target. Use --target for editor.
 `,
   )
-  .action((target, options) => skillsInstallCommand(target, options));
+  .action((skillName, options) => skillsInstallCommand(skillName, options));
 
 // cmssy add-source (hidden - use `cmssy publish --with-source` instead)
 program.addCommand(
