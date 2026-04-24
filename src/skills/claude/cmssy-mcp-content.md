@@ -47,7 +47,7 @@ When this rule is violated, you either silently drop a language or write under t
 
 All block content MUST be keyed by the workspace's enabled language codes (see Rule 0). Examples below show `en` + `pl` purely as an illustration - substitute whatever `enabledLanguages` returns for the actual workspace.
 
-```json
+```jsonc
 // CORRECT - language-keyed, includes EVERY language the workspace enabled
 // (here en + pl; your workspace might return e.g. ["en","de","zh"] instead)
 {
