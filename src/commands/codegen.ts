@@ -57,7 +57,8 @@ export async function codegenCommand(options: CodegenOptions) {
   if (options.init) {
     const configPath = path.join(process.cwd(), CODEGEN_CONFIG_FILE);
     if (fs.existsSync(configPath)) {
-      console.error(
+      // The only warning path - skipping an existing config - goes to stderr.
+      console.warn(
         chalk.yellow(`⚠ ${CODEGEN_CONFIG_FILE} already exists. Skipping.`),
       );
     } else {
@@ -66,9 +67,10 @@ export async function codegenCommand(options: CodegenOptions) {
         : getWorkspaceApiUrl(config.apiUrl, "<your-workspace-slug>");
       const configContent = generateCodegenConfig(placeholderUrl, output);
       fs.writeFileSync(configPath, configContent);
-      console.warn(chalk.green(`✔ Created ${CODEGEN_CONFIG_FILE}`));
+      // Success + guidance go to stdout so pipes and scripts work.
+      console.log(chalk.green(`✔ Created ${CODEGEN_CONFIG_FILE}`));
       if (!options.workspace) {
-        console.warn(
+        console.log(
           chalk.dim(
             `  Replace <your-workspace-slug> in ${CODEGEN_CONFIG_FILE} with your slug (see \`cmssy workspaces\`).`,
           ),
@@ -76,7 +78,7 @@ export async function codegenCommand(options: CodegenOptions) {
       }
     }
 
-    console.warn(
+    console.log(
       chalk.dim(
         `\nInstall codegen dependencies:\n  npm install -D @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-operations\n\nThen run:\n  cmssy codegen --workspace <slug>`,
       ),
