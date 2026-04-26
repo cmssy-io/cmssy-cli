@@ -2,7 +2,6 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
-import { addSourceCommand } from "./commands/add-source.js";
 import { buildCommand } from "./commands/build.js";
 import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
@@ -282,10 +281,6 @@ program
     "--zip",
     "Package into ZIP files and upload (instead of direct GraphQL)",
   )
-  .option(
-    "--with-source",
-    "Upload source code for AI Block Builder after publish",
-  )
   .addHelpText(
     "after",
     `
@@ -293,7 +288,6 @@ Examples:
   $ cmssy publish --all -w abc123              Publish all, preserve content
   $ cmssy publish hero -w abc123 --patch       Publish hero with patch bump
   $ cmssy publish --all --zip -w abc123        Package as ZIP and upload
-  $ cmssy publish --all --with-source -w abc   Publish + upload source for AI
   $ cmssy publish --all -w abc123 --overwrite-content
                                                Force overwrite content/schema
 
@@ -436,27 +430,6 @@ Changed in 0.14.0: the first positional arg is now the skill name (e.g.
 `,
   )
   .action((skillName, options) => skillsInstallCommand(skillName, options));
-
-// cmssy add-source (hidden - use `cmssy publish --with-source` instead)
-program.addCommand(
-  new Command("add-source")
-    .argument("[blocks...]")
-    .description("Upload source code to workspace for AI Block Builder")
-    .option("-w, --workspace <id>", "Target workspace ID")
-    .option("--all", "Add source for all local blocks")
-    .addHelpText(
-      "after",
-      `
-Examples:
-  $ cmssy add-source hero pricing -w abc123
-  $ cmssy add-source --all -w abc123
-
-Enables AI Block Builder to edit your blocks in the Cmssy editor.
-`,
-    )
-    .action(addSourceCommand),
-  { hidden: true },
-);
 
 // cmssy codegen (hidden - use `cmssy init --graphql` for setup)
 program.addCommand(
