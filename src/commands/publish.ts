@@ -811,9 +811,8 @@ async function scanPackages(
   return packages;
 }
 
-// Bundle source code with esbuild (combines all local imports into single file)
-// Bundle source code with esbuild (combines all local imports into single file)
-// UPDATED: Use CommonJS format to avoid ES module export statements
+// Bundle source code with esbuild (combines all local imports into single
+// file). CommonJS format to avoid ES module export statements.
 async function bundleSourceCode(
   packagePath: string,
   serverActionFiles?: string[],
