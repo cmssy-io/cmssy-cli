@@ -25,7 +25,6 @@ import { scanTheme } from "../utils/scanner.js";
 import { convertThemeToInput } from "../utils/theme-builder.js";
 import { packageResource } from "./package.js";
 import { uploadPackage } from "./upload.js";
-import { uploadBlockSource } from "./add-source.js";
 import {
   diffSchema,
   hasBreakingChanges,
@@ -42,7 +41,6 @@ interface PublishOptions {
   all?: boolean;
   overwriteContent?: boolean;
   zip?: boolean;
-  withSource?: boolean;
   force?: boolean;
 }
 
@@ -383,13 +381,6 @@ export async function publishCommand(
 
   // --zip mode: package into ZIPs and upload
   if (options.zip) {
-    if (options.withSource) {
-      console.log(
-        chalk.yellow(
-          "⚠ --with-source is not supported with --zip mode, ignoring\n",
-        ),
-      );
-    }
     console.log(
       chalk.cyan(
         `🏢 Target: Workspace (${workspaceId})\n` +
@@ -555,86 +546,6 @@ export async function publishCommand(
     console.log(
       chalk.yellow(`⚠ ${successCount} succeeded, ${errorCount} failed\n`),
     );
-  }
-
-  // --with-source: upload source code for AI Block Builder
-  if (options.withSource && publishedBlocks.length === 0) {
-    console.log(
-      chalk.gray(
-        "ℹ --with-source: no blocks published, skipping source upload\n",
-      ),
-    );
-  }
-  if (options.withSource && publishedBlocks.length > 0) {
-    console.log(
-      chalk.cyan("📝 Uploading source code for AI Block Builder...\n"),
-    );
-
-    const client = new GraphQLClient(config.apiUrl, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiToken}`,
-        "X-Workspace-ID": workspaceId as string,
-      },
-    });
-
-    // Fetch workspace blocks to get block IDs
-    let workspaceBlocks: { id: string; blockType: string }[] = [];
-    try {
-      const result: any = await client.request(GET_WORKSPACE_BLOCKS_QUERY);
-      workspaceBlocks = result.workspaceBlocks;
-    } catch {
-      console.warn(
-        chalk.yellow("⚠ Could not fetch workspace blocks for source upload\n"),
-      );
-      return;
-    }
-
-    let sourceSuccess = 0;
-    let sourceFail = 0;
-
-    for (const block of publishedBlocks) {
-      const wsBlock =
-        workspaceBlocks.find((b) => b.blockType === block.blockType) ??
-        workspaceBlocks.find((b) => b.blockType === block.name);
-      if (!wsBlock) {
-        console.warn(
-          chalk.yellow(
-            `  ⚠ ${block.name}: not found in workspace, skipping source`,
-          ),
-        );
-        continue;
-      }
-
-      const spinner = ora(`Uploading source for ${block.name}...`).start();
-      try {
-        const uploaded = await uploadBlockSource(
-          block.name,
-          block.path,
-          wsBlock.id,
-          client,
-        );
-        if (uploaded) {
-          spinner.succeed(chalk.green(`${block.name}: source uploaded`));
-          sourceSuccess++;
-        } else {
-          spinner.warn(`${block.name}: no source code found`);
-        }
-      } catch (error: any) {
-        spinner.fail(chalk.red(`${block.name}: source upload failed`));
-        console.error(chalk.red(`  Error: ${error.message}`));
-        sourceFail++;
-      }
-    }
-
-    console.log("");
-    if (sourceFail === 0) {
-      console.log(chalk.green.bold(`✓ ${sourceSuccess} source(s) uploaded\n`));
-    } else {
-      console.log(
-        chalk.yellow(`⚠ ${sourceSuccess} succeeded, ${sourceFail} failed\n`),
-      );
-    }
   }
 
   // Publish theme if present when using --all
@@ -900,100 +811,8 @@ async function scanPackages(
   return packages;
 }
 
-/**
- * Read original source code for AI Block Builder (editable in Sandpack).
- * Combines the main component file with type definitions into a single file.
- */
-async function readOriginalSourceCode(packagePath: string): Promise<{
-  sourceCode: string | undefined;
-  sourceCss: string | undefined;
-}> {
-  const srcDir = path.join(packagePath, "src");
-
-  // Find main component file (not index.tsx, but the actual component)
-  const files = fs.readdirSync(srcDir);
-  let mainComponentFile: string | undefined;
-  let sourceCode: string | undefined;
-
-  // Look for component files (excluding index.tsx and .d.ts files)
-  for (const file of files) {
-    if (
-      (file.endsWith(".tsx") || file.endsWith(".ts")) &&
-      !file.startsWith("index") &&
-      !file.endsWith(".d.ts")
-    ) {
-      mainComponentFile = path.join(srcDir, file);
-      break;
-    }
-  }
-
-  // If no main component found, try index.tsx
-  if (!mainComponentFile) {
-    const indexPath = path.join(srcDir, "index.tsx");
-    if (fs.existsSync(indexPath)) {
-      mainComponentFile = indexPath;
-    }
-  }
-
-  if (mainComponentFile && fs.existsSync(mainComponentFile)) {
-    // Read the main component
-    let content = fs.readFileSync(mainComponentFile, "utf-8");
-
-    // Read block.d.ts if exists and inline the types
-    const blockDtsPath = path.join(srcDir, "block.d.ts");
-    if (fs.existsSync(blockDtsPath)) {
-      const blockDts = fs.readFileSync(blockDtsPath, "utf-8");
-
-      // Extract interface/type definitions from block.d.ts
-      const typeMatch = blockDts.match(
-        /(?:export\s+)?(?:interface|type)\s+BlockContent[\s\S]*?(?=(?:export\s+)?(?:interface|type)|$)/,
-      );
-
-      if (typeMatch) {
-        // Remove the import from block.d.ts and add inline type
-        content = content.replace(
-          /import\s*{\s*BlockContent\s*}\s*from\s*["']\.\/block(?:\.d)?["'];?\n?/,
-          "",
-        );
-
-        // Add inline interface at the top
-        const inlineInterface = `interface BlockContent {
-  [key: string]: any;
-}\n\n`;
-
-        // Insert after imports
-        const lastImportMatch = content.match(
-          /^(import[\s\S]*?from\s*['"][^'"]+['"];?\n)/m,
-        );
-        if (lastImportMatch) {
-          const insertPos =
-            content.lastIndexOf(lastImportMatch[0]) + lastImportMatch[0].length;
-          content =
-            content.slice(0, insertPos) +
-            "\n" +
-            inlineInterface +
-            content.slice(insertPos);
-        } else {
-          content = inlineInterface + content;
-        }
-      }
-    }
-
-    sourceCode = content;
-  }
-
-  // Read CSS
-  const cssPath = path.join(srcDir, "index.css");
-  const sourceCss = fs.existsSync(cssPath)
-    ? fs.readFileSync(cssPath, "utf-8")
-    : undefined;
-
-  return { sourceCode, sourceCss };
-}
-
-// Bundle source code with esbuild (combines all local imports into single file)
-// Bundle source code with esbuild (combines all local imports into single file)
-// UPDATED: Use CommonJS format to avoid ES module export statements
+// Bundle source code with esbuild (combines all local imports into single
+// file). CommonJS format to avoid ES module export statements.
 async function bundleSourceCode(
   packagePath: string,
   serverActionFiles?: string[],
@@ -1322,9 +1141,6 @@ async function publishToWorkspace(
   // Templates have no source code — skip compilation
   let bundledSourceCode: string | undefined;
   let compiledCss: string | undefined;
-  let rawSourceCode: string | undefined;
-  let rawSourceCss: string | undefined;
-  let dependencies: Record<string, string> = {};
   let serverActionCode: string | undefined;
   let serverActionNames: string[] = [];
 
@@ -1354,14 +1170,6 @@ async function publishToWorkspace(
 
     // Compile CSS (with Tailwind if needed)
     compiledCss = await compileCss(packagePath, bundledSourceCode);
-
-    // Read original source code for AI Block Builder editing
-    const originalSource = await readOriginalSourceCode(packagePath);
-    rawSourceCode = originalSource.sourceCode;
-    rawSourceCss = originalSource.sourceCss;
-
-    // Read dependencies from package.json for AI Block Builder
-    dependencies = packageJson.dependencies || {};
   }
 
   // Convert config.ts schema to schemaFields if using blockConfig
@@ -1387,11 +1195,6 @@ async function publishToWorkspace(
     version: packageJson.version || "1.0.0",
     packageType, // "block" or "template"
     preserveContent,
-    // AI Block Builder source files (for editable blocks in Sandpack)
-    rawSourceCode,
-    rawSourceCss,
-    dependencies:
-      Object.keys(dependencies).length > 0 ? dependencies : undefined,
     // Server action support (CMS-224)
     serverActionCode: serverActionCode || undefined,
     serverActions: serverActionNames.length > 0 ? serverActionNames : undefined,
@@ -1547,9 +1350,6 @@ async function publishToWorkspace(
     delete input.packageType;
     delete input.sourceCode;
     delete input.cssCode;
-    delete input.rawSourceCode;
-    delete input.rawSourceCss;
-    delete input.dependencies;
 
     const requestPromise = client.request(IMPORT_TEMPLATE_MUTATION, { input });
 
