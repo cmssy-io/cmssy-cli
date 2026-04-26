@@ -71,19 +71,6 @@ export const IMPORT_TEMPLATE_MUTATION = `
 // - pageTypes: [TemplatePageTypeInput] - creates page types (e.g. "Blog Post")
 // - resetWorkspace: Boolean - deletes pages, page types, blocks (keeps media)
 
-export const ADD_BLOCK_SOURCE_CODE_MUTATION = `
-  mutation AddBlockSourceCode($input: AddBlockSourceCodeInput!) {
-    addBlockSourceCode(input: $input) {
-      id
-      blockType
-      name
-      sourceUrl
-      sourceCssUrl
-      dependenciesUrl
-    }
-  }
-`;
-
 export const UPDATE_THEME_MUTATION = `
   mutation UpdateTheme($input: ThemeConfigInput!) {
     updateTheme(input: $input) {
@@ -137,7 +124,6 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
       id
       blockType
       name
-      sourceUrl
       version
       schemaFields {
         ${SCHEMA_FIELDS_FRAGMENT}
