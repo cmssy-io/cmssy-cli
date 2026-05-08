@@ -65,7 +65,7 @@ export async function collectBlockSources(
   const { blockDir } = options;
   const includeExt = options.includeExt ?? DEFAULT_INCLUDE_EXT;
   const ignoreDirs = options.ignoreDirs ?? DEFAULT_IGNORE_DIRS;
-  const entryRel = options.entryRel ?? "src/index.tsx";
+  const entryRel = normalizeEntryPath(options.entryRel ?? "src/index.tsx");
 
   if (!(await fs.pathExists(blockDir))) {
     throw new Error(`block directory not found: ${blockDir}`);
@@ -145,4 +145,22 @@ export async function collectBlockSources(
 
   files.sort((a, b) => a.relPath.localeCompare(b.relPath));
   return { files, entryPath: entryRel };
+}
+
+export function normalizeEntryPath(input: string): string {
+  let p = input.trim().replace(/\\/g, "/");
+  while (p.startsWith("./")) {
+    p = p.slice(2);
+  }
+  if (p.startsWith("/")) {
+    throw new Error(
+      `entry path must be relative to the block directory, got "${input}"`,
+    );
+  }
+  if (p.length === 0) {
+    throw new Error(
+      `entry path is empty after normalization (input: "${input}")`,
+    );
+  }
+  return p;
 }

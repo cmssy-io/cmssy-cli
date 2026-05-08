@@ -236,13 +236,13 @@ async function pollJobUntilTerminal(
       }
       await sleep(POLL_INTERVAL_MS);
     }
+    const lastStatus = last?.status ?? "unknown";
     spinner.fail(
-      `Polling timed out after ${Math.round(POLL_MAX_MS / 1000)}s (job ${jobId})`,
+      `Polling timed out after ${Math.round(POLL_MAX_MS / 1000)}s (job ${jobId}, last status: ${lastStatus})`,
     );
-    if (!last) {
-      throw new Error(`publish job ${jobId} never returned a status`);
-    }
-    return last;
+    throw new Error(
+      `publish job ${jobId} did not reach a terminal state within ${Math.round(POLL_MAX_MS / 1000)}s (last status: ${lastStatus}). Check the workspace publish jobs UI for progress.`,
+    );
   } finally {
     if (spinner.isSpinning) spinner.stop();
   }

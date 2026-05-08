@@ -6,6 +6,7 @@ import {
   collectBlockSources,
   MAX_FILES,
   MAX_TOTAL_BYTES,
+  normalizeEntryPath,
 } from "../src/utils/source-collector.js";
 
 const tmpRoots: string[] = [];
@@ -190,6 +191,23 @@ describe("collectBlockSources", () => {
     );
   });
 
+  it("accepts entry path with backslashes (Windows) and leading ./", async () => {
+    const dir = await makeBlock({
+      "package.json": '{"name":"hero","version":"0.1.0"}',
+      "src/index.tsx": "x",
+    });
+    const a = await collectBlockSources({
+      blockDir: dir,
+      entryRel: "src\\index.tsx",
+    });
+    expect(a.entryPath).toBe("src/index.tsx");
+    const b = await collectBlockSources({
+      blockDir: dir,
+      entryRel: "./src/index.tsx",
+    });
+    expect(b.entryPath).toBe("src/index.tsx");
+  });
+
   it("returns files sorted by relPath", async () => {
     const dir = await makeBlock({
       "package.json": '{"name":"hero","version":"0.1.0"}',
@@ -206,5 +224,27 @@ describe("collectBlockSources", () => {
       "src/index.tsx",
       "src/z.ts",
     ]);
+  });
+});
+
+describe("normalizeEntryPath", () => {
+  it("converts backslashes to forward slashes", () => {
+    expect(normalizeEntryPath("src\\Block\\index.tsx")).toBe(
+      "src/Block/index.tsx",
+    );
+  });
+  it("strips leading ./ (single and repeated)", () => {
+    expect(normalizeEntryPath("./src/index.tsx")).toBe("src/index.tsx");
+    expect(normalizeEntryPath("././src/index.tsx")).toBe("src/index.tsx");
+  });
+  it("trims surrounding whitespace", () => {
+    expect(normalizeEntryPath("  src/index.tsx  ")).toBe("src/index.tsx");
+  });
+  it("rejects absolute paths", () => {
+    expect(() => normalizeEntryPath("/abs/path")).toThrow(/relative/);
+  });
+  it("rejects empty input", () => {
+    expect(() => normalizeEntryPath("./")).toThrow(/empty/);
+    expect(() => normalizeEntryPath("")).toThrow(/empty/);
   });
 });

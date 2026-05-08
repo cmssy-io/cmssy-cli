@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import chalk from "chalk";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { buildCommand } from "./commands/build.js";
 import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
@@ -339,7 +339,14 @@ lib
   .description("Install npm package(s) locally and sync the manifest")
   .argument("<packages...>", "npm package specs (e.g. lodash zod@^4)")
   .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
-  .option("--package-manager <pm>", "Force npm|pnpm|yarn|bun")
+  .addOption(
+    new Option("--package-manager <pm>", "Force the package manager").choices([
+      "npm",
+      "pnpm",
+      "yarn",
+      "bun",
+    ]),
+  )
   .option("--skip-install", "Skip local install; only sync from package.json")
   .option("--dry-run", "Don't push manifest, just print it")
   .action((packages, options) => libInstallCommand(packages, options));
