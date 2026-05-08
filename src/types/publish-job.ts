@@ -21,8 +21,8 @@ export type BlockBuildStatus =
 export interface PublishJobBlockResult {
   type: string;
   version: string;
-  sourceUrl: string;
   status: BlockBuildStatus | string;
+  sourceUrl?: string | null;
   bundleUrls?: { server: string; client: string; styles: string } | null;
   bundleSizes?: { server: number; client: number; styles: number } | null;
   bundleMs?: number | null;
@@ -44,7 +44,7 @@ export interface PublishJob {
   id: string;
   workspaceId: string;
   status: PublishJobStatus | string;
-  libManifestHash: string;
+  libManifestHash?: string | null;
   snapshotId?: string | null;
   blocks: PublishJobBlockResult[];
   timings: PublishJobTimings;
