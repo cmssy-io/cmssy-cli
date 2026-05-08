@@ -92,10 +92,26 @@ export async function libInstallCommand(
       );
       process.exit(1);
     }
-    if (result.status !== 0) {
+    if (result.signal) {
+      console.error(
+        chalk.red(
+          `✖ ${pm} ${args.join(" ")} terminated by signal ${result.signal}`,
+        ),
+      );
+      process.exit(1);
+    }
+    if (typeof result.status === "number" && result.status !== 0) {
       console.error(
         chalk.red(
           `✖ ${pm} ${args.join(" ")} exited with code ${result.status}`,
+        ),
+      );
+      process.exit(1);
+    }
+    if (result.status === null) {
+      console.error(
+        chalk.red(
+          `✖ ${pm} ${args.join(" ")} ended without an exit code (no signal reported)`,
         ),
       );
       process.exit(1);
