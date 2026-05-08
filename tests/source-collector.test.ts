@@ -191,6 +191,18 @@ describe("collectBlockSources", () => {
     );
   });
 
+  it("rejects oversize file via stat pre-check (no full read)", async () => {
+    const dir = await makeBlock({
+      "package.json": '{"name":"big","version":"0.1.0"}',
+      "src/index.tsx": "x",
+    });
+    const huge = Buffer.alloc(MAX_TOTAL_BYTES + 5, 0x62).toString("utf8");
+    await fs.writeFile(path.join(dir, "src/huge.ts"), huge);
+    await expect(collectBlockSources({ blockDir: dir })).rejects.toThrow(
+      /sources exceed/,
+    );
+  });
+
   it("accepts entry path with backslashes (Windows) and leading ./", async () => {
     const dir = await makeBlock({
       "package.json": '{"name":"hero","version":"0.1.0"}',
@@ -246,5 +258,9 @@ describe("normalizeEntryPath", () => {
   it("rejects empty input", () => {
     expect(() => normalizeEntryPath("./")).toThrow(/empty/);
     expect(() => normalizeEntryPath("")).toThrow(/empty/);
+  });
+  it("rejects Windows drive-letter absolute paths", () => {
+    expect(() => normalizeEntryPath("C:\\foo\\bar.tsx")).toThrow(/relative/);
+    expect(() => normalizeEntryPath("D:/bar/baz.tsx")).toThrow(/relative/);
   });
 });

@@ -11,14 +11,14 @@ export async function resolveWorkspaceId(
   optsValue: string | boolean | undefined,
   config: WorkspaceResolveSource,
 ): Promise<string> {
-  if (typeof optsValue === "string" && optsValue.length > 0) {
-    return optsValue;
+  if (typeof optsValue === "string") {
+    const trimmed = optsValue.trim();
+    if (trimmed.length > 0) return trimmed;
   }
-  if (config.workspaceId) {
-    console.log(
-      chalk.gray(`Using workspace ID from .env: ${config.workspaceId}`),
-    );
-    return config.workspaceId;
+  const fromEnv = config.workspaceId?.trim();
+  if (fromEnv) {
+    console.log(chalk.gray(`Using workspace ID from .env: ${fromEnv}`));
+    return fromEnv;
   }
   const answer = await inquirer.prompt<{ workspaceId: string }>([
     {
@@ -26,10 +26,12 @@ export async function resolveWorkspaceId(
       name: "workspaceId",
       message: "Enter Workspace ID:",
       validate: (v) =>
-        v ? true : "Workspace ID is required (or set CMSSY_WORKSPACE_ID)",
+        v.trim().length > 0
+          ? true
+          : "Workspace ID is required (or set CMSSY_WORKSPACE_ID)",
     },
   ]);
-  return answer.workspaceId;
+  return answer.workspaceId.trim();
 }
 
 export function warnIfWorkspaceIdLooksWrong(workspaceId: string): void {

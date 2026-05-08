@@ -106,13 +106,14 @@ export async function collectBlockSources(
         continue;
       }
       const absPath = path.join(dir, name);
-      const buf = await fs.readFile(absPath);
-      totalBytes += buf.byteLength;
-      if (totalBytes > MAX_TOTAL_BYTES) {
+      const fileStat = await fs.stat(absPath);
+      if (totalBytes + fileStat.size > MAX_TOTAL_BYTES) {
         throw new Error(
-          `block sources exceed ${MAX_TOTAL_BYTES} bytes - prune large assets or split the block`,
+          `block sources exceed ${MAX_TOTAL_BYTES} bytes (would-be ${totalBytes + fileStat.size} after "${relParent ? `${relParent}/${name}` : name}") - prune large assets or split the block`,
         );
       }
+      const buf = await fs.readFile(absPath);
+      totalBytes += buf.byteLength;
       const relPath = relParent ? `${relParent}/${name}` : name;
       const lower = relPath.toLowerCase();
       if (seenLowercased.has(lower)) {
@@ -148,7 +149,13 @@ export async function collectBlockSources(
 }
 
 export function normalizeEntryPath(input: string): string {
-  let p = input.trim().replace(/\\/g, "/");
+  const trimmed = input.trim();
+  if (path.isAbsolute(trimmed) || path.win32.isAbsolute(trimmed)) {
+    throw new Error(
+      `entry path must be relative to the block directory, got "${input}"`,
+    );
+  }
+  let p = trimmed.replace(/\\/g, "/");
   while (p.startsWith("./")) {
     p = p.slice(2);
   }

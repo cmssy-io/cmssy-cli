@@ -65,6 +65,27 @@ describe("buildLibManifest", () => {
     expect(() => buildLibManifest({ lodash: "" })).toThrow(/empty version/);
   });
 
+  it("treats whitespace-only version specs as empty", () => {
+    expect(() => buildLibManifest({ lodash: "   " })).toThrow(/empty version/);
+  });
+
+  it("rejects unsupported version sources case-insensitively and after trim", () => {
+    expect(() => buildLibManifest({ a: "  NPM:other@^1" })).toThrow(
+      /unsupported version source/,
+    );
+    expect(() => buildLibManifest({ b: "GIT+https://x" })).toThrow(
+      /unsupported version source/,
+    );
+    expect(() => buildLibManifest({ c: "  Workspace:*" })).toThrow(
+      /unsupported version source/,
+    );
+  });
+
+  it("trims valid version specs before storing", () => {
+    const m = buildLibManifest({ lodash: "  ^4.0.0  " });
+    expect(m.dependencies.lodash).toBe("^4.0.0");
+  });
+
   it("rejects version specs with illegal characters", () => {
     expect(() => buildLibManifest({ lodash: "1.0.0; rm -rf /" })).toThrow(
       /illegal characters/,

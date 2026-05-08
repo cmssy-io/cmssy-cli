@@ -33,35 +33,37 @@ export function buildLibManifest(deps: Record<string, string>): LibManifest {
       errors.push(`invalid npm package name: "${name}"`);
       continue;
     }
-    if (typeof spec !== "string" || spec.length === 0) {
+    if (typeof spec !== "string" || spec.trim().length === 0) {
       errors.push(`empty version spec for "${name}"`);
       continue;
     }
-    if (spec.length > 100) {
+    const normalizedSpec = spec.trim();
+    if (normalizedSpec.length > 100) {
       errors.push(`version spec too long for "${name}" (max 100 chars)`);
       continue;
     }
+    const lowerSpec = normalizedSpec.toLowerCase();
     if (
-      spec.startsWith("npm:") ||
-      spec.startsWith("git") ||
-      spec.startsWith("file:") ||
-      spec.startsWith("workspace:") ||
-      spec.startsWith("link:") ||
-      spec.startsWith("http:") ||
-      spec.startsWith("https:")
+      lowerSpec.startsWith("npm:") ||
+      lowerSpec.startsWith("git") ||
+      lowerSpec.startsWith("file:") ||
+      lowerSpec.startsWith("workspace:") ||
+      lowerSpec.startsWith("link:") ||
+      lowerSpec.startsWith("http:") ||
+      lowerSpec.startsWith("https:")
     ) {
       errors.push(
         `unsupported version source for "${name}": "${spec}" (aliases, git, file:, workspace:, link:, http(s) all rejected)`,
       );
       continue;
     }
-    if (!VALID_VERSION_SPEC.test(spec)) {
+    if (!VALID_VERSION_SPEC.test(normalizedSpec)) {
       errors.push(
         `version spec for "${name}" contains illegal characters: "${spec}"`,
       );
       continue;
     }
-    out[name] = spec;
+    out[name] = normalizedSpec;
   }
   if (errors.length > 0) {
     throw new Error(
