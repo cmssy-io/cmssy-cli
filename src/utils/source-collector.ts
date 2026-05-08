@@ -137,15 +137,16 @@ export async function collectBlockSources(
     throw new Error(`block at ${blockDir} contains no recognized source files`);
   }
 
-  const hasEntry = files.some((f) => f.relPath === entryRel);
-  if (!hasEntry) {
+  const entryLower = entryRel.toLowerCase();
+  const entryMatch = files.find((f) => f.relPath.toLowerCase() === entryLower);
+  if (!entryMatch) {
     throw new Error(
       `entry path "${entryRel}" not found in block source tree (${blockDir})`,
     );
   }
 
   files.sort((a, b) => a.relPath.localeCompare(b.relPath));
-  return { files, entryPath: entryRel };
+  return { files, entryPath: entryMatch.relPath };
 }
 
 export function normalizeEntryPath(input: string): string {

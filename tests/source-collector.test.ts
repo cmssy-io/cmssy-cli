@@ -165,6 +165,18 @@ describe("collectBlockSources", () => {
     expect(result.entryPath).toBe("src/main.tsx");
   });
 
+  it("matches entry path case-insensitively and returns the on-disk casing", async () => {
+    const dir = await makeBlock({
+      "package.json": '{"name":"hero","version":"0.1.0"}',
+      "src/Main.tsx": "x",
+    });
+    const result = await collectBlockSources({
+      blockDir: dir,
+      entryRel: "src/main.tsx",
+    });
+    expect(result.entryPath).toBe("src/Main.tsx");
+  });
+
   it("rejects trees exceeding MAX_FILES", async () => {
     const files: Record<string, string> = {
       "package.json": '{"name":"big","version":"0.1.0"}',

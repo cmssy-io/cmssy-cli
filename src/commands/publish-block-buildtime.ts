@@ -53,11 +53,29 @@ export async function publishBlockBuildtimeCommand(
     process.exit(1);
   }
 
+  if (!BLOCK_TYPE_REGEX.test(blockName)) {
+    console.error(
+      chalk.red(
+        `✖ Block name "${blockName}" must match /^[a-z][a-z0-9-]*$/ for the build pipeline (rejects path separators, traversal, uppercase)`,
+      ),
+    );
+    process.exit(1);
+  }
+
   const workspaceId = await resolveWorkspaceId(options.workspace, config);
   warnIfWorkspaceIdLooksWrong(workspaceId);
 
   const cwd = process.cwd();
-  const blockDir = path.resolve(cwd, "blocks", blockName);
+  const blocksRoot = path.resolve(cwd, "blocks");
+  const blockDir = path.resolve(blocksRoot, blockName);
+  if (blockDir !== blocksRoot && !blockDir.startsWith(blocksRoot + path.sep)) {
+    console.error(
+      chalk.red(
+        `✖ Block path "${blockDir}" escapes blocks/ root (refusing to read).`,
+      ),
+    );
+    process.exit(1);
+  }
   if (!(await fs.pathExists(blockDir))) {
     console.error(chalk.red(`✖ Block "${blockName}" not found at ${blockDir}`));
     process.exit(1);
@@ -88,14 +106,6 @@ export async function publishBlockBuildtimeCommand(
     );
   }
   const blockType = blockName;
-  if (!BLOCK_TYPE_REGEX.test(blockType)) {
-    console.error(
-      chalk.red(
-        `✖ Block name "${blockType}" must match /^[a-z][a-z0-9-]*$/ for the build pipeline`,
-      ),
-    );
-    process.exit(1);
-  }
   const blockVersion = pkg.version;
   if (!BLOCK_VERSION_REGEX.test(blockVersion)) {
     console.error(
