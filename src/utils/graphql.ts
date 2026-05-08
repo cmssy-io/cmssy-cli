@@ -132,7 +132,30 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
   }
 `;
 
-const PUBLISH_JOB_FIELDS = `
+const PUBLISH_JOB_POLL_FIELDS = `
+  id
+  workspaceId
+  status
+  blocks {
+    type
+    version
+    status
+    bundleMs
+    error { code stage message }
+  }
+  timings {
+    queuedAt
+    buildStartedAt
+    buildCompletedAt
+    spawnMs
+    pnpmInstallMs
+    networkLockdownMs
+    snapshotMs
+  }
+  error { code stage message }
+`;
+
+const PUBLISH_JOB_FULL_FIELDS = `
   id
   workspaceId
   status
@@ -159,15 +182,12 @@ const PUBLISH_JOB_FIELDS = `
     snapshotMs
   }
   error { code stage message }
-  createdAt
-  updatedAt
-  completedAt
 `;
 
 export const PUBLISH_BLOCK_MUTATION = `
   mutation PublishBlock($input: PublishBlockInput!) {
     publishBlock(input: $input) {
-      ${PUBLISH_JOB_FIELDS}
+      ${PUBLISH_JOB_FULL_FIELDS}
     }
   }
 `;
@@ -175,7 +195,15 @@ export const PUBLISH_BLOCK_MUTATION = `
 export const PUBLISH_JOB_STATUS_QUERY = `
   query PublishJobStatus($jobId: ID!) {
     publishJobStatus(jobId: $jobId) {
-      ${PUBLISH_JOB_FIELDS}
+      ${PUBLISH_JOB_POLL_FIELDS}
+    }
+  }
+`;
+
+export const PUBLISH_JOB_FULL_QUERY = `
+  query PublishJobFull($jobId: ID!) {
+    publishJobStatus(jobId: $jobId) {
+      ${PUBLISH_JOB_FULL_FIELDS}
     }
   }
 `;

@@ -6,6 +6,7 @@ import { hasConfig, loadConfig } from "../utils/config.js";
 import {
   createClient,
   PUBLISH_BLOCK_MUTATION,
+  PUBLISH_JOB_FULL_QUERY,
   PUBLISH_JOB_STATUS_QUERY,
 } from "../utils/graphql.js";
 import {
@@ -185,6 +186,17 @@ export async function publishBlockBuildtimeCommand(
     );
     process.exit(1);
   }
+
+  try {
+    const full = await client.request<{ publishJobStatus: PublishJob | null }>(
+      PUBLISH_JOB_FULL_QUERY,
+      { jobId: job.id },
+    );
+    if (full.publishJobStatus) finalJob = full.publishJobStatus;
+  } catch {
+    void 0;
+  }
+
   printJobReport(finalJob);
 
   if (finalJob.status !== PUBLISH_JOB_STATUS.COMPLETED) {
