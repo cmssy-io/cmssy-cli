@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import chalk from "chalk";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { buildCommand } from "./commands/build.js";
 import { codegenCommand } from "./commands/codegen.js";
 import { configureCommand } from "./commands/configure.js";
@@ -14,6 +14,8 @@ import { testCommand } from "./commands/test.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
+import { publishBlockBuildtimeCommand } from "./commands/publish-block-buildtime.js";
+import { libInstallCommand, libSyncCommand } from "./commands/lib.js";
 import { packageCommand } from "./commands/package.js";
 import { skillsInstallCommand, skillsListCommand } from "./commands/skills.js";
 import { uploadCommand } from "./commands/upload.js";
@@ -298,6 +300,63 @@ Content preservation:
 `,
   )
   .action(publishCommand);
+
+program
+  .command("publish-block")
+  .description(
+    "Publish a single block via the build pipeline (Vercel Sandbox + Inngest).\n\n" +
+      "  Sends the block source tree to the backend, which packs it as tar.gz,\n" +
+      "  uploads to Vercel Blob, then enqueues an Inngest job that bundles in\n" +
+      "  a sandbox and stores artifacts back to Blob.",
+  )
+  .argument("<name>", "Block directory name under blocks/")
+  .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
+  .option(
+    "--entry <path>",
+    "Entry path inside block dir (default: src/index.tsx)",
+  )
+  .option("--dry-run", "Collect files and print plan without uploading")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy publish-block hero                   Publish blocks/hero
+  $ cmssy publish-block hero --dry-run         Show what would be sent
+  $ cmssy publish-block faq -w 65f...          Override workspace
+
+Limits per block: 200 files, 10 MB total.
+Build polling: 1.5s interval, 10 minute cap, gives up after 5 consecutive errors.
+`,
+  )
+  .action((name, options) => publishBlockBuildtimeCommand(name, options));
+
+const lib = program
+  .command("lib")
+  .description("Manage the workspace's npm dependency manifest");
+
+lib
+  .command("install")
+  .description("Install npm package(s) locally and sync the manifest")
+  .argument("<packages...>", "npm package specs (e.g. lodash zod@^4)")
+  .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
+  .addOption(
+    new Option("--package-manager <pm>", "Force the package manager").choices([
+      "npm",
+      "pnpm",
+      "yarn",
+      "bun",
+    ]),
+  )
+  .option("--skip-install", "Skip local install; only sync from package.json")
+  .option("--dry-run", "Don't push manifest, just print it")
+  .action((packages, options) => libInstallCommand(packages, options));
+
+lib
+  .command("sync")
+  .description("Push current package.json deps to the workspace manifest")
+  .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
+  .option("--dry-run", "Don't push manifest, just print it")
+  .action((options) => libSyncCommand(options));
 
 // cmssy sync
 program

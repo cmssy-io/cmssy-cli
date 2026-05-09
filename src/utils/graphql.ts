@@ -131,3 +131,87 @@ export const GET_WORKSPACE_BLOCKS_QUERY = `
     }
   }
 `;
+
+const PUBLISH_JOB_POLL_FIELDS = `
+  id
+  workspaceId
+  status
+  blocks {
+    type
+    version
+    status
+    bundleMs
+    error { code stage message }
+  }
+  timings {
+    queuedAt
+    buildStartedAt
+    buildCompletedAt
+    spawnMs
+    pnpmInstallMs
+    networkLockdownMs
+    snapshotMs
+  }
+  error { code stage message }
+`;
+
+const PUBLISH_JOB_FULL_FIELDS = `
+  id
+  workspaceId
+  status
+  libManifestHash
+  snapshotId
+  blocks {
+    type
+    version
+    sourceUrl
+    status
+    bundleUrls { server client styles }
+    bundleSizes { server client styles }
+    bundleMs
+    ssrTestMs
+    error { code stage message }
+  }
+  timings {
+    queuedAt
+    buildStartedAt
+    buildCompletedAt
+    spawnMs
+    pnpmInstallMs
+    networkLockdownMs
+    snapshotMs
+  }
+  error { code stage message }
+`;
+
+export const PUBLISH_BLOCK_MUTATION = `
+  mutation PublishBlock($input: PublishBlockInput!) {
+    publishBlock(input: $input) {
+      ${PUBLISH_JOB_FULL_FIELDS}
+    }
+  }
+`;
+
+export const PUBLISH_JOB_STATUS_QUERY = `
+  query PublishJobStatus($jobId: ID!) {
+    publishJobStatus(jobId: $jobId) {
+      ${PUBLISH_JOB_POLL_FIELDS}
+    }
+  }
+`;
+
+export const PUBLISH_JOB_FULL_QUERY = `
+  query PublishJobFull($jobId: ID!) {
+    publishJobStatus(jobId: $jobId) {
+      ${PUBLISH_JOB_FULL_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_WORKSPACE_LIBS_MUTATION = `
+  mutation UpdateWorkspaceLibs($input: UpdateWorkspaceLibsInput!) {
+    updateWorkspaceLibs(input: $input) {
+      dependencies
+    }
+  }
+`;
