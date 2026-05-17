@@ -138,21 +138,6 @@ export async function publishBlockBuildtimeCommand(
     process.exit(1);
   }
 
-  // Extract defaultContent from config.ts so the backend smoke test can
-  // render the block with realistic props instead of a sentinel object.
-  // Null is fine - backend falls back to the legacy smoke sentinel.
-  let defaultContent: Record<string, unknown> | null = null;
-  try {
-    const blockConfig = await loadBlockConfig(blockDir);
-    if (blockConfig?.schema) {
-      defaultContent = extractDefaultContent(blockConfig.schema);
-    }
-  } catch {
-    // Non-fatal - publish continues without defaultContent and the
-    // smoke test runs against the legacy sentinel content.
-    defaultContent = null;
-  }
-
   if (options.dryRun) {
     console.log(
       chalk.cyan(
@@ -165,6 +150,24 @@ export async function publishBlockBuildtimeCommand(
     console.log(chalk.gray(`\nTarget API: ${config.apiUrl}`));
     console.log(chalk.gray(`Target workspace: ${workspaceId}\n`));
     return;
+  }
+
+  // Extract defaultContent from config.ts so the backend smoke test
+  // can render the block with realistic props instead of a sentinel
+  // object. Null is fine - backend falls back to the legacy smoke
+  // sentinel. Deferred until after the dry-run short-circuit so the
+  // dry-run preview never executes the block's config.ts (which may
+  // have side effects: cache files, network, etc.).
+  let defaultContent: Record<string, unknown> | null = null;
+  try {
+    const blockConfig = await loadBlockConfig(blockDir);
+    if (blockConfig?.schema) {
+      defaultContent = extractDefaultContent(blockConfig.schema);
+    }
+  } catch {
+    // Non-fatal - publish continues without defaultContent and the
+    // smoke test runs against the legacy sentinel content.
+    defaultContent = null;
   }
 
   const client = createClient();

@@ -124,18 +124,26 @@ export async function collectBlockSources(
   function addFile(absPath: string, relPath: string, buf: Buffer): void {
     let content = buf;
     if (relPath.toLowerCase().endsWith(".css")) {
-      // Strip bare-specifier `@import "tailwindcss"` / `@import "x/y"`
+      // Strip bare-specifier `@import "tailwindcss"` style at-rules
       // - they target postcss/Tailwind processing, esbuild cannot
       // resolve them, and the consumer site re-processes utility
       // classes via its own Tailwind pipeline at render time.
-      // Preserve relative imports (`./`, `../`) AND absolute URLs
-      // (`http(s)://`, protocol-relative `//`) - web fonts and CDN
-      // stylesheets are valid runtime references.
+      // Preserve:
+      // - relative imports (`./`, `../`) - block-local CSS
+      // - absolute URLs (`http(s)://`, protocol-relative `//`) - web
+      //   fonts and CDN stylesheets
+      // - tsconfig path aliases (`@/...`) - imported file lands in
+      //   the archive via the import scanner; dropping the @import
+      //   would orphan it
+      // Match the FULL at-rule (including condition lists like
+      // `layer(base)`, `supports(...)`, media queries) up to the
+      // terminating `;` so we never leave a dangling `layer(base);`
+      // behind.
       const text = buf.toString("utf8");
       const stripped = text.replace(
-        /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?\s*;?\s*\n?/g,
+        /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?[^;]*;[ \t]*\n?/g,
         (match, spec: string) => {
-          if (/^(?:\.\.?\/|https?:\/\/|\/\/)/.test(spec)) return match;
+          if (/^(?:\.\.?\/|https?:\/\/|\/\/|@\/)/.test(spec)) return match;
           return "";
         },
       );

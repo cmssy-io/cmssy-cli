@@ -1398,18 +1398,6 @@ async function publishToWorkspace(
 // Re-export from publish-helpers (single source of truth)
 // DO NOT duplicate convertSchemaToFields here
 import { convertSchemaToFields } from "../utils/publish-helpers.js";
-
-// Helper: Extract default content from schema
-function extractDefaultContent(schema: Record<string, any>): any {
-  const content: any = {};
-
-  Object.entries(schema).forEach(([key, field]: [string, any]) => {
-    if (field.defaultValue !== undefined) {
-      content[key] = field.defaultValue;
-    } else if (field.type === "repeater") {
-      content[key] = [];
-    }
-  });
-
-  return content;
-}
+// Single source of truth shared with publish-block-buildtime so the
+// two publish paths can't drift on what "default content" means.
+import { extractDefaultContent } from "../utils/block-config.js";
