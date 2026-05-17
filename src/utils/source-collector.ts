@@ -118,14 +118,20 @@ export async function collectBlockSources(
   function addFile(absPath: string, relPath: string, buf: Buffer): void {
     let content = buf;
     if (relPath.toLowerCase().endsWith(".css")) {
-      // Strip bare-specifier @imports (e.g. `@import "tailwindcss"`):
-      // they target postcss/Tailwind processing, esbuild cannot resolve
-      // them, and the consumer site re-processes utility classes via
-      // its own Tailwind pipeline at render time.
+      // Strip bare-specifier `@import "tailwindcss"` / `@import "x/y"`
+      // - they target postcss/Tailwind processing, esbuild cannot
+      // resolve them, and the consumer site re-processes utility
+      // classes via its own Tailwind pipeline at render time.
+      // Preserve relative imports (`./`, `../`) AND absolute URLs
+      // (`http(s)://`, protocol-relative `//`) - web fonts and CDN
+      // stylesheets are valid runtime references.
       const text = buf.toString("utf8");
       const stripped = text.replace(
-        /@import\s+(?:url\(\s*)?["'](?![./])[^"']+["'](?:\s*\))?\s*;?\s*\n?/g,
-        "",
+        /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?\s*;?\s*\n?/g,
+        (match, spec: string) => {
+          if (/^(?:\.\.?\/|https?:\/\/|\/\/)/.test(spec)) return match;
+          return "";
+        },
       );
       if (stripped !== text) {
         content = Buffer.from(stripped);
@@ -137,7 +143,19 @@ export async function collectBlockSources(
       );
     }
     const lower = relPath.toLowerCase();
-    if (collected.has(lower)) return;
+    const existing = collected.get(lower);
+    if (existing) {
+      // Same case-folded path already collected. Tolerate the exact
+      // same path (e.g. an import resolver landing on a file already
+      // walked from blockDir); refuse a case-only collision so we
+      // don't silently drop a file on case-sensitive filesystems.
+      if (existing.relPath !== relPath) {
+        throw new Error(
+          `duplicate path "${relPath}" collides case-insensitively with "${existing.relPath}" - paths must be unique`,
+        );
+      }
+      return;
+    }
     collected.set(lower, {
       relPath,
       contentBase64: content.toString("base64"),
@@ -260,7 +278,13 @@ export async function collectBlockSources(
 }
 
 async function findProjectRoot(blockDir: string): Promise<string> {
-  let dir = path.resolve(blockDir);
+  // Prefer an ancestor with package.json (the real cmssy-marketing
+  // layout: blockDir is `blocks/<name>` whose own package.json is the
+  // block manifest, not the project root). Fall back to blockDir
+  // itself when no ancestor has a manifest - covers test fixtures and
+  // legacy single-block trees where the block is the project.
+  const resolved = path.resolve(blockDir);
+  let dir = resolved;
   for (let i = 0; i < 16; i++) {
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -269,8 +293,11 @@ async function findProjectRoot(blockDir: string): Promise<string> {
     }
     dir = parent;
   }
+  if (await fs.pathExists(path.join(resolved, "package.json"))) {
+    return resolved;
+  }
   throw new Error(
-    `Could not find a parent directory with package.json above "${blockDir}" - publish requires a project root`,
+    `Could not find a directory with package.json at or above "${blockDir}" - publish requires a project root`,
   );
 }
 
@@ -281,14 +308,11 @@ async function loadTsConfigPaths(projectRoot: string): Promise<TsConfigPaths> {
   }
   try {
     const raw = await fs.readFile(tsconfigPath, "utf8");
-    // Tolerant JSONC: strip line comments + trailing commas. Block
-    // comments are NOT stripped because the naive `/* ... */` regex
-    // also matches substrings inside JSON strings like
-    // `"blocks/**/*"` (the `**/` ends a fake block comment opened by
-    // an earlier `@/*` path), which silently truncates the file.
-    const cleaned = raw
-      .replace(/(^|[^:])\/\/.*$/gm, "$1")
-      .replace(/,(\s*[}\]])/g, "$1");
+    // Tolerant JSONC: strip line + block comments + trailing commas
+    // string-aware so we don't truncate paths like `"blocks/**/*"`
+    // (whose `*/` would close a fake block comment opened by an
+    // earlier `@/*` in the same file).
+    const cleaned = stripJsoncCommentsAndTrailingCommas(raw);
     const parsed = JSON.parse(cleaned) as {
       compilerOptions?: {
         baseUrl?: string;
@@ -367,19 +391,23 @@ function matchTsPath(
 }
 
 async function resolveTarget(target: string): Promise<string | null> {
-  if (await fs.pathExists(target)) {
-    const stat = await fs.stat(target).catch(() => null);
-    if (stat?.isFile()) return target;
-    if (stat?.isDirectory()) {
-      for (const ext of RESOLVE_EXTS) {
-        const candidate = path.join(target, `index${ext}`);
-        if (await fs.pathExists(candidate)) return candidate;
-      }
+  // `lstat` so we refuse to follow a symlink. The block-dir walk
+  // already skips symbolic links; mirroring that here stops an
+  // imported in-project symlink from sneaking a file from outside
+  // the project root into the archive under an in-project path.
+  const lstat = await fs.lstat(target).catch(() => null);
+  if (lstat?.isFile()) return target;
+  if (lstat?.isDirectory()) {
+    for (const ext of RESOLVE_EXTS) {
+      const candidate = path.join(target, `index${ext}`);
+      const candLstat = await fs.lstat(candidate).catch(() => null);
+      if (candLstat?.isFile()) return candidate;
     }
   }
   for (const ext of RESOLVE_EXTS) {
     const candidate = `${target}${ext}`;
-    if (await fs.pathExists(candidate)) return candidate;
+    const candLstat = await fs.lstat(candidate).catch(() => null);
+    if (candLstat?.isFile()) return candidate;
   }
   return null;
 }
@@ -391,10 +419,15 @@ function hasProjectRootTsconfig(
 }
 
 function buildSyntheticTsconfig(tsconfig: TsConfigPaths): string {
+  // Preserve the original baseUrl so projects that point paths at a
+  // non-root directory (e.g. `baseUrl: "src", paths: { "@/*": ["*"] }`)
+  // keep resolving the same way inside the sandbox. We default to "."
+  // only when the source tsconfig didn't specify one - matches TS's
+  // default behavior when baseUrl is omitted.
   return `${JSON.stringify(
     {
       compilerOptions: {
-        baseUrl: ".",
+        baseUrl: tsconfig.baseUrl || ".",
         paths: tsconfig.paths,
         jsx: "preserve",
         moduleResolution: "bundler",
@@ -407,6 +440,51 @@ function buildSyntheticTsconfig(tsconfig: TsConfigPaths): string {
 
 function toForwardSlash(p: string): string {
   return p.split(path.sep).join("/");
+}
+
+function stripJsoncCommentsAndTrailingCommas(input: string): string {
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    // String literal: copy verbatim, including any `//` or `/*` inside.
+    if (ch === '"') {
+      out += ch;
+      i++;
+      while (i < input.length) {
+        const c = input[i];
+        out += c;
+        if (c === "\\") {
+          if (i + 1 < input.length) {
+            out += input[i + 1];
+            i += 2;
+            continue;
+          }
+        }
+        i++;
+        if (c === '"') break;
+      }
+      continue;
+    }
+    // Line comment.
+    if (ch === "/" && input[i + 1] === "/") {
+      i += 2;
+      while (i < input.length && input[i] !== "\n") i++;
+      continue;
+    }
+    // Block comment.
+    if (ch === "/" && input[i + 1] === "*") {
+      i += 2;
+      while (i < input.length && !(input[i] === "*" && input[i + 1] === "/"))
+        i++;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  // Trailing commas.
+  return out.replace(/,(\s*[}\]])/g, "$1");
 }
 
 export function normalizeEntryPath(input: string): string {
