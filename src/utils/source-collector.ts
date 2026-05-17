@@ -102,12 +102,18 @@ export async function collectBlockSources(
   }
 
   const projectRoot = await findProjectRoot(blockDir);
-  const blockProjectRel = toForwardSlash(path.relative(projectRoot, blockDir));
-  if (!blockProjectRel || blockProjectRel.startsWith("..")) {
+  const relFromRoot = toForwardSlash(path.relative(projectRoot, blockDir));
+  // Empty `relFromRoot` is legal: it means blockDir IS the project
+  // root (`findProjectRoot` fell back to blockDir's own package.json).
+  // In that layout block files live at their natural relative paths
+  // (no `blocks/<name>/` prefix). `..` segments still indicate the
+  // block sits outside the resolved root.
+  if (relFromRoot.startsWith("..")) {
     throw new Error(
       `block directory ${blockDir} is not inside project root ${projectRoot}`,
     );
   }
+  const blockProjectRel = relFromRoot;
 
   const tsconfig = await loadTsConfigPaths(projectRoot);
 
@@ -196,19 +202,28 @@ export async function collectBlockSources(
       }
       const absPath = path.join(dir, name);
       const buf = await fs.readFile(absPath);
-      const projectRel = `${blockProjectRel}/${relParent ? `${relParent}/${name}` : name}`;
+      const relInBlock = relParent ? `${relParent}/${name}` : name;
+      const projectRel = blockProjectRel
+        ? `${blockProjectRel}/${relInBlock}`
+        : relInBlock;
       addFile(absPath, projectRel, buf);
     }
   }
 
   await walkBlockDir(blockDir, "");
 
-  const entryProjectRel = `${blockProjectRel}/${entryRel}`;
-  if (!collected.has(entryProjectRel.toLowerCase())) {
+  const entryLookup = blockProjectRel
+    ? `${blockProjectRel}/${entryRel}`
+    : entryRel;
+  const entryHit = collected.get(entryLookup.toLowerCase());
+  if (!entryHit) {
     throw new Error(
       `entry path "${entryRel}" not found in block source tree (${blockDir})`,
     );
   }
+  // Use the on-disk casing rather than the caller-supplied entryRel
+  // so the backend's `entryPath` check matches what's in `files[]`.
+  const entryProjectRel = entryHit.relPath;
 
   const queue: string[] = [];
   for (const absPath of collectedAbs) {
@@ -265,7 +280,13 @@ export async function collectBlockSources(
     }
   }
 
-  if (!hasProjectRootTsconfig(collected)) {
+  // Only emit a synthetic tsconfig when the project actually carries
+  // path aliases that the sandbox esbuild needs to resolve. Without
+  // this, every legacy single-block fixture (no parent tsconfig)
+  // would get an extra file in the archive even though it has no
+  // aliases to resolve.
+  const hasAliases = Object.keys(tsconfig.paths).length > 0;
+  if (hasAliases && !hasProjectRootTsconfig(collected)) {
     const synthetic = buildSyntheticTsconfig(tsconfig);
     const buf = Buffer.from(synthetic);
     addFile(path.join(projectRoot, "tsconfig.json"), "tsconfig.json", buf);
