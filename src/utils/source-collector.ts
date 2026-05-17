@@ -49,21 +49,14 @@ const DEFAULT_IGNORE_FILES = new Set([
 const TEST_FILE_REGEX =
   /\.(test|spec|stories|story)\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 
-// Match esbuild's default `resolveExtensions` order so the collector
-// archives the same file the sandbox build will bundle. With `.ts`
-// listed before `.tsx`, a block with both `Button.ts` and
-// `Button.tsx` would archive the wrong file when an import omits
-// the extension.
-const RESOLVE_EXTS = [
-  ".tsx",
-  ".ts",
-  ".jsx",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".json",
-];
+// Match esbuild's default `resolveExtensions` exactly so the collector
+// archives the same file the sandbox build will bundle. esbuild's
+// default is `.tsx, .ts, .jsx, .js, .css, .json` - it does NOT try
+// `.mjs` / `.cjs` for extensionless imports, so listing them here
+// would let the collector pick e.g. `foo.mjs` while the sandbox
+// bundle resolved `foo.css` instead. Files with explicit `.mjs` /
+// `.cjs` extensions still walk and bundle normally.
+const RESOLVE_EXTS = [".tsx", ".ts", ".jsx", ".js", ".css", ".json"];
 
 const SCANNABLE_EXTS = new Set([
   ".ts",
