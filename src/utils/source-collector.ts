@@ -301,6 +301,16 @@ export async function collectBlockSources(
       if (segments.some((seg) => seg.startsWith("."))) {
         continue;
       }
+      // Match the block-walk `ignoreDirs` exclusion too. A transitive
+      // import like `../../node_modules/pkg/index.js` resolves to a
+      // path technically inside the project root (so the
+      // `startsWith("..")` filter doesn't fire), but the walker would
+      // have skipped that directory entirely. Without this guard the
+      // collector silently archives `node_modules` / `dist` / `.next`
+      // content the caller never intended to ship.
+      if (segments.some((seg) => ignoreDirs.has(seg))) {
+        continue;
+      }
       const ext = path.extname(resolved).toLowerCase();
       if (!includeExt.has(ext)) continue;
       // Stat-then-read so a single oversize import (e.g. a stray
@@ -460,12 +470,21 @@ function matchTsPath(
 }
 
 async function resolveTarget(target: string): Promise<string | null> {
-  // Resolution order matches Node + TS + esbuild: extension-suffixed
-  // candidates BEFORE directory-index lookup. Reversing this order
-  // produced a real mismatch with esbuild when a workspace had both
-  // `components/button.tsx` (file) AND `components/button/index.tsx`
-  // (directory). esbuild bundles the file; the collector was archiving
-  // the directory's index instead.
+  // If the import already names an explicit, known extension
+  // (`@/styles/main.css`, `./foo.js`), an exact match wins outright -
+  // never start probing `main.css.tsx` / `foo.js.tsx`, which would
+  // archive the wrong file when both exist in a project.
+  const targetExt = path.extname(target).toLowerCase();
+  if (targetExt && RESOLVE_EXTS.includes(targetExt)) {
+    const exactLstat = await fs.lstat(target).catch(() => null);
+    if (exactLstat?.isFile()) return target;
+  }
+  // Otherwise extensionless: try extension-suffixed candidates BEFORE
+  // directory-index lookup to match Node + TS + esbuild semantics.
+  // Reversing this order produced a real mismatch with esbuild when
+  // a workspace had both `components/button.tsx` (file) AND
+  // `components/button/index.tsx` (directory) - esbuild bundles the
+  // file; the collector was archiving the directory's index.
   for (const ext of RESOLVE_EXTS) {
     const candidate = `${target}${ext}`;
     const candLstat = await fs.lstat(candidate).catch(() => null);
