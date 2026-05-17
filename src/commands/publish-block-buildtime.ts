@@ -14,6 +14,10 @@ import {
   type CollectResult,
 } from "../utils/source-collector.js";
 import {
+  extractDefaultContent,
+  loadBlockConfig,
+} from "../utils/block-config.js";
+import {
   resolveWorkspaceId,
   warnIfWorkspaceIdLooksWrong,
 } from "../utils/resolve-workspace.js";
@@ -148,6 +152,24 @@ export async function publishBlockBuildtimeCommand(
     return;
   }
 
+  // Extract defaultContent from config.ts so the backend smoke test
+  // can render the block with realistic props instead of a sentinel
+  // object. Null is fine - backend falls back to the legacy smoke
+  // sentinel. Deferred until after the dry-run short-circuit so the
+  // dry-run preview never executes the block's config.ts (which may
+  // have side effects: cache files, network, etc.).
+  let defaultContent: Record<string, unknown> | null = null;
+  try {
+    const blockConfig = await loadBlockConfig(blockDir);
+    if (blockConfig?.schema) {
+      defaultContent = extractDefaultContent(blockConfig.schema);
+    }
+  } catch {
+    // Non-fatal - publish continues without defaultContent and the
+    // smoke test runs against the legacy sentinel content.
+    defaultContent = null;
+  }
+
   const client = createClient();
   client.setHeader("x-workspace-id", workspaceId);
 
@@ -163,6 +185,7 @@ export async function publishBlockBuildtimeCommand(
           blockType,
           blockVersion,
           entryPath: collected.entryPath,
+          defaultContent,
           files: collected.files.map((f) => ({
             path: f.relPath,
             contentBase64: f.contentBase64,
