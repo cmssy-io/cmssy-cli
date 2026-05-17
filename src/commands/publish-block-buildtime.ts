@@ -14,6 +14,10 @@ import {
   type CollectResult,
 } from "../utils/source-collector.js";
 import {
+  extractDefaultContent,
+  loadBlockConfig,
+} from "../utils/block-config.js";
+import {
   resolveWorkspaceId,
   warnIfWorkspaceIdLooksWrong,
 } from "../utils/resolve-workspace.js";
@@ -134,6 +138,21 @@ export async function publishBlockBuildtimeCommand(
     process.exit(1);
   }
 
+  // Extract defaultContent from config.ts so the backend smoke test can
+  // render the block with realistic props instead of a sentinel object.
+  // Null is fine - backend falls back to the legacy smoke sentinel.
+  let defaultContent: Record<string, unknown> | null = null;
+  try {
+    const blockConfig = await loadBlockConfig(blockDir);
+    if (blockConfig?.schema) {
+      defaultContent = extractDefaultContent(blockConfig.schema);
+    }
+  } catch {
+    // Non-fatal - publish continues without defaultContent and the
+    // smoke test runs against the legacy sentinel content.
+    defaultContent = null;
+  }
+
   if (options.dryRun) {
     console.log(
       chalk.cyan(
@@ -163,6 +182,7 @@ export async function publishBlockBuildtimeCommand(
           blockType,
           blockVersion,
           entryPath: collected.entryPath,
+          defaultContent,
           files: collected.files.map((f) => ({
             path: f.relPath,
             contentBase64: f.contentBase64,

@@ -49,6 +49,27 @@ const DEFAULT_IGNORE_FILES = new Set([
 const TEST_FILE_REGEX =
   /\.(test|spec|stories|story)\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 
+const RESOLVE_EXTS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".json",
+];
+
+const SCANNABLE_EXTS = new Set([
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".css",
+]);
+
 export const MAX_FILES = 200;
 export const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
@@ -57,6 +78,11 @@ export interface CollectOptions {
   entryRel?: string;
   includeExt?: Set<string>;
   ignoreDirs?: Set<string>;
+}
+
+interface TsConfigPaths {
+  baseUrl: string;
+  paths: Record<string, string[]>;
 }
 
 export async function collectBlockSources(
@@ -75,11 +101,57 @@ export async function collectBlockSources(
     throw new Error(`block path is not a directory: ${blockDir}`);
   }
 
-  const files: CollectedFile[] = [];
-  const seenLowercased = new Set<string>();
+  const projectRoot = await findProjectRoot(blockDir);
+  const blockProjectRel = toForwardSlash(path.relative(projectRoot, blockDir));
+  if (!blockProjectRel || blockProjectRel.startsWith("..")) {
+    throw new Error(
+      `block directory ${blockDir} is not inside project root ${projectRoot}`,
+    );
+  }
+
+  const tsconfig = await loadTsConfigPaths(projectRoot);
+
+  const collected = new Map<string, CollectedFile>();
+  const collectedAbs = new Set<string>();
   let totalBytes = 0;
 
-  async function walk(dir: string, relParent: string): Promise<void> {
+  function addFile(absPath: string, relPath: string, buf: Buffer): void {
+    let content = buf;
+    if (relPath.toLowerCase().endsWith(".css")) {
+      // Strip bare-specifier @imports (e.g. `@import "tailwindcss"`):
+      // they target postcss/Tailwind processing, esbuild cannot resolve
+      // them, and the consumer site re-processes utility classes via
+      // its own Tailwind pipeline at render time.
+      const text = buf.toString("utf8");
+      const stripped = text.replace(
+        /@import\s+(?:url\(\s*)?["'](?![./])[^"']+["'](?:\s*\))?\s*;?\s*\n?/g,
+        "",
+      );
+      if (stripped !== text) {
+        content = Buffer.from(stripped);
+      }
+    }
+    if (totalBytes + content.byteLength > MAX_TOTAL_BYTES) {
+      throw new Error(
+        `block sources exceed ${MAX_TOTAL_BYTES} bytes (would-be ${totalBytes + content.byteLength} after "${relPath}") - prune large assets or split the block`,
+      );
+    }
+    const lower = relPath.toLowerCase();
+    if (collected.has(lower)) return;
+    collected.set(lower, {
+      relPath,
+      contentBase64: content.toString("base64"),
+    });
+    collectedAbs.add(absPath);
+    totalBytes += content.byteLength;
+    if (collected.size > MAX_FILES) {
+      throw new Error(
+        `block has more than ${MAX_FILES} source files - prune the tree before publishing`,
+      );
+    }
+  }
+
+  async function walkBlockDir(dir: string, relParent: string): Promise<void> {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const name = entry.name;
@@ -89,7 +161,7 @@ export async function collectBlockSources(
         if (name.startsWith(".")) continue;
         if (!SEGMENT_REGEX.test(name)) continue;
         const nextRel = relParent ? `${relParent}/${name}` : name;
-        await walk(path.join(dir, name), nextRel);
+        await walkBlockDir(path.join(dir, name), nextRel);
         continue;
       }
       if (!entry.isFile()) continue;
@@ -98,55 +170,243 @@ export async function collectBlockSources(
       if (TEST_FILE_REGEX.test(name)) continue;
       if (!SEGMENT_REGEX.test(name)) continue;
       const ext = path.extname(name).toLowerCase();
-      const baseName = path.basename(name);
-      const isPkg = baseName === "package.json";
-      const isCfg = baseName === "config.ts" || baseName === "config.js";
-      const isPreview = baseName === "preview.json";
+      const isPkg = name === "package.json";
+      const isCfg = name === "config.ts" || name === "config.js";
+      const isPreview = name === "preview.json";
       if (!isPkg && !isCfg && !isPreview && !includeExt.has(ext)) {
         continue;
       }
       const absPath = path.join(dir, name);
-      const fileStat = await fs.stat(absPath);
-      if (totalBytes + fileStat.size > MAX_TOTAL_BYTES) {
-        throw new Error(
-          `block sources exceed ${MAX_TOTAL_BYTES} bytes (would-be ${totalBytes + fileStat.size} after "${relParent ? `${relParent}/${name}` : name}") - prune large assets or split the block`,
-        );
-      }
       const buf = await fs.readFile(absPath);
-      totalBytes += buf.byteLength;
-      const relPath = relParent ? `${relParent}/${name}` : name;
-      const lower = relPath.toLowerCase();
-      if (seenLowercased.has(lower)) {
-        throw new Error(
-          `duplicate path "${relPath}" (paths must be unique case-insensitively)`,
-        );
-      }
-      seenLowercased.add(lower);
-      files.push({ relPath, contentBase64: buf.toString("base64") });
-      if (files.length > MAX_FILES) {
-        throw new Error(
-          `block has more than ${MAX_FILES} source files - prune the tree before publishing`,
-        );
-      }
+      const projectRel = `${blockProjectRel}/${relParent ? `${relParent}/${name}` : name}`;
+      addFile(absPath, projectRel, buf);
     }
   }
 
-  await walk(blockDir, "");
+  await walkBlockDir(blockDir, "");
 
-  if (files.length === 0) {
-    throw new Error(`block at ${blockDir} contains no recognized source files`);
-  }
-
-  const entryLower = entryRel.toLowerCase();
-  const entryMatch = files.find((f) => f.relPath.toLowerCase() === entryLower);
-  if (!entryMatch) {
+  const entryProjectRel = `${blockProjectRel}/${entryRel}`;
+  if (!collected.has(entryProjectRel.toLowerCase())) {
     throw new Error(
       `entry path "${entryRel}" not found in block source tree (${blockDir})`,
     );
   }
 
-  files.sort((a, b) => a.relPath.localeCompare(b.relPath));
-  return { files, entryPath: entryMatch.relPath };
+  const queue: string[] = [];
+  for (const absPath of collectedAbs) {
+    const ext = path.extname(absPath).toLowerCase();
+    if (SCANNABLE_EXTS.has(ext)) queue.push(absPath);
+  }
+  const scanned = new Set<string>();
+
+  while (queue.length > 0) {
+    const importerAbs = queue.shift()!;
+    if (scanned.has(importerAbs)) continue;
+    scanned.add(importerAbs);
+
+    let source: string;
+    try {
+      source = await fs.readFile(importerAbs, "utf8");
+    } catch {
+      continue;
+    }
+    const importerExt = path.extname(importerAbs).toLowerCase();
+    const specs = extractImportSpecifiers(source, importerExt);
+    for (const spec of specs) {
+      const resolved = await resolveImportSpecifier(
+        spec,
+        importerAbs,
+        projectRoot,
+        tsconfig,
+      );
+      if (!resolved) continue;
+      if (collectedAbs.has(resolved)) continue;
+
+      const externalProjectRel = toForwardSlash(
+        path.relative(projectRoot, resolved),
+      );
+      if (!externalProjectRel || externalProjectRel.startsWith("..")) {
+        // Outside project root - silently skip (e.g., monorepo workspace dep).
+        continue;
+      }
+      const segments = externalProjectRel.split("/");
+      if (segments.some((seg) => !SEGMENT_REGEX.test(seg))) {
+        continue;
+      }
+      const ext = path.extname(resolved).toLowerCase();
+      if (!includeExt.has(ext)) continue;
+      try {
+        const buf = await fs.readFile(resolved);
+        addFile(resolved, externalProjectRel, buf);
+      } catch {
+        continue;
+      }
+      if (SCANNABLE_EXTS.has(ext)) {
+        queue.push(resolved);
+      }
+    }
+  }
+
+  if (!hasProjectRootTsconfig(collected)) {
+    const synthetic = buildSyntheticTsconfig(tsconfig);
+    const buf = Buffer.from(synthetic);
+    addFile(path.join(projectRoot, "tsconfig.json"), "tsconfig.json", buf);
+  }
+
+  const files = [...collected.values()].sort((a, b) =>
+    a.relPath.localeCompare(b.relPath),
+  );
+  return { files, entryPath: entryProjectRel };
+}
+
+async function findProjectRoot(blockDir: string): Promise<string> {
+  let dir = path.resolve(blockDir);
+  for (let i = 0; i < 16; i++) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    if (await fs.pathExists(path.join(parent, "package.json"))) {
+      return parent;
+    }
+    dir = parent;
+  }
+  throw new Error(
+    `Could not find a parent directory with package.json above "${blockDir}" - publish requires a project root`,
+  );
+}
+
+async function loadTsConfigPaths(projectRoot: string): Promise<TsConfigPaths> {
+  const tsconfigPath = path.join(projectRoot, "tsconfig.json");
+  if (!(await fs.pathExists(tsconfigPath))) {
+    return { baseUrl: ".", paths: {} };
+  }
+  try {
+    const raw = await fs.readFile(tsconfigPath, "utf8");
+    // Tolerant JSONC: strip line comments + trailing commas. Block
+    // comments are NOT stripped because the naive `/* ... */` regex
+    // also matches substrings inside JSON strings like
+    // `"blocks/**/*"` (the `**/` ends a fake block comment opened by
+    // an earlier `@/*` path), which silently truncates the file.
+    const cleaned = raw
+      .replace(/(^|[^:])\/\/.*$/gm, "$1")
+      .replace(/,(\s*[}\]])/g, "$1");
+    const parsed = JSON.parse(cleaned) as {
+      compilerOptions?: {
+        baseUrl?: string;
+        paths?: Record<string, string[]>;
+      };
+    };
+    return {
+      baseUrl: parsed.compilerOptions?.baseUrl ?? ".",
+      paths: parsed.compilerOptions?.paths ?? {},
+    };
+  } catch {
+    return { baseUrl: ".", paths: {} };
+  }
+}
+
+const IMPORT_FROM_RE =
+  /(?:^|[\s;{}()])(?:import|export)\s+(?:type\s+)?[\s\S]+?\s+from\s+["']([^"']+)["']/g;
+const IMPORT_SIDE_RE = /(?:^|[\s;{}()])import\s+["']([^"']+)["']/g;
+const IMPORT_DYN_RE = /\bimport\s*\(\s*["']([^"']+)["']/g;
+const REQUIRE_RE = /\brequire\s*\(\s*["']([^"']+)["']/g;
+const CSS_IMPORT_RE = /@import\s+(?:url\(\s*)?["']([^"']+)["']/g;
+const CSS_URL_RE = /\burl\(\s*["']?([^"')]+)["']?\s*\)/g;
+
+function extractImportSpecifiers(code: string, fileExt: string): string[] {
+  const all = new Set<string>();
+  const isCss = fileExt === ".css";
+  const regexes = isCss
+    ? [CSS_IMPORT_RE, CSS_URL_RE]
+    : [IMPORT_FROM_RE, IMPORT_SIDE_RE, IMPORT_DYN_RE, REQUIRE_RE];
+  for (const re of regexes) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(code)) !== null) {
+      all.add(m[1]);
+    }
+  }
+  return [...all];
+}
+
+async function resolveImportSpecifier(
+  spec: string,
+  importerAbs: string,
+  projectRoot: string,
+  tsconfig: TsConfigPaths,
+): Promise<string | null> {
+  if (!spec) return null;
+  if (spec.startsWith(".")) {
+    return resolveTarget(path.resolve(path.dirname(importerAbs), spec));
+  }
+  for (const [pattern, mappings] of Object.entries(tsconfig.paths)) {
+    const matched = matchTsPath(spec, pattern, mappings);
+    if (!matched) continue;
+    for (const candidate of matched) {
+      const target = path.resolve(projectRoot, tsconfig.baseUrl, candidate);
+      const found = await resolveTarget(target);
+      if (found) return found;
+    }
+    return null;
+  }
+  return null;
+}
+
+function matchTsPath(
+  spec: string,
+  pattern: string,
+  mappings: string[],
+): string[] | null {
+  if (pattern.endsWith("/*")) {
+    const prefix = pattern.slice(0, -1);
+    if (!spec.startsWith(prefix)) return null;
+    const rest = spec.slice(prefix.length);
+    return mappings.map((m) => m.replace(/\*$/, rest));
+  }
+  if (spec === pattern) return mappings;
+  return null;
+}
+
+async function resolveTarget(target: string): Promise<string | null> {
+  if (await fs.pathExists(target)) {
+    const stat = await fs.stat(target).catch(() => null);
+    if (stat?.isFile()) return target;
+    if (stat?.isDirectory()) {
+      for (const ext of RESOLVE_EXTS) {
+        const candidate = path.join(target, `index${ext}`);
+        if (await fs.pathExists(candidate)) return candidate;
+      }
+    }
+  }
+  for (const ext of RESOLVE_EXTS) {
+    const candidate = `${target}${ext}`;
+    if (await fs.pathExists(candidate)) return candidate;
+  }
+  return null;
+}
+
+function hasProjectRootTsconfig(
+  collected: Map<string, CollectedFile>,
+): boolean {
+  return collected.has("tsconfig.json");
+}
+
+function buildSyntheticTsconfig(tsconfig: TsConfigPaths): string {
+  return `${JSON.stringify(
+    {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: tsconfig.paths,
+        jsx: "preserve",
+        moduleResolution: "bundler",
+      },
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+function toForwardSlash(p: string): string {
+  return p.split(path.sep).join("/");
 }
 
 export function normalizeEntryPath(input: string): string {
