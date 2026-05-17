@@ -49,11 +49,16 @@ const DEFAULT_IGNORE_FILES = new Set([
 const TEST_FILE_REGEX =
   /\.(test|spec|stories|story)\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 
+// Match esbuild's default `resolveExtensions` order so the collector
+// archives the same file the sandbox build will bundle. With `.ts`
+// listed before `.tsx`, a block with both `Button.ts` and
+// `Button.tsx` would archive the wrong file when an import omits
+// the extension.
 const RESOLVE_EXTS = [
-  ".ts",
   ".tsx",
-  ".js",
+  ".ts",
   ".jsx",
+  ".js",
   ".mjs",
   ".cjs",
   ".css",
@@ -130,6 +135,7 @@ export async function collectBlockSources(
       // classes via its own Tailwind pipeline at render time.
       // Preserve:
       // - relative imports (`./`, `../`) - block-local CSS
+      // - root-relative URLs (`/theme.css`) - consumer site asset
       // - absolute URLs (`http(s)://`, protocol-relative `//`) - web
       //   fonts and CDN stylesheets
       // - any tsconfig path alias (`@/...`, `components/...`, ...) -
@@ -143,7 +149,7 @@ export async function collectBlockSources(
       const stripped = text.replace(
         /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?[^;]*;[ \t]*\n?/g,
         (match, spec: string) => {
-          if (/^(?:\.\.?\/|https?:\/\/|\/\/)/.test(spec)) return match;
+          if (/^(?:\.\.?\/|\/|https?:\/\/)/.test(spec)) return match;
           if (specMatchesAnyAlias(spec, tsconfig.paths)) return match;
           return "";
         },
