@@ -201,6 +201,18 @@ export async function collectBlockSources(
         continue;
       }
       const absPath = path.join(dir, name);
+      // Stat-then-read so a single malicious or accidentally-huge
+      // file (e.g. a stray screenshot in src/) can't blow past the
+      // archive budget before we fail the publish. addFile applies
+      // the cumulative cap; this catches per-file outliers up front
+      // without ever allocating their content into memory.
+      const fileStat = await fs.stat(absPath);
+      const relForError = relParent ? `${relParent}/${name}` : name;
+      if (totalBytes + fileStat.size > MAX_TOTAL_BYTES) {
+        throw new Error(
+          `block sources exceed ${MAX_TOTAL_BYTES} bytes (would-be ${totalBytes + fileStat.size} after "${relForError}") - prune large assets or split the block`,
+        );
+      }
       const buf = await fs.readFile(absPath);
       const relInBlock = relParent ? `${relParent}/${name}` : name;
       const projectRel = blockProjectRel
@@ -266,8 +278,29 @@ export async function collectBlockSources(
       if (segments.some((seg) => !SEGMENT_REGEX.test(seg))) {
         continue;
       }
+      // Match the block-walk dotfile exclusion. `import "../.env"` or
+      // `import "../.generated/foo"` would otherwise smuggle hidden
+      // files into the archive even though the walker treats them as
+      // out of scope - a workspace publishing a block could leak
+      // local secrets that way.
+      if (segments.some((seg) => seg.startsWith("."))) {
+        continue;
+      }
       const ext = path.extname(resolved).toLowerCase();
       if (!includeExt.has(ext)) continue;
+      // Stat-then-read so a single oversize import (e.g. a stray
+      // PDF/binary asset) fails fast instead of allocating GB into
+      // memory before the cumulative cap fires. Unlike the block
+      // walk, transitive imports tolerate missing/unreadable files
+      // (silently skipped) - we never throw at the user for a flaky
+      // node_modules layout we didn't ask them to publish.
+      const fileStat = await fs.stat(resolved).catch(() => null);
+      if (!fileStat) continue;
+      if (totalBytes + fileStat.size > MAX_TOTAL_BYTES) {
+        throw new Error(
+          `block sources exceed ${MAX_TOTAL_BYTES} bytes (would-be ${totalBytes + fileStat.size} after "${externalProjectRel}") - prune large assets or split the block`,
+        );
+      }
       try {
         const buf = await fs.readFile(resolved);
         addFile(resolved, externalProjectRel, buf);
