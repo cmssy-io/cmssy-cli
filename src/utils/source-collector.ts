@@ -132,9 +132,9 @@ export async function collectBlockSources(
       // - relative imports (`./`, `../`) - block-local CSS
       // - absolute URLs (`http(s)://`, protocol-relative `//`) - web
       //   fonts and CDN stylesheets
-      // - tsconfig path aliases (`@/...`) - imported file lands in
-      //   the archive via the import scanner; dropping the @import
-      //   would orphan it
+      // - any tsconfig path alias (`@/...`, `components/...`, ...) -
+      //   imported file lands in the archive via the import scanner;
+      //   dropping the @import would orphan it
       // Match the FULL at-rule (including condition lists like
       // `layer(base)`, `supports(...)`, media queries) up to the
       // terminating `;` so we never leave a dangling `layer(base);`
@@ -143,7 +143,8 @@ export async function collectBlockSources(
       const stripped = text.replace(
         /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?[^;]*;[ \t]*\n?/g,
         (match, spec: string) => {
-          if (/^(?:\.\.?\/|https?:\/\/|\/\/|@\/)/.test(spec)) return match;
+          if (/^(?:\.\.?\/|https?:\/\/|\/\/)/.test(spec)) return match;
+          if (specMatchesAnyAlias(spec, tsconfig.paths)) return match;
           return "";
         },
       );
@@ -280,6 +281,13 @@ export async function collectBlockSources(
       );
       if (!externalProjectRel || externalProjectRel.startsWith("..")) {
         // Outside project root - silently skip (e.g., monorepo workspace dep).
+        continue;
+      }
+      // `path.relative` doesn't follow symlinks - it works on the
+      // unresolved string. An in-project symlinked ancestor (e.g.
+      // `vendor -> /etc`) would slip through above. Resolve realpath
+      // for both paths and re-check the parent relationship.
+      if (!(await isWithinRealProjectRoot(resolved, projectRoot))) {
         continue;
       }
       const segments = externalProjectRel.split("/");
@@ -453,6 +461,17 @@ function matchTsPath(
 }
 
 async function resolveTarget(target: string): Promise<string | null> {
+  // Resolution order matches Node + TS + esbuild: extension-suffixed
+  // candidates BEFORE directory-index lookup. Reversing this order
+  // produced a real mismatch with esbuild when a workspace had both
+  // `components/button.tsx` (file) AND `components/button/index.tsx`
+  // (directory). esbuild bundles the file; the collector was archiving
+  // the directory's index instead.
+  for (const ext of RESOLVE_EXTS) {
+    const candidate = `${target}${ext}`;
+    const candLstat = await fs.lstat(candidate).catch(() => null);
+    if (candLstat?.isFile()) return candidate;
+  }
   // `lstat` so we refuse to follow a symlink. The block-dir walk
   // already skips symbolic links; mirroring that here stops an
   // imported in-project symlink from sneaking a file from outside
@@ -466,12 +485,31 @@ async function resolveTarget(target: string): Promise<string | null> {
       if (candLstat?.isFile()) return candidate;
     }
   }
-  for (const ext of RESOLVE_EXTS) {
-    const candidate = `${target}${ext}`;
-    const candLstat = await fs.lstat(candidate).catch(() => null);
-    if (candLstat?.isFile()) return candidate;
-  }
   return null;
+}
+
+// Defense against symlinked ancestor segments. `lstat(final)` only
+// checks the leaf; an in-project symlink directory imported as
+// `./linked-vendor/foo` would let esbuild collect a file whose real
+// location is outside projectRoot. `realpath` resolves the entire
+// chain, after which a startsWith(projectRoot-realpath) check is
+// authoritative.
+async function isWithinRealProjectRoot(
+  resolvedPath: string,
+  projectRoot: string,
+): Promise<boolean> {
+  try {
+    const [realFile, realRoot] = await Promise.all([
+      fs.realpath(resolvedPath),
+      fs.realpath(projectRoot),
+    ]);
+    const rootWithSep = realRoot.endsWith(path.sep)
+      ? realRoot
+      : realRoot + path.sep;
+    return realFile === realRoot || realFile.startsWith(rootWithSep);
+  } catch {
+    return false;
+  }
 }
 
 function hasProjectRootTsconfig(
@@ -502,6 +540,26 @@ function buildSyntheticTsconfig(tsconfig: TsConfigPaths): string {
 
 function toForwardSlash(p: string): string {
   return p.split(path.sep).join("/");
+}
+
+// Does this CSS @import specifier match ANY configured tsconfig path
+// alias? Used to keep `@import "@/styles/x.css"` or `@import
+// "components/tokens.css"` in the archive when the project declares
+// those aliases - the imported file is collected via the import
+// scanner; stripping the at-rule would orphan it.
+function specMatchesAnyAlias(
+  spec: string,
+  paths: Record<string, string[]>,
+): boolean {
+  for (const pattern of Object.keys(paths)) {
+    if (pattern.endsWith("/*")) {
+      const prefix = pattern.slice(0, -1);
+      if (spec.startsWith(prefix)) return true;
+    } else if (spec === pattern) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function stripJsoncCommentsAndTrailingCommas(input: string): string {
