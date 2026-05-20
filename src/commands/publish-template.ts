@@ -23,7 +23,9 @@ interface PublishTemplateOptions {
   patch?: boolean;
   minor?: boolean;
   major?: boolean;
-  noBump?: boolean;
+  // Commander's `--no-bump` sets this to `false` (default `true`);
+  // there is NO `noBump` option. Mirrors the legacy publish command.
+  bump?: boolean;
   dryRun?: boolean;
   overwriteContent?: boolean;
 }
@@ -36,10 +38,10 @@ const TEMPLATE_NAME_REGEX = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * Templates are declarative - no sandbox build needed. Reads
- * `templates/<name>/config.ts` + `pages.json` + `preview.json` and
- * uploads via the existing `IMPORT_TEMPLATE_MUTATION`. The mutation
- * triggers cache revalidation backend-side (CMS-604/CMS-843), so the
- * public site picks up the new template without manual intervention.
+ * `templates/<name>/config.ts` + `pages.json` and uploads via the
+ * existing `IMPORT_TEMPLATE_MUTATION`. The mutation triggers cache
+ * revalidation backend-side (CMS-604/CMS-843), so the public site
+ * picks up the new template without manual intervention.
  *
  * Mirrors `publish-block` UX (same option flags, same workspace
  * resolution) so users can mentally swap `block` ↔ `template` without
@@ -148,10 +150,12 @@ export async function publishTemplateCommand(
     process.exit(1);
   }
 
-  // Bump version unless --no-bump
+  // Bump version unless --no-bump. Commander sets `options.bump = false`
+  // for `--no-bump`; default is `true`. Matches the legacy publish
+  // command's convention.
   const currentVersion = packageJson.version ?? "0.0.0";
   let nextVersion = currentVersion;
-  if (!options.noBump) {
+  if (options.bump !== false) {
     const bumpType = options.major
       ? "major"
       : options.minor
@@ -159,7 +163,19 @@ export async function publishTemplateCommand(
         : options.patch
           ? "patch"
           : "patch"; // default to patch when no flag
-    nextVersion = semver.inc(currentVersion, bumpType) ?? currentVersion;
+    const bumped = semver.inc(currentVersion, bumpType);
+    if (!bumped) {
+      // Silent fallback to currentVersion would publish "in place" and
+      // hide a real config problem (typo in package.json version,
+      // pre-release tag we don't recognize, etc.). Fail loud instead.
+      console.error(
+        chalk.red(
+          `✖ Cannot ${bumpType}-bump invalid version "${currentVersion}" in templates/${templateName}/package.json. Fix it or pass --no-bump.\n`,
+        ),
+      );
+      process.exit(1);
+    }
+    nextVersion = bumped;
   }
 
   // Pre-validate user input from pages.json / config.ts before mapping
