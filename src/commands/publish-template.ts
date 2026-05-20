@@ -109,6 +109,24 @@ export async function publishTemplateCommand(
     );
     process.exit(1);
   }
+  // Lexical startsWith catches `..` traversal but NOT symlinks
+  // (`templates/foo -> /etc` resolves to a path inside templates/
+  // syntactically while pointing outside on disk). Compare realpaths
+  // to close that gap. realpathSync requires the path to exist - the
+  // existsSync check above guarantees that.
+  const realTemplatesRoot = fs.realpathSync(templatesRoot);
+  const realTemplatePath = fs.realpathSync(templatePath);
+  if (
+    realTemplatePath !== realTemplatesRoot &&
+    !realTemplatePath.startsWith(realTemplatesRoot + path.sep)
+  ) {
+    console.error(
+      chalk.red(
+        `✖ Template path "${templatePath}" resolves to "${realTemplatePath}" (outside templates/) - refusing to read.\n`,
+      ),
+    );
+    process.exit(1);
+  }
 
   // Read package.json (for version bumping)
   const pkgJsonPath = path.join(templatePath, "package.json");
@@ -223,14 +241,23 @@ export async function publishTemplateCommand(
     console.error(chalk.red(`✖ templates/${templateName}: ${msg}\n`));
     process.exit(1);
   };
+  // Treat whitespace-only strings as missing - `" "` is truthy in JS,
+  // so a naive `!value` check would let them through and produce empty
+  // block types / position keys downstream.
+  const isNonEmptyString = (v: unknown): v is string =>
+    typeof v === "string" && v.trim().length > 0;
   const pageSource = pagesData.pages ?? [];
   pageSource.forEach((page, pageIdx) => {
-    const pageLabel = page?.slug ?? `page[${pageIdx}]`;
-    if (typeof page?.slug !== "string" || !page.slug) {
+    // Resolve label BEFORE the slug check so a missing/blank slug
+    // still produces an actionable prefix instead of a leading blank.
+    const pageLabel = isNonEmptyString(page?.slug)
+      ? page.slug
+      : `page[${pageIdx}]`;
+    if (!isNonEmptyString(page?.slug)) {
       failValidation(`${pageLabel} is missing a non-empty string \`slug\``);
     }
     (page.blocks ?? []).forEach((block: any, blockIdx: number) => {
-      if (typeof block?.type !== "string" || !block.type) {
+      if (!isNonEmptyString(block?.type)) {
         failValidation(
           `${pageLabel} block[${blockIdx}] is missing a non-empty string \`type\``,
         );
@@ -248,15 +275,12 @@ export async function publishTemplateCommand(
         ? Object.values(page.layoutPositions)
         : [];
     lpSource.forEach((lp: any, lpIdx: number) => {
-      if (typeof lp?.type !== "string" || !lp.type) {
+      if (!isNonEmptyString(lp?.type)) {
         failValidation(
           `${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
         );
       }
-      if (
-        lpIsArrayPerPage &&
-        (typeof lp?.position !== "string" || !lp.position)
-      ) {
+      if (lpIsArrayPerPage && !isNonEmptyString(lp?.position)) {
         failValidation(
           `${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`position\``,
         );
@@ -270,12 +294,12 @@ export async function publishTemplateCommand(
       ? Object.values(pagesData.layoutPositions)
       : [];
   lpSourceGlobal.forEach((lp: any, lpIdx: number) => {
-    if (typeof lp?.type !== "string" || !lp.type) {
+    if (!isNonEmptyString(lp?.type)) {
       failValidation(
         `global layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
       );
     }
-    if (lpIsArrayGlobal && (typeof lp?.position !== "string" || !lp.position)) {
+    if (lpIsArrayGlobal && !isNonEmptyString(lp?.position)) {
       failValidation(
         `global layoutPosition[${lpIdx}] is missing a non-empty string \`position\``,
       );
