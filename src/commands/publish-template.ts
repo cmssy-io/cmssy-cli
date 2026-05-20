@@ -261,11 +261,16 @@ function resolveNextVersion(
   templateName: string,
 ): string {
   if (options.bump === false) return currentVersion;
-  const bumpType: semver.ReleaseType = options.major
-    ? "major"
-    : options.minor
-      ? "minor"
-      : "patch";
+  const flags: semver.ReleaseType[] = [];
+  if (options.major) flags.push("major");
+  if (options.minor) flags.push("minor");
+  if (options.patch) flags.push("patch");
+  if (flags.length > 1) {
+    bail(
+      `Conflicting bump flags: ${flags.map((f) => `--${f}`).join(" + ")}. Pass at most one of --patch / --minor / --major.`,
+    );
+  }
+  const bumpType = flags[0] ?? "patch";
   const bumped = semver.inc(currentVersion, bumpType);
   if (!bumped) {
     // Silent fallback would publish "in place" and hide a real config
@@ -300,12 +305,34 @@ function validatePagesData(
     });
   };
 
+  // Guard the .forEach calls below - malformed pages.json could ship
+  // `pages: {}` or `blocks: {}` which would throw a TypeError on
+  // .forEach and print a raw stack trace instead of an actionable
+  // error.
+  if (pagesData.pages !== undefined && !Array.isArray(pagesData.pages)) {
+    fail("`pages` must be an array");
+  }
+
   (pagesData.pages ?? []).forEach((page, pageIdx) => {
     const pageLabel = isNonEmptyString(page?.slug)
       ? page.slug
       : `page[${pageIdx}]`;
     if (!isNonEmptyString(page?.slug)) {
       fail(`${pageLabel} is missing a non-empty string \`slug\``);
+    }
+    // After stripping leading `/`, a slug must still have content
+    // (unless the page IS the root `/`). Otherwise inputs like `"///"`
+    // or `"/   "` pass the non-empty check but normalize to an empty
+    // string downstream and get uploaded as blank.
+    const normalizedSlug =
+      page.slug === "/" ? "/" : page.slug.replace(/^\/+/, "").trim();
+    if (normalizedSlug.length === 0) {
+      fail(
+        `${pageLabel} slug normalizes to empty - use "/" for the root page or provide a non-slash path`,
+      );
+    }
+    if (page.blocks !== undefined && !Array.isArray(page.blocks)) {
+      fail(`${pageLabel} \`blocks\` must be an array`);
     }
     (page.blocks ?? []).forEach((block: any, blockIdx: number) => {
       if (!isNonEmptyString(block?.type)) {
