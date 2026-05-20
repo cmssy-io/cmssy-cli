@@ -257,11 +257,14 @@ Runs diagnostic checks:
   )
   .action(doctorCommand);
 
-// cmssy publish
+// cmssy publish (DEPRECATED - use `cmssy publish-block` instead)
 program
   .command("publish [packages...]")
   .description(
-    "Publish blocks/templates to workspace\n\n" +
+    "[DEPRECATED] Publish blocks/templates via legacy GraphQL upload.\n\n" +
+      "  Use `cmssy publish-block <name>` instead - it runs through the\n" +
+      "  Vercel Sandbox build pipeline (CMS-576) and auto-walks shared\n" +
+      "  imports. This legacy command will be removed in a future release.\n\n" +
       "  Packages are directory names from blocks/ or templates/ folders.\n" +
       "  Examples:\n" +
       "    cmssy publish hero faq --workspace abc123 --patch\n" +

@@ -328,11 +328,18 @@ cmssy codegen --workspace my-workspace-slug
 
 ### Publish to Workspace
 
+> ⚠ **Deprecated** - prefer [`cmssy publish-block`](#publish-block-sandbox-build-pipeline) for new code.
+> `cmssy publish` builds the block locally and uploads via legacy
+> GraphQL. The new `publish-block` command runs through the Vercel
+> Sandbox build pipeline (CMS-576), auto-walks shared imports, and
+> writes both server + client bundles. The legacy command will be
+> removed in a future release; see CMS-599.
+
 ```bash
 cmssy publish [packages...] [options]
 ```
 
-Publish blocks/templates to your workspace.
+Publish blocks/templates to your workspace via the legacy local-build flow.
 
 **Options:**
 
@@ -364,6 +371,42 @@ cmssy publish --all --workspace --dry-run
 - Workspace ID can be provided via flag or `CMSSY_WORKSPACE_ID` in `.env`
 - Version bumping updates `package.json` before publishing
 - Published instantly (no review required)
+
+---
+
+### Publish-block (sandbox build pipeline)
+
+```bash
+cmssy publish-block <name> [options]
+```
+
+Publish a single block via the Vercel Sandbox build pipeline (CMS-576).
+This is the preferred command for new code - it auto-walks shared
+imports (`../../components/*`, `../../lib/*`, tsconfig path aliases),
+ships them with the source archive, runs the build in an isolated
+sandbox, and writes both server (CJS for SSR) and client (ESM)
+bundles to Vercel Blob.
+
+**Options:**
+
+- `-w, --workspace [id]` - Workspace id (defaults to `.env`)
+- `--entry <path>` - Entry path inside block dir (default: `src/index.tsx`)
+- `--dry-run` - Collect files and print plan without uploading
+
+**Example:**
+
+```bash
+cmssy publish-block hero -w 507f1f77bcf86cd799439011
+cmssy publish-block header --dry-run     # see what's in the source archive
+```
+
+**Notes:**
+
+- Source files are auto-collected by walking imports from the entry.
+  Shared modules outside the block dir are detected automatically;
+  no need to declare them.
+- Limits per block: 200 files, 10 MB total.
+- Build polls every 1.5s; gives up after 10 min total or 5 errors.
 
 ---
 

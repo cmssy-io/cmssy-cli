@@ -57,6 +57,14 @@ export async function publishCommand(
   options: PublishOptions,
 ) {
   console.log(chalk.blue.bold("\n📦 Cmssy - Publish\n"));
+  console.warn(
+    chalk.yellow(
+      "⚠ `cmssy publish` is deprecated and will be removed in a future release.\n" +
+        "  Use `cmssy publish-block <name>` instead - it runs through the\n" +
+        "  Vercel Sandbox build pipeline (CMS-576) which auto-walks shared\n" +
+        "  imports and ships the new bundle artifacts the public site reads.\n",
+    ),
+  );
 
   // Validate flags: must have --workspace
   if (!options.workspace) {
