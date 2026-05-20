@@ -120,7 +120,17 @@ export async function publishTemplateCommand(
     );
     process.exit(1);
   }
-  const packageJson = fs.readJsonSync(pkgJsonPath);
+  let packageJson: any;
+  try {
+    packageJson = fs.readJsonSync(pkgJsonPath);
+  } catch (err) {
+    console.error(
+      chalk.red(
+        `✖ Failed to read templates/${templateName}/package.json: ${err instanceof Error ? err.message : String(err)}\n`,
+      ),
+    );
+    process.exit(1);
+  }
 
   // Load template config (defineTemplate metadata). `loadTemplateConfig`
   // returns null for BOTH "file missing" and "file exists but failed to
@@ -226,7 +236,13 @@ export async function publishTemplateCommand(
         );
       }
     });
-    const lpSource = Array.isArray(page?.layoutPositions)
+    // Array form `[{position, type, content}]` has `position` ON each
+    // entry; object form `{[position]: {type, content}}` carries the
+    // position in the parent KEY. Only the array form can omit
+    // `position` and leak through as `position: undefined` into the
+    // mutation - validate it here.
+    const lpIsArrayPerPage = Array.isArray(page?.layoutPositions);
+    const lpSource = lpIsArrayPerPage
       ? page.layoutPositions
       : page?.layoutPositions
         ? Object.values(page.layoutPositions)
@@ -237,9 +253,18 @@ export async function publishTemplateCommand(
           `${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
         );
       }
+      if (
+        lpIsArrayPerPage &&
+        (typeof lp?.position !== "string" || !lp.position)
+      ) {
+        failValidation(
+          `${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`position\``,
+        );
+      }
     });
   });
-  const lpSourceGlobal = Array.isArray(pagesData.layoutPositions)
+  const lpIsArrayGlobal = Array.isArray(pagesData.layoutPositions);
+  const lpSourceGlobal = lpIsArrayGlobal
     ? pagesData.layoutPositions
     : pagesData.layoutPositions
       ? Object.values(pagesData.layoutPositions)
@@ -248,6 +273,11 @@ export async function publishTemplateCommand(
     if (typeof lp?.type !== "string" || !lp.type) {
       failValidation(
         `global layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
+      );
+    }
+    if (lpIsArrayGlobal && (typeof lp?.position !== "string" || !lp.position)) {
+      failValidation(
+        `global layoutPosition[${lpIdx}] is missing a non-empty string \`position\``,
       );
     }
   });

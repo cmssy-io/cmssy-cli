@@ -1076,13 +1076,6 @@ async function compileCss(
   }
 }
 
-/**
- * Convert full block type name to simple type.
- * "@cmssy-marketing/blocks.hero" -> "hero"
- * "@vendor/blocks.pricing-table" -> "pricing-table"
- * "hero" -> "hero" (already simple)
- */
-
 async function publishToWorkspace(
   pkg: PackageInfo,
   workspaceId: string,
