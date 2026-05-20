@@ -251,27 +251,3 @@ export function convertConfigToPagesData(config: Record<string, any>): {
 
   return result;
 }
-
-/**
- * Normalize a block/template specifier (`@cmssy-marketing/blocks.hero`,
- * `blocks.hero`, `hero`) to its short type name (`hero`). Used in
- * IMPORT_BLOCK_MUTATION + IMPORT_TEMPLATE_MUTATION payloads where
- * `requiredBlocks` and per-block `type` must be the short form.
- */
-export function convertBlockTypeToSimple(blockType: string): string {
-  let simple = blockType;
-
-  // Remove @scope/ prefix
-  if (simple.includes("/")) {
-    simple = simple.split("/").pop()!;
-  }
-
-  // Remove blocks. or templates. prefix
-  if (simple.startsWith("blocks.")) {
-    simple = simple.substring(7);
-  } else if (simple.startsWith("templates.")) {
-    simple = simple.substring(10);
-  }
-
-  return simple;
-}

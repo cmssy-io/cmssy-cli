@@ -18,7 +18,7 @@ import {
   validateSchema,
 } from "../utils/block-config.js";
 import {
-  convertBlockTypeToSimple,
+  extractBlockType,
   convertConfigToPagesData,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
@@ -317,7 +317,7 @@ export async function publishCommand(
 
       let hasAnyBreaking = false;
       for (const pkg of blocksWithConfig) {
-        const blockType = convertBlockTypeToSimple(pkg.packageJson.name);
+        const blockType = extractBlockType(pkg.packageJson.name);
         const remote = remoteBlocks.find((b) => b.blockType === blockType);
         if (!remote || !remote.schemaFields?.length) continue;
 
@@ -684,13 +684,13 @@ function extractBlockTypesFromConfig(
   for (const page of config.pages || []) {
     for (const block of page.blocks || []) {
       if (block.type) {
-        blockTypes.add(convertBlockTypeToSimple(block.type));
+        blockTypes.add(extractBlockType(block.type));
       }
     }
     // Per-page layout positions
     if (Array.isArray(page.layoutPositions)) {
       for (const lp of page.layoutPositions) {
-        if (lp.type) blockTypes.add(convertBlockTypeToSimple(lp.type));
+        if (lp.type) blockTypes.add(extractBlockType(lp.type));
       }
     }
   }
@@ -698,7 +698,7 @@ function extractBlockTypesFromConfig(
   // Extract from global layoutPositions (array format from defineTemplate)
   if (Array.isArray(config.layoutPositions)) {
     for (const lp of config.layoutPositions) {
-      if (lp.type) blockTypes.add(convertBlockTypeToSimple(lp.type));
+      if (lp.type) blockTypes.add(extractBlockType(lp.type));
     }
   }
 
@@ -1261,7 +1261,7 @@ async function publishToWorkspace(
         name: page.name,
         slug,
         blocks: (page.blocks || []).map((block: any) => ({
-          type: convertBlockTypeToSimple(block.type),
+          type: extractBlockType(block.type),
           content: block.content || {},
         })),
       };
@@ -1282,7 +1282,7 @@ async function publishToWorkspace(
         result.layoutPositions = lpEntries.map(
           ([position, data]: [string, any]) => ({
             position,
-            type: convertBlockTypeToSimple(data.type),
+            type: extractBlockType(data.type),
             content: data.content || {},
           }),
         );
@@ -1297,7 +1297,7 @@ async function publishToWorkspace(
       : Object.entries(rawLayoutPositions);
     const layoutPositions = layoutEntries.map(([position, data]) => ({
       position,
-      type: convertBlockTypeToSimple(data.type),
+      type: extractBlockType(data.type),
       content: data.content || {},
     }));
 

@@ -9,8 +9,8 @@ import {
   type ImportTemplateResponse,
 } from "../utils/graphql.js";
 import {
-  convertBlockTypeToSimple,
   convertConfigToPagesData,
+  extractBlockType,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
 import {
@@ -29,6 +29,10 @@ interface PublishTemplateOptions {
 }
 
 const REQUEST_TIMEOUT_MS = 180_000;
+// Mirror publish-block-buildtime: lowercase alphanumeric + dashes,
+// must start with alphanumeric. Anything else (`../`, `/abs`, spaces)
+// is rejected before we touch the filesystem.
+const TEMPLATE_NAME_REGEX = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * Templates are declarative - no sandbox build needed. Reads
@@ -64,9 +68,36 @@ export async function publishTemplateCommand(
   const workspaceId = await resolveWorkspaceId(options.workspace, config);
   warnIfWorkspaceIdLooksWrong(workspaceId);
 
-  // Resolve template dir
-  const templatesDir = path.join(process.cwd(), "templates");
-  const templatePath = path.join(templatesDir, templateName);
+  // Validate name format before touching the filesystem. Anything that
+  // can be interpreted as a path segment (`../`, absolute paths) gets
+  // rejected here - prevents reading/writing arbitrary directories via
+  // a crafted name argument.
+  if (!TEMPLATE_NAME_REGEX.test(templateName)) {
+    console.error(
+      chalk.red(
+        `✖ Invalid template name "${templateName}" - lowercase alphanumeric + dashes only.\n`,
+      ),
+    );
+    process.exit(1);
+  }
+
+  // Resolve template dir + confirm the resolved path stays inside the
+  // templates/ root (belt-and-suspenders defense against any name
+  // that slipped past the regex above).
+  const cwd = process.cwd();
+  const templatesRoot = path.resolve(cwd, "templates");
+  const templatePath = path.resolve(templatesRoot, templateName);
+  if (
+    templatePath !== templatesRoot &&
+    !templatePath.startsWith(templatesRoot + path.sep)
+  ) {
+    console.error(
+      chalk.red(
+        `✖ Template path "${templatePath}" escapes templates/ root (refusing to read).\n`,
+      ),
+    );
+    process.exit(1);
+  }
   if (
     !fs.existsSync(templatePath) ||
     !fs.statSync(templatePath).isDirectory()
@@ -131,17 +162,62 @@ export async function publishTemplateCommand(
     nextVersion = semver.inc(currentVersion, bumpType) ?? currentVersion;
   }
 
+  // Pre-validate user input from pages.json / config.ts before mapping
+  // it into the mutation. extractBlockType blindly calls
+  // `.replace(...)` on its argument; a missing or non-string `type`
+  // would throw a runtime exception with no breadcrumb pointing at
+  // the offending page. Surface a clear error instead.
+  const pageSource = pagesData.pages ?? [];
+  pageSource.forEach((page, pageIdx) => {
+    const pageLabel = page?.slug ?? `page[${pageIdx}]`;
+    if (typeof page?.slug !== "string" || !page.slug) {
+      throw new Error(
+        `templates/${templateName}: ${pageLabel} is missing a non-empty string \`slug\``,
+      );
+    }
+    (page.blocks ?? []).forEach((block: any, blockIdx: number) => {
+      if (typeof block?.type !== "string" || !block.type) {
+        throw new Error(
+          `templates/${templateName}: ${pageLabel} block[${blockIdx}] is missing a non-empty string \`type\``,
+        );
+      }
+    });
+    const lpSource = Array.isArray(page?.layoutPositions)
+      ? page.layoutPositions
+      : page?.layoutPositions
+        ? Object.values(page.layoutPositions)
+        : [];
+    lpSource.forEach((lp: any, lpIdx: number) => {
+      if (typeof lp?.type !== "string" || !lp.type) {
+        throw new Error(
+          `templates/${templateName}: ${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
+        );
+      }
+    });
+  });
+  const lpSourceGlobal = Array.isArray(pagesData.layoutPositions)
+    ? pagesData.layoutPositions
+    : pagesData.layoutPositions
+      ? Object.values(pagesData.layoutPositions)
+      : [];
+  lpSourceGlobal.forEach((lp: any, lpIdx: number) => {
+    if (typeof lp?.type !== "string" || !lp.type) {
+      throw new Error(
+        `templates/${templateName}: global layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
+      );
+    }
+  });
+
   // Build IMPORT_TEMPLATE_MUTATION input. Pages get their slug
   // normalized and block types collapsed to short form so the backend
   // resolves them against `workspace_blocks.blockType`.
-  const pages = (pagesData.pages ?? []).map((page: any) => {
-    const slug =
-      page.slug === "/" ? "/" : String(page.slug).replace(/^\/+/, "");
+  const pages = pageSource.map((page: any) => {
+    const slug = page.slug === "/" ? "/" : page.slug.replace(/^\/+/, "");
     const result: Record<string, any> = {
       name: page.name,
       slug,
       blocks: (page.blocks ?? []).map((block: any) => ({
-        type: convertBlockTypeToSimple(block.type),
+        type: extractBlockType(block.type),
         content: block.content ?? {},
       })),
     };
@@ -155,7 +231,7 @@ export async function publishTemplateCommand(
       result.layoutPositions = lpEntries.map(
         ([position, data]: [string, any]) => ({
           position,
-          type: convertBlockTypeToSimple(data.type),
+          type: extractBlockType(data.type),
           content: data.content ?? {},
         }),
       );
@@ -169,7 +245,7 @@ export async function publishTemplateCommand(
     : Object.entries(rawLayoutPositions);
   const layoutPositions = layoutEntries.map(([position, data]) => ({
     position,
-    type: convertBlockTypeToSimple(data.type),
+    type: extractBlockType(data.type),
     content: data.content ?? {},
   }));
 
@@ -189,7 +265,7 @@ export async function publishTemplateCommand(
   // ship only what the schema accepts; the rest is consumed locally
   // (e.g. `tags` is used for `cmssy publish --marketplace` flow only).
   const input: Record<string, any> = {
-    blockType: convertBlockTypeToSimple(packageJson.name ?? templateName),
+    blockType: extractBlockType(packageJson.name ?? templateName),
     name: templateConfig.name ?? templateName,
     description: templateConfig.description ?? "",
     category: templateConfig.category ?? "website",
@@ -232,7 +308,11 @@ export async function publishTemplateCommand(
     fs.writeJsonSync(pkgJsonPath, packageJson, { spaces: 2 });
   }
 
-  // Upload via existing IMPORT_TEMPLATE_MUTATION
+  // Upload via existing IMPORT_TEMPLATE_MUTATION.
+  // AbortController + signal so the request is actually cancelled on
+  // timeout - otherwise the mutation can succeed server-side AFTER
+  // the CLI reports failure and rolls back the local version, leaving
+  // the user in an inconsistent state (server v1.2.11, local v1.2.10).
   const client = new GraphQLClient(apiUrl, {
     headers: {
       "Content-Type": "application/json",
@@ -241,25 +321,18 @@ export async function publishTemplateCommand(
     },
   });
 
-  let timeoutId: NodeJS.Timeout | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(
-        new Error(
-          `Template upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. ` +
-            "Large pages.json or slow network can cause this; retry or split the template.",
-        ),
-      );
-    }, REQUEST_TIMEOUT_MS);
-  });
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    abortController.abort();
+  }, REQUEST_TIMEOUT_MS);
 
   try {
-    const result = (await Promise.race([
-      client.request(IMPORT_TEMPLATE_MUTATION, { input }),
-      timeoutPromise,
-    ])) as ImportTemplateResponse;
-
-    if (timeoutId) clearTimeout(timeoutId);
+    const result = (await client.request({
+      document: IMPORT_TEMPLATE_MUTATION,
+      variables: { input },
+      signal: abortController.signal,
+    })) as ImportTemplateResponse;
+    clearTimeout(timeoutHandle);
 
     if (!result.importTemplate?.success) {
       throw new Error(
@@ -273,16 +346,21 @@ export async function publishTemplateCommand(
       ),
     );
   } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId);
+    clearTimeout(timeoutHandle);
     // Roll back the version bump on failure so the next attempt
     // doesn't accidentally skip a version.
     if (nextVersion !== currentVersion) {
       packageJson.version = currentVersion;
       fs.writeJsonSync(pkgJsonPath, packageJson, { spaces: 2 });
     }
+    const userMessage = abortController.signal.aborted
+      ? `Template upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Large pages.json or slow network can cause this; retry or split the template.`
+      : err instanceof Error
+        ? err.message
+        : String(err);
     console.error(
       chalk.red(
-        `\n✖ Failed to publish template ${templateName}: ${err instanceof Error ? err.message : String(err)}\n`,
+        `\n✖ Failed to publish template ${templateName}: ${userMessage}\n`,
       ),
     );
     process.exit(1);
