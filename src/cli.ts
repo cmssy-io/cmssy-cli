@@ -15,6 +15,7 @@ import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { publishCommand } from "./commands/publish.js";
 import { publishBlockBuildtimeCommand } from "./commands/publish-block-buildtime.js";
+import { publishTemplateCommand } from "./commands/publish-template.js";
 import { libInstallCommand, libSyncCommand } from "./commands/lib.js";
 import { packageCommand } from "./commands/package.js";
 import { skillsInstallCommand, skillsListCommand } from "./commands/skills.js";
@@ -329,6 +330,40 @@ Build polling: 1.5s interval, 10 minute cap, gives up after 5 consecutive errors
 `,
   )
   .action((name, options) => publishBlockBuildtimeCommand(name, options));
+
+// cmssy publish-template
+program
+  .command("publish-template")
+  .description(
+    "Publish a single template (page tree + content) to a workspace.\n\n" +
+      "  Templates are declarative - no sandbox build. Reads config.ts +\n" +
+      "  pages.json and uploads via GraphQL. The backend revalidates the\n" +
+      "  public-site cache so changes appear immediately.",
+  )
+  .argument("<name>", "Template directory name under templates/")
+  .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
+  .option("--patch", "Bump patch version (1.0.0 -> 1.0.1) - default")
+  .option("--minor", "Bump minor version (1.0.0 -> 1.1.0)")
+  .option("--major", "Bump major version (1.0.0 -> 2.0.0)")
+  .option("--no-bump", "Publish without version bump")
+  .option("--dry-run", "Print plan without uploading")
+  .option(
+    "--overwrite-content",
+    "Overwrite existing page content on republish (default: preserve)",
+  )
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ cmssy publish-template marketing-site               Publish templates/marketing-site
+  $ cmssy publish-template marketing-site --dry-run     Show the plan
+  $ cmssy publish-template blog -w 65f... --minor       Override workspace + minor bump
+
+Required blocks listed in the template must already exist in the workspace
+(publish them via \`cmssy publish-block\` first).
+`,
+  )
+  .action((name, options) => publishTemplateCommand(name, options));
 
 const lib = program
   .command("lib")

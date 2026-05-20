@@ -18,6 +18,7 @@ import {
   validateSchema,
 } from "../utils/block-config.js";
 import {
+  convertBlockTypeToSimple,
   convertConfigToPagesData,
   loadTemplateConfig,
 } from "../utils/publish-helpers.js";
@@ -1081,23 +1082,6 @@ async function compileCss(
  * "@vendor/blocks.pricing-table" -> "pricing-table"
  * "hero" -> "hero" (already simple)
  */
-function convertBlockTypeToSimple(blockType: string): string {
-  let simple = blockType;
-
-  // Remove @scope/ prefix
-  if (simple.includes("/")) {
-    simple = simple.split("/").pop()!;
-  }
-
-  // Remove blocks. or templates. prefix
-  if (simple.startsWith("blocks.")) {
-    simple = simple.substring(7);
-  } else if (simple.startsWith("templates.")) {
-    simple = simple.substring(10);
-  }
-
-  return simple;
-}
 
 async function publishToWorkspace(
   pkg: PackageInfo,

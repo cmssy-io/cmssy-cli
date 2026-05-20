@@ -71,6 +71,21 @@ export const IMPORT_TEMPLATE_MUTATION = `
 // - pageTypes: [TemplatePageTypeInput] - creates page types (e.g. "Blog Post")
 // - resetWorkspace: Boolean - deletes pages, page types, blocks (keeps media)
 
+export interface ImportTemplateResponse {
+  importTemplate?: {
+    success: boolean;
+    block?: {
+      id: string;
+      blockType: string;
+      name: string;
+      version: string;
+    };
+    pagesCreated?: number;
+    pagesUpdated?: number;
+    message?: string;
+  };
+}
+
 export const UPDATE_THEME_MUTATION = `
   mutation UpdateTheme($input: ThemeConfigInput!) {
     updateTheme(input: $input) {
