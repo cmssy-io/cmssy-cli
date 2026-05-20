@@ -456,7 +456,9 @@ function convertSchemaToLegacyFormat(
   return fields;
 }
 
-function extractDefaultContent(schema: Record<string, FieldConfig>): any {
+export function extractDefaultContent(
+  schema: Record<string, FieldConfig>,
+): any {
   const content: any = {};
 
   Object.entries(schema).forEach(([key, field]) => {
