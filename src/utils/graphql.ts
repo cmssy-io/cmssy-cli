@@ -74,6 +74,10 @@ export const IMPORT_TEMPLATE_MUTATION = `
 export interface ImportTemplateResponse {
   importTemplate?: {
     success: boolean;
+    // `block` (not `template`) matches the backend schema - templates
+    // are persisted as `WorkspaceBlock` records in `workspace_blocks`,
+    // so `ImportTemplateResult.block` returns the underlying block row.
+    // See apps/backend/src/graphql/resolvers/workspace-template.ts.
     block?: {
       id: string;
       blockType: string;

@@ -149,7 +149,11 @@ export async function publishTemplateCommand(
     version: nextVersion,
     pages,
     layoutPositions,
-    requiredBlocks: Array.from(requiredBlockTypes),
+    // Sorted so the CLI output, the uploaded payload, and a git diff
+    // of consecutive publishes are stable. Otherwise the order depends
+    // on Object.entries() traversal of `layoutPositions`, which is
+    // close to insertion-order in modern engines but not guaranteed.
+    requiredBlocks: Array.from(requiredBlockTypes).sort(),
     // Default backend behavior preserves existing page content on
     // republish; --overwrite-content flips it.
     preserveContent: !options.overwriteContent,
@@ -361,7 +365,10 @@ function buildMutationContent(pagesData: {
     });
 
   const pages = (pagesData.pages ?? []).map((page: any) => {
-    const slug = page.slug === "/" ? "/" : page.slug.replace(/^\/+/, "");
+    // Match the validation pass: strip leading slashes AND trim. Skipping
+    // `.trim()` here lets inputs like `"/foo "` upload with a trailing
+    // space even though validation accepted them.
+    const slug = page.slug === "/" ? "/" : page.slug.replace(/^\/+/, "").trim();
     const result: Record<string, any> = {
       name: page.name,
       slug,
@@ -373,7 +380,7 @@ function buildMutationContent(pagesData: {
     };
     if (page.pageType) result.pageType = page.pageType;
     if (page.parentSlug) {
-      result.parentSlug = String(page.parentSlug).replace(/^\/+/, "");
+      result.parentSlug = String(page.parentSlug).replace(/^\/+/, "").trim();
     }
     if (page.layoutPositions) {
       result.layoutPositions = buildLpList(page.layoutPositions);
@@ -405,7 +412,9 @@ function printPlan(args: {
   console.log(chalk.gray(`Pages:       `) + chalk.white(String(pages.length)));
   console.log(
     chalk.gray(`Required blocks: `) +
-      chalk.white(Array.from(args.requiredBlockTypes).join(", ") || "(none)"),
+      chalk.white(
+        Array.from(args.requiredBlockTypes).sort().join(", ") || "(none)",
+      ),
   );
 }
 
@@ -452,12 +461,19 @@ async function uploadTemplate(args: {
       ),
     );
   } catch (err) {
+    // On a true server-side failure we know the publish didn't land,
+    // so roll the local version back. On an abort (timeout) the server
+    // may have already accepted the mutation - rolling back would
+    // leave the user one version behind reality and the next publish
+    // would try to reuse the published number. Keep the local bump
+    // and tell the user to verify.
+    if (controller.signal.aborted) {
+      bail(
+        `Template upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. The server may have accepted the mutation - check whether ${args.templateName}@${args.nextVersion} exists in the workspace before retrying. The local version was kept at ${args.nextVersion}; bump manually if you confirm the publish did NOT land.`,
+      );
+    }
     args.onFailure();
-    const userMessage = controller.signal.aborted
-      ? `Template upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Large pages.json or slow network can cause this; retry or split the template.`
-      : err instanceof Error
-        ? err.message
-        : String(err);
+    const userMessage = err instanceof Error ? err.message : String(err);
     bail(`Failed to publish template ${args.templateName}: ${userMessage}`);
   } finally {
     clearTimeout(timer);
