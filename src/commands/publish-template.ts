@@ -122,9 +122,12 @@ export async function publishTemplateCommand(
   }
   const packageJson = fs.readJsonSync(pkgJsonPath);
 
-  // Load template config (defineTemplate metadata)
-  const templateConfig = loadTemplateConfig(templatePath, process.cwd());
-  if (!templateConfig) {
+  // Load template config (defineTemplate metadata). `loadTemplateConfig`
+  // returns null for BOTH "file missing" and "file exists but failed to
+  // evaluate" - check existence first so the error message points the
+  // user at the right problem.
+  const configPath = path.join(templatePath, "config.ts");
+  if (!fs.existsSync(configPath)) {
     console.error(
       chalk.red(
         `✖ Missing templates/${templateName}/config.ts - templates require a defineTemplate() config.\n`,
@@ -132,13 +135,35 @@ export async function publishTemplateCommand(
     );
     process.exit(1);
   }
+  const templateConfig = loadTemplateConfig(templatePath, process.cwd());
+  if (!templateConfig) {
+    console.error(
+      chalk.red(
+        `✖ Failed to load templates/${templateName}/config.ts - check for syntax errors or missing imports.\n`,
+      ),
+    );
+    process.exit(1);
+  }
 
   // Resolve pages data: prefer pages.json on disk, fall back to
-  // config.ts's `pages` array (defineTemplate inline form).
+  // config.ts's `pages` array (defineTemplate inline form). Wrap the
+  // JSON read because malformed pages.json or a permission error
+  // would otherwise surface as a raw stack trace.
   const pagesJsonPath = path.join(templatePath, "pages.json");
   let pagesData: { layoutPositions?: any; pages?: any[]; pageTypes?: any[] };
   if (fs.existsSync(pagesJsonPath)) {
-    pagesData = fs.readJsonSync(pagesJsonPath);
+    try {
+      pagesData = fs.readJsonSync(pagesJsonPath);
+    } catch (err) {
+      console.error(
+        chalk.red(
+          `✖ Failed to read templates/${templateName}/pages.json: ${
+            err instanceof Error ? err.message : String(err)
+          }\n`,
+        ),
+      );
+      process.exit(1);
+    }
   } else if (templateConfig.pages || templateConfig.layoutPositions) {
     pagesData = convertConfigToPagesData(templateConfig);
   } else {
@@ -182,19 +207,22 @@ export async function publishTemplateCommand(
   // it into the mutation. extractBlockType blindly calls
   // `.replace(...)` on its argument; a missing or non-string `type`
   // would throw a runtime exception with no breadcrumb pointing at
-  // the offending page. Surface a clear error instead.
+  // the offending page. Surface a clean CLI error instead of an
+  // uncaught throw + stack trace.
+  const failValidation = (msg: string): never => {
+    console.error(chalk.red(`✖ templates/${templateName}: ${msg}\n`));
+    process.exit(1);
+  };
   const pageSource = pagesData.pages ?? [];
   pageSource.forEach((page, pageIdx) => {
     const pageLabel = page?.slug ?? `page[${pageIdx}]`;
     if (typeof page?.slug !== "string" || !page.slug) {
-      throw new Error(
-        `templates/${templateName}: ${pageLabel} is missing a non-empty string \`slug\``,
-      );
+      failValidation(`${pageLabel} is missing a non-empty string \`slug\``);
     }
     (page.blocks ?? []).forEach((block: any, blockIdx: number) => {
       if (typeof block?.type !== "string" || !block.type) {
-        throw new Error(
-          `templates/${templateName}: ${pageLabel} block[${blockIdx}] is missing a non-empty string \`type\``,
+        failValidation(
+          `${pageLabel} block[${blockIdx}] is missing a non-empty string \`type\``,
         );
       }
     });
@@ -205,8 +233,8 @@ export async function publishTemplateCommand(
         : [];
     lpSource.forEach((lp: any, lpIdx: number) => {
       if (typeof lp?.type !== "string" || !lp.type) {
-        throw new Error(
-          `templates/${templateName}: ${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
+        failValidation(
+          `${pageLabel} layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
         );
       }
     });
@@ -218,8 +246,8 @@ export async function publishTemplateCommand(
       : [];
   lpSourceGlobal.forEach((lp: any, lpIdx: number) => {
     if (typeof lp?.type !== "string" || !lp.type) {
-      throw new Error(
-        `templates/${templateName}: global layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
+      failValidation(
+        `global layoutPosition[${lpIdx}] is missing a non-empty string \`type\``,
       );
     }
   });
