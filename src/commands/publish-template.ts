@@ -117,12 +117,6 @@ export async function publishTemplateCommand(
     process.exit(1);
   }
 
-  // Optional preview.json (image/url metadata)
-  const previewJsonPath = path.join(templatePath, "preview.json");
-  const preview = fs.existsSync(previewJsonPath)
-    ? fs.readJsonSync(previewJsonPath)
-    : null;
-
   // Bump version unless --no-bump
   const currentVersion = packageJson.version ?? "0.0.0";
   let nextVersion = currentVersion;
@@ -189,23 +183,28 @@ export async function publishTemplateCommand(
   }
   for (const lp of layoutPositions) requiredBlockTypes.add(lp.type);
 
+  // Fields mirror ImportTemplateInput in backend
+  // (apps/backend/src/graphql/resolvers/workspace-template.ts:154). `tags`,
+  // `previewImageUrl`, and freeform metadata aren't on the input - we
+  // ship only what the schema accepts; the rest is consumed locally
+  // (e.g. `tags` is used for `cmssy publish --marketplace` flow only).
   const input: Record<string, any> = {
     blockType: convertBlockTypeToSimple(packageJson.name ?? templateName),
     name: templateConfig.name ?? templateName,
     description: templateConfig.description ?? "",
     category: templateConfig.category ?? "website",
-    tags: Array.isArray(templateConfig.tags) ? templateConfig.tags : [],
     version: nextVersion,
     pages,
     layoutPositions,
     requiredBlocks: Array.from(requiredBlockTypes),
+    // Default backend behavior preserves existing page content on
+    // republish; --overwrite-content flips it to overwrite.
+    preserveContent: !options.overwriteContent,
   };
 
   if (Array.isArray(pagesData.pageTypes) && pagesData.pageTypes.length > 0) {
     input.pageTypes = pagesData.pageTypes;
   }
-  if (preview?.imageUrl) input.previewImageUrl = preview.imageUrl;
-  if (options.overwriteContent) input.overwriteContent = true;
 
   // Dry run: print the plan and exit
   console.log(chalk.gray(`Template:    `) + chalk.white(templateName));
