@@ -1187,6 +1187,11 @@ async function publishToWorkspace(
     input.requires = blockConfig.requires;
   }
 
+  // Hydration strategy — false (default) keeps the block server-only.
+  if (blockConfig?.useClient !== undefined) {
+    input.useClient = blockConfig.useClient;
+  }
+
   // Check if this is a template with pages data (pages.json or config.ts)
   const isTemplateType = packageType === "template";
   const pagesJsonPath = path.join(packagePath, "pages.json");
