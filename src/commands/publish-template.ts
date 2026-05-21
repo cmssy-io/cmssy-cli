@@ -301,9 +301,12 @@ function validatePagesData(
   const validateLayoutPositions = (raw: unknown, scope: string) => {
     const { entries, isArray } = normalizeLayoutPositions(raw);
     entries.forEach(([position, lp], i) => {
-      if (isArray && !isNonEmptyString(position)) {
+      // `position` must be non-empty in BOTH forms: an array entry can
+      // omit the field, and an object can have an empty/whitespace key
+      // (`{ "  ": {...} }`) - both trim to "" in the payload otherwise.
+      if (!isNonEmptyString(position)) {
         fail(
-          `${scope} layoutPosition[${i}] is missing a non-empty string \`position\``,
+          `${scope} layoutPosition[${i}] has an empty \`position\` ${isArray ? "field" : "key"}`,
         );
       }
       if (!isNonEmptyString(lp?.type)) {
