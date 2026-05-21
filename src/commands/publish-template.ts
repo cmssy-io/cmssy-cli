@@ -32,7 +32,12 @@ interface PublishTemplateOptions {
 
 const REQUEST_TIMEOUT_MS = 180_000;
 const DEFAULT_API_URL = "https://api.cmssy.io/graphql";
-const TEMPLATE_NAME_REGEX = /^[a-z0-9][a-z0-9-]*$/;
+// Accepts the directory names legacy `cmssy publish` scans without
+// validation (it readdir's templates/ blindly) - alphanumeric plus
+// `-`/`_`, any case. Still rejects anything with a path separator,
+// `.`, or whitespace, so `../`, absolute paths and `..` can't slip
+// through; the realpath containment check below is the real defense.
+const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 const isNonEmptyString = (v: unknown): v is string =>
   typeof v === "string" && v.trim().length > 0;
@@ -205,7 +210,7 @@ function resolveTemplatePath(templateName: string): string {
   // rejected here.
   if (!TEMPLATE_NAME_REGEX.test(templateName)) {
     bail(
-      `Invalid template name "${templateName}" - lowercase alphanumeric + dashes only.`,
+      `Invalid template name "${templateName}" - alphanumeric plus \`-\`/\`_\` only (no path separators).`,
     );
   }
   const templatesRoot = path.resolve(process.cwd(), "templates");

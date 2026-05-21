@@ -81,12 +81,21 @@ export function extractDefaultContent(schema: Record<string, any>): any {
  * Extract block type from full package name.
  * @example "@cmssy/blocks.hero" -> "hero"
  * @example "@org/templates.landing" -> "landing"
+ * @example "vendor/blocks.hero" -> "hero"
+ * @example "blocks.hero" -> "hero"
  */
 export function extractBlockType(packageName: string): string {
-  return packageName
-    .replace(/@[^/]+\//, "") // Remove @scope/
-    .replace(/^blocks\./, "") // Remove blocks. prefix
-    .replace(/^templates\./, ""); // Remove templates. prefix
+  // Take the final path segment so scoped (`@scope/blocks.hero`),
+  // non-scoped (`vendor/blocks.hero`), and bare (`blocks.hero`) names
+  // all reduce identically - then drop the `blocks.`/`templates.`
+  // prefix. Only ONE prefix is stripped (if/else, not chained) - a
+  // type carries one or the other, never both.
+  const segment = packageName.includes("/")
+    ? (packageName.split("/").pop() ?? packageName)
+    : packageName;
+  if (segment.startsWith("blocks.")) return segment.slice(7);
+  if (segment.startsWith("templates.")) return segment.slice(10);
+  return segment;
 }
 
 /**
