@@ -364,9 +364,12 @@ function buildMutationContent(pagesData: {
 
   const buildLpList = (raw: unknown) =>
     normalizeLayoutPositions(raw).entries.map(([position, data]) => {
+      // `extractBlockType` trims the type; trim `position` too so a
+      // whitespace-padded slot name from pages.json doesn't reach the
+      // mutation (validation only checks non-empty-after-trim).
       const type = extractBlockType(data.type);
       requiredBlockTypes.add(type);
-      return { position, type, content: data.content ?? {} };
+      return { position: position.trim(), type, content: data.content ?? {} };
     });
 
   const pages = (pagesData.pages ?? []).map((page: any) => {

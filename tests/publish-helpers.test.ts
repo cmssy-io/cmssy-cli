@@ -328,6 +328,23 @@ describe("extractBlockType", () => {
       "cta-section",
     );
   });
+
+  it("should strip a non-scoped path prefix (regression - lost when convertBlockTypeToSimple was removed)", () => {
+    expect(extractBlockType("vendor/blocks.hero")).toBe("hero");
+    expect(extractBlockType("cmssy/blocks.pricing-table")).toBe(
+      "pricing-table",
+    );
+  });
+
+  it("should take the last segment when multiple slashes are present", () => {
+    expect(extractBlockType("@scope/sub/blocks.hero")).toBe("hero");
+  });
+
+  it("should trim surrounding whitespace before matching the prefix", () => {
+    expect(extractBlockType("  blocks.hero  ")).toBe("hero");
+    expect(extractBlockType(" @cmssy/blocks.cta ")).toBe("cta");
+    expect(extractBlockType("\thero\n")).toBe("hero");
+  });
 });
 
 // =============================================================================

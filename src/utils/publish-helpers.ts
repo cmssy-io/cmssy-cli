@@ -85,14 +85,18 @@ export function extractDefaultContent(schema: Record<string, any>): any {
  * @example "blocks.hero" -> "hero"
  */
 export function extractBlockType(packageName: string): string {
+  // Trim first - surrounding whitespace from a hand-edited pages.json
+  // would otherwise break the `blocks.`/`templates.` prefix match and
+  // leak into the uploaded type.
+  const trimmed = packageName.trim();
   // Take the final path segment so scoped (`@scope/blocks.hero`),
   // non-scoped (`vendor/blocks.hero`), and bare (`blocks.hero`) names
   // all reduce identically - then drop the `blocks.`/`templates.`
   // prefix. Only ONE prefix is stripped (if/else, not chained) - a
   // type carries one or the other, never both.
-  const segment = packageName.includes("/")
-    ? (packageName.split("/").pop() ?? packageName)
-    : packageName;
+  const segment = trimmed.includes("/")
+    ? (trimmed.split("/").pop() ?? trimmed)
+    : trimmed;
   if (segment.startsWith("blocks.")) return segment.slice(7);
   if (segment.startsWith("templates.")) return segment.slice(10);
   return segment;
