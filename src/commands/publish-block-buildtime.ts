@@ -17,6 +17,8 @@ import {
   extractDefaultContent,
   loadBlockConfig,
 } from "../utils/block-config.js";
+import { convertSchemaToFields } from "../utils/publish-helpers.js";
+import type { FieldConfig } from "@cmssy/types";
 import {
   resolveWorkspaceId,
   warnIfWorkspaceIdLooksWrong,
@@ -152,22 +154,67 @@ export async function publishBlockBuildtimeCommand(
     return;
   }
 
-  // Extract defaultContent from config.ts so the backend smoke test
-  // can render the block with realistic props instead of a sentinel
-  // object. Null is fine - backend falls back to the legacy smoke
-  // sentinel. Deferred until after the dry-run short-circuit so the
-  // dry-run preview never executes the block's config.ts (which may
-  // have side effects: cache files, network, etc.).
+  // Load config.ts for: (1) defaultContent for the backend smoke test,
+  // (2) block metadata (name/schema/requires/...) that the resolver
+  // upserts onto the workspace_block row before the build runs -
+  // publish-block is self-sufficient since cmssy/cmssy#863, so without
+  // this a freshly-published block would have no schema or name.
+  // Deferred until after the dry-run short-circuit so the dry-run
+  // preview never executes the block's config.ts (side effects).
   let defaultContent: Record<string, unknown> | null = null;
+  let blockMetadata: Record<string, unknown> = {};
   try {
     const blockConfig = await loadBlockConfig(blockDir);
-    if (blockConfig?.schema) {
-      defaultContent = extractDefaultContent(blockConfig.schema);
+    if (blockConfig) {
+      // publish-block handles blocks, not templates; the loaded config
+      // is a BlockConfig. `useClient` isn't in the @cmssy/types
+      // BlockConfig surface yet (CMS-593), so read the shape loosely.
+      const cfg = blockConfig as {
+        name?: string;
+        description?: string;
+        category?: string;
+        layoutPosition?: string;
+        requires?: unknown;
+        useClient?: boolean;
+        schema?: Record<string, FieldConfig>;
+      };
+      if (cfg.schema) {
+        defaultContent = extractDefaultContent(cfg.schema);
+      }
+      // Only send fields that are actually defined - the resolver
+      // treats an omitted field as "preserve" on a republish.
+      blockMetadata = {
+        ...(cfg.name !== undefined && { name: cfg.name }),
+        ...(cfg.description !== undefined && {
+          description: cfg.description,
+        }),
+        ...(cfg.category !== undefined && { category: cfg.category }),
+        ...(cfg.layoutPosition !== undefined && {
+          layoutPosition: cfg.layoutPosition,
+        }),
+        ...(cfg.requires !== undefined && { requires: cfg.requires }),
+        ...(cfg.useClient !== undefined && { useClient: cfg.useClient }),
+        // Truthy check (not `!== undefined`) - a `schema: null` would
+        // pass the latter and make `convertSchemaToFields` throw on
+        // `Object.entries(null)`. Matches the defaultContent guard above.
+        ...(cfg.schema && {
+          schemaFields: convertSchemaToFields(cfg.schema),
+        }),
+      };
     }
-  } catch {
-    // Non-fatal - publish continues without defaultContent and the
-    // smoke test runs against the legacy sentinel content.
+  } catch (err) {
+    // Non-fatal - publish continues without defaultContent/metadata.
+    // For an existing block the resolver preserves stored metadata; a
+    // brand-new block with no config.ts is rejected backend-side with
+    // a clear "a new block requires a non-empty name" error. Warn so a
+    // broken config.ts (now the source of block metadata) is visible.
+    console.warn(
+      chalk.yellow(
+        `⚠ Could not load ${blockName}/config.ts - publishing without block metadata: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+    );
     defaultContent = null;
+    blockMetadata = {};
   }
 
   const client = createClient();
@@ -186,6 +233,7 @@ export async function publishBlockBuildtimeCommand(
           blockVersion,
           entryPath: collected.entryPath,
           defaultContent,
+          ...blockMetadata,
           files: collected.files.map((f) => ({
             path: f.relPath,
             contentBase64: f.contentBase64,

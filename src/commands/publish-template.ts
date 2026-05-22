@@ -32,12 +32,15 @@ interface PublishTemplateOptions {
 
 const REQUEST_TIMEOUT_MS = 180_000;
 const DEFAULT_API_URL = "https://api.cmssy.io/graphql";
-// Accepts the directory names legacy `cmssy publish` scans without
-// validation (it readdir's templates/ blindly) - alphanumeric plus
-// `-`/`_`, any case. Still rejects anything with a path separator,
-// `.`, or whitespace, so `../`, absolute paths and `..` can't slip
-// through; the realpath containment check below is the real defense.
-const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+// A safe single path segment: case-insensitive alphanumeric, `-`,
+// `_`. Accepts the directory names legacy `cmssy publish` scans
+// without validation (it calls readdir on templates/ blindly).
+// Rejects path separators, `.`, and whitespace so `../`, `..`, and
+// absolute paths can't slip through; the realpath containment check
+// below is the real defense. Note: a name starting with `-` is valid
+// here but Commander treats `-foo` as an option - the user must pass
+// it as `cmssy publish-template -- -foo`.
+export const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9_-]+$/;
 
 const isNonEmptyString = (v: unknown): v is string =>
   typeof v === "string" && v.trim().length > 0;
