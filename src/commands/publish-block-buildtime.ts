@@ -194,16 +194,25 @@ export async function publishBlockBuildtimeCommand(
         }),
         ...(cfg.requires !== undefined && { requires: cfg.requires }),
         ...(cfg.useClient !== undefined && { useClient: cfg.useClient }),
-        ...(cfg.schema !== undefined && {
+        // Truthy check (not `!== undefined`) - a `schema: null` would
+        // pass the latter and make `convertSchemaToFields` throw on
+        // `Object.entries(null)`. Matches the defaultContent guard above.
+        ...(cfg.schema && {
           schemaFields: convertSchemaToFields(cfg.schema),
         }),
       };
     }
-  } catch {
+  } catch (err) {
     // Non-fatal - publish continues without defaultContent/metadata.
     // For an existing block the resolver preserves stored metadata; a
     // brand-new block with no config.ts is rejected backend-side with
-    // a clear "a new block requires a non-empty name" error.
+    // a clear "a new block requires a non-empty name" error. Warn so a
+    // broken config.ts (now the source of block metadata) is visible.
+    console.warn(
+      chalk.yellow(
+        `⚠ Could not load ${blockName}/config.ts - publishing without block metadata: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+    );
     defaultContent = null;
     blockMetadata = {};
   }
