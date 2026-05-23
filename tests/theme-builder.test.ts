@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildThemeCSS,
-  convertThemeToInput,
-} from "../src/utils/theme-builder.js";
+import { buildThemeCSS } from "../src/utils/theme-builder.js";
 import type { DefineThemeConfig } from "@cmssy/types";
 
 // =============================================================================
@@ -120,96 +117,5 @@ describe("buildThemeCSS", () => {
     };
     const css = buildThemeCSS(theme);
     expect(css).toContain(".hero { backdrop-filter: blur(8px); }");
-  });
-});
-
-// =============================================================================
-// convertThemeToInput
-// =============================================================================
-
-describe("convertThemeToInput", () => {
-  it("should convert fonts to headingFont/bodyFont", () => {
-    const theme: DefineThemeConfig = {
-      name: "Fonts",
-      fonts: {
-        heading: {
-          family: "Domine",
-          source: "google",
-          weights: [400, 700, 900],
-        },
-        body: { family: "Raleway", source: "google" },
-      },
-    };
-    const input = convertThemeToInput(theme);
-    expect(input.headingFont).toEqual({
-      family: "Domine",
-      source: "google",
-      weights: [400, 700, 900],
-      customFontUrl: null,
-    });
-    expect(input.bodyFont).toEqual({
-      family: "Raleway",
-      source: "google",
-      weights: [400, 700],
-      customFontUrl: null,
-    });
-  });
-
-  it("should pass through colors directly", () => {
-    const theme: DefineThemeConfig = {
-      name: "Colors",
-      colors: { primary: "#D4AF37", background: "#fff" },
-    };
-    const input = convertThemeToInput(theme);
-    expect(input.colors).toEqual({ primary: "#D4AF37", background: "#fff" });
-  });
-
-  it("should compile customVariables into customCSS", () => {
-    const theme: DefineThemeConfig = {
-      name: "Vars",
-      customVariables: { "--hero-overlay": "rgba(0,0,0,0.5)" },
-      customCSS: "body { margin: 0; }",
-    };
-    const input = convertThemeToInput(theme);
-    expect(input.customCSS).toContain(":root {");
-    expect(input.customCSS).toContain("--hero-overlay: rgba(0,0,0,0.5);");
-    expect(input.customCSS).toContain("body { margin: 0; }");
-  });
-
-  it("should not include customCSS when empty", () => {
-    const theme: DefineThemeConfig = { name: "Minimal" };
-    const input = convertThemeToInput(theme);
-    expect(input.customCSS).toBeUndefined();
-  });
-
-  it("should pass spacing and borderRadius", () => {
-    const theme: DefineThemeConfig = {
-      name: "Layout",
-      spacing: 1.25,
-      borderRadius: "sm",
-    };
-    const input = convertThemeToInput(theme);
-    expect(input.spacing).toBe(1.25);
-    expect(input.borderRadius).toBe("sm");
-  });
-
-  it("should handle custom font with URL", () => {
-    const theme: DefineThemeConfig = {
-      name: "Custom Font",
-      fonts: {
-        heading: {
-          family: "MyFont",
-          source: "custom",
-          customFontUrl: "https://example.com/font.woff2",
-        },
-      },
-    };
-    const input = convertThemeToInput(theme);
-    expect(input.headingFont).toEqual({
-      family: "MyFont",
-      source: "custom",
-      weights: [400, 700],
-      customFontUrl: "https://example.com/font.woff2",
-    });
   });
 });

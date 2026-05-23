@@ -1,5 +1,4 @@
 import { GraphQLClient } from "graphql-request";
-import { blockFieldGraphQLSelection } from "@cmssy/types";
 import { loadConfig } from "./config.js";
 
 export function createClient(): GraphQLClient {
@@ -17,39 +16,7 @@ export function createClient(): GraphQLClient {
   });
 }
 
-const SCHEMA_FIELDS_FRAGMENT = blockFieldGraphQLSelection();
-
 // GraphQL Mutations
-export const IMPORT_BLOCK_MUTATION = `
-  mutation ImportBlock($input: ImportBlockInput!) {
-    importBlock(input: $input) {
-      id
-      blockType
-      name
-      description
-      icon
-      category
-      layoutPosition
-      schemaFields {
-        ${SCHEMA_FIELDS_FRAGMENT}
-      }
-      defaultContent
-      requires {
-        auth
-        language
-        workspace
-        modules
-        permissions
-        features
-      }
-      serverActionUrl
-      serverActions
-      version
-      createdAt
-    }
-  }
-`;
-
 export const IMPORT_TEMPLATE_MUTATION = `
   mutation ImportTemplate($input: ImportTemplateInput!) {
     importTemplate(input: $input) {
@@ -89,67 +56,6 @@ export interface ImportTemplateResponse {
     message?: string;
   };
 }
-
-export const UPDATE_THEME_MUTATION = `
-  mutation UpdateTheme($input: ThemeConfigInput!) {
-    updateTheme(input: $input) {
-      id
-      theme {
-        fonts {
-          heading { family source weights customFontUrl }
-          body { family source weights customFontUrl }
-        }
-        colors {
-          primary primaryForeground secondary secondaryForeground
-          accent accentForeground background foreground
-          muted mutedForeground card cardForeground
-          border input ring destructive
-        }
-        typography { h1 h2 h3 h4 h5 h6 body small }
-        spacing
-        borderRadius
-        customCSS
-      }
-    }
-  }
-`;
-
-export const GET_SITE_CONFIG_THEME_QUERY = `
-  query GetSiteConfigTheme {
-    siteConfig {
-      theme {
-        fonts {
-          heading { family source weights customFontUrl }
-          body { family source weights customFontUrl }
-        }
-        colors {
-          primary primaryForeground secondary secondaryForeground
-          accent accentForeground background foreground
-          muted mutedForeground card cardForeground
-          border input ring destructive
-        }
-        typography { h1 h2 h3 h4 h5 h6 body small }
-        spacing
-        borderRadius
-        customCSS
-      }
-    }
-  }
-`;
-
-export const GET_WORKSPACE_BLOCKS_QUERY = `
-  query GetWorkspaceBlocks {
-    workspaceBlocks {
-      id
-      blockType
-      name
-      version
-      schemaFields {
-        ${SCHEMA_FIELDS_FRAGMENT}
-      }
-    }
-  }
-`;
 
 const PUBLISH_JOB_POLL_FIELDS = `
   id
