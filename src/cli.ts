@@ -13,7 +13,6 @@ import { initCommand } from "./commands/init.js";
 import { testCommand } from "./commands/test.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
-import { publishCommand } from "./commands/publish.js";
 import { publishBlockBuildtimeCommand } from "./commands/publish-block-buildtime.js";
 import { publishTemplateCommand } from "./commands/publish-template.js";
 import { libInstallCommand, libSyncCommand } from "./commands/lib.js";
@@ -257,50 +256,6 @@ Runs diagnostic checks:
 `,
   )
   .action(doctorCommand);
-
-// cmssy publish
-program
-  .command("publish [packages...]")
-  .description(
-    "Publish blocks/templates to workspace\n\n" +
-      "  Packages are directory names from blocks/ or templates/ folders.\n" +
-      "  Examples:\n" +
-      "    cmssy publish hero faq --workspace abc123 --patch\n" +
-      "    cmssy publish --all --workspace abc123",
-  )
-  .option("-w, --workspace [id]", "Publish to workspace")
-  .option("--all", "Publish all blocks and templates")
-  .option("--patch", "Bump patch version (1.0.0 -> 1.0.1)")
-  .option("--minor", "Bump minor version (1.0.0 -> 1.1.0)")
-  .option("--major", "Bump major version (1.0.0 -> 2.0.0)")
-  .option("--no-bump", "Publish without version bump")
-  .option("--dry-run", "Preview what would be published without uploading")
-  .option("--force", "Skip schema diff confirmation for breaking changes")
-  .option(
-    "--overwrite-content",
-    "Overwrite existing defaultContent and schemaFields on republish",
-  )
-  .option(
-    "--zip",
-    "Package into ZIP files and upload (instead of direct GraphQL)",
-  )
-  .addHelpText(
-    "after",
-    `
-Examples:
-  $ cmssy publish --all -w abc123              Publish all, preserve content
-  $ cmssy publish hero -w abc123 --patch       Publish hero with patch bump
-  $ cmssy publish --all --zip -w abc123        Package as ZIP and upload
-  $ cmssy publish --all -w abc123 --overwrite-content
-                                               Force overwrite content/schema
-
-Content preservation:
-  By default, republishing a block preserves existing defaultContent and
-  schemaFields in the workspace. Use --overwrite-content to reset them
-  from config.ts / preview.json.
-`,
-  )
-  .action(publishCommand);
 
 program
   .command("publish-block")
