@@ -16,9 +16,7 @@ import { migrateCommand } from "./commands/migrate.js";
 import { publishBlockBuildtimeCommand } from "./commands/publish-block-buildtime.js";
 import { publishTemplateCommand } from "./commands/publish-template.js";
 import { libInstallCommand, libSyncCommand } from "./commands/lib.js";
-import { packageCommand } from "./commands/package.js";
 import { skillsInstallCommand, skillsListCommand } from "./commands/skills.js";
-import { uploadCommand } from "./commands/upload.js";
 import { workspacesCommand } from "./commands/workspaces.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -42,21 +40,21 @@ program
     "after",
     `
 Examples:
-  $ cmssy init my-blocks          Create new project (uses create-next-app)
-  $ cmssy init                    Add Cmssy to existing Next.js project
-  $ cmssy create block hero       Add a new block to your project
-  $ cmssy dev                     Start dev server with hot reload
-  $ cmssy build                   Build all blocks for production
-  $ cmssy publish --all -w abc    Publish all to workspace
+  $ cmssy init my-blocks           Create new project (uses create-next-app)
+  $ cmssy init                     Add Cmssy to existing Next.js project
+  $ cmssy create block hero        Add a new block to your project
+  $ cmssy dev                      Start dev server with hot reload
+  $ cmssy build                    Build all blocks for production
+  $ cmssy publish-block hero -w abc Publish a single block to workspace
 
 Workflow:
-  1. init     → Create project with example block
-  2. link     → Connect to your workspace
-  3. create   → Add more blocks/templates
-  4. dev      → Develop with live preview
-  5. test     → Run block tests
-  6. build    → Bundle for production
-  7. publish  → Deploy to workspace
+  1. init          → Create project with example block
+  2. link          → Connect to your workspace
+  3. create        → Add more blocks/templates
+  4. dev           → Develop with live preview
+  5. test          → Run block tests
+  6. build         → Bundle for production
+  7. publish-block → Deploy a block via the sandbox build pipeline
 
 Documentation: https://cmssy.io/docs/cli
 `,
@@ -384,47 +382,6 @@ Converts:
   { hidden: true },
 );
 
-// cmssy package (hidden - use `cmssy publish --zip` instead)
-program.addCommand(
-  new Command("package")
-    .argument("[packages...]")
-    .description("Package blocks/templates into ZIP files for manual upload")
-    .option("--all", "Package all blocks and templates")
-    .option("-o, --output <dir>", "Output directory", "packages")
-    .addHelpText(
-      "after",
-      `
-Examples:
-  $ cmssy package hero faq         Package specific blocks
-  $ cmssy package --all            Package everything
-  $ cmssy package -o dist --all    Package to custom directory
-
-Use with 'upload' for two-step deployment.
-`,
-    )
-    .action(packageCommand),
-  { hidden: true },
-);
-
-// cmssy upload (hidden - use `cmssy publish --zip` instead)
-program.addCommand(
-  new Command("upload")
-    .argument("[files...]")
-    .description("Upload ZIP packages to workspace")
-    .option("-w, --workspace <id>", "Target workspace ID")
-    .option("--all", "Upload all from packages directory")
-    .addHelpText(
-      "after",
-      `
-Examples:
-  $ cmssy upload hero.zip -w abc123     Upload single package
-  $ cmssy upload --all -w abc123        Upload all packages
-`,
-    )
-    .action(uploadCommand),
-  { hidden: true },
-);
-
 // cmssy workspaces
 program
   .command("workspaces")
@@ -433,8 +390,8 @@ program
     "after",
     `
 Use workspace IDs with:
-  $ cmssy publish --workspace <id>
-  $ cmssy upload --workspace <id>
+  $ cmssy publish-block <name> --workspace <id>
+  $ cmssy publish-template <name> --workspace <id>
   $ cmssy sync --workspace <id>
 `,
   )

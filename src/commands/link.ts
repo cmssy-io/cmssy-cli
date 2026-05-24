@@ -161,6 +161,8 @@ export async function linkCommand(options: LinkOptions) {
   console.log(chalk.white(`  Slug: ${selectedWorkspace.slug}`));
   console.log(chalk.white(`  ID:   ${selectedWorkspace.id}`));
   console.log(chalk.cyan("\nNext steps:\n"));
-  console.log(chalk.white("  cmssy dev           Start developing"));
-  console.log(chalk.white("  cmssy publish --all  Publish to workspace\n"));
+  console.log(chalk.white("  cmssy dev                  Start developing"));
+  console.log(
+    chalk.white("  cmssy publish-block <name>  Publish a block to workspace\n"),
+  );
 }
