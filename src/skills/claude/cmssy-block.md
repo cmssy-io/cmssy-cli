@@ -105,7 +105,7 @@ cmssy publish-block <name> --dry-run              # collect files + print plan, 
 cmssy publish-block <name> --entry src/main.tsx   # override default src/index.tsx entry
 ```
 
-**Flow:** CLI tar.gz's the block source tree, uploads to the backend, which enqueues an Inngest job that bundles in a Vercel Sandbox and writes artifacts to Blob. CLI polls `publishJobStatus` until `SUCCEEDED` or `FAILED`.
+**Flow:** CLI collects the source files and POSTs them base64-encoded via the `publishBlock` GraphQL mutation. The backend packs the bundle into `tar.gz`, uploads it to Vercel Blob, and enqueues an Inngest job that builds in a Vercel Sandbox and writes artifacts back to Blob. CLI polls `publishJobStatus` until status is `completed` or `failed`.
 
 **Limits:** 200 files / 10 MB total per block. Polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
 
