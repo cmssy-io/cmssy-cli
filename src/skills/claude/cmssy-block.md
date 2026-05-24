@@ -94,7 +94,7 @@ cmssy build --block hero pricing         # subset
 cmssy build --framework react            # override
 ```
 
-Outputs `public/@<vendor>/blocks.<name>/<version>/{index.js,index.css,package.json}`. Run before publish if you want to preview the bundle.
+Outputs `public/@<vendor>/blocks.<name>/<version>/{index.js,index.css,package.json}`. Run before `cmssy publish-block` if you want to preview the bundle locally - publishing itself bundles again in the sandbox.
 
 ### 1.8 `cmssy publish-block` - upload to workspace via the sandbox build pipeline
 

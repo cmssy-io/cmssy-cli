@@ -606,11 +606,11 @@ cmssy publish-block footer -w 507f1f77bcf86cd799439011
 
 ## Environment Variables Reference
 
-| Variable             | Required             | Description                             | Example                        |
-| -------------------- | -------------------- | --------------------------------------- | ------------------------------ |
-| `CMSSY_API_URL`      | Yes (for publishing) | Cmssy API GraphQL endpoint              | `https://api.cmssy.io/graphql` |
-| `CMSSY_API_TOKEN`    | Yes (for publishing) | API authentication token                | `cmssy_abc123...`              |
-| `CMSSY_WORKSPACE_ID` | No                   | Default workspace ID (MongoDB ObjectId) | `507f1f77bcf86cd799439011`     |
+| Variable             | Required                                                                                                 | Description                                                                       | Example                        |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------ |
+| `CMSSY_API_URL`      | No (defaults to `https://api.cmssy.io/graphql`)                                                          | Cmssy API GraphQL endpoint - override only when targeting a local/staging backend | `https://api.cmssy.io/graphql` |
+| `CMSSY_API_TOKEN`    | Yes (any command that hits the API: `publish-block`, `publish-template`, `sync`, `workspaces`, `doctor`) | API authentication token                                                          | `cmssy_abc123...`              |
+| `CMSSY_WORKSPACE_ID` | No (commands that take `-w` fall back to this)                                                           | Default workspace ID (MongoDB ObjectId)                                           | `507f1f77bcf86cd799439011`     |
 
 ## Requirements
 
