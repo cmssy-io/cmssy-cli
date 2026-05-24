@@ -36,10 +36,11 @@ cmssy test
 # 8. Build for production
 cmssy build
 
-# 9. Publish to your workspace (ID, or rely on CMSSY_WORKSPACE_ID from .env)
-cmssy publish --all --workspace <id>
-# or, if CMSSY_WORKSPACE_ID is set by `cmssy link`:
-cmssy publish --all --workspace
+# 9. Publish a block to your workspace via the sandbox build pipeline
+#    (relies on CMSSY_WORKSPACE_ID from .env, or override with -w)
+cmssy publish-block my-block
+# or, override the workspace explicitly:
+cmssy publish-block my-block -w <id>
 ```
 
 ## Environment Configuration
@@ -326,129 +327,65 @@ cmssy codegen --workspace my-workspace-slug
 
 ---
 
-### Publish to Workspace
+### Publish a Block
 
 ```bash
-cmssy publish [packages...] [options]
+cmssy publish-block <name> [options]
 ```
 
-Publish blocks/templates to your workspace.
+Send a single block to your workspace via the sandbox build pipeline (Vercel Sandbox + Inngest). The CLI collects the block source tree, uploads it to the backend, and polls the build job until it finishes.
 
 **Options:**
 
-- `-w, --workspace [id]` - Publish to workspace
-- `--all` - Publish all blocks and templates
-- `--patch` - Bump patch version (1.0.0 → 1.0.1)
-- `--minor` - Bump minor version (1.0.0 → 1.1.0)
-- `--major` - Bump major version (1.0.0 → 2.0.0)
-- `--dry-run` - Preview what would be published without uploading
+- `-w, --workspace [id]` - Workspace id (defaults to `CMSSY_WORKSPACE_ID`)
+- `--entry <path>` - Entry path inside the block dir (default: `src/index.tsx`)
+- `--dry-run` - Collect files and print the plan without uploading
 
 **Example:**
 
 ```bash
-# Publish to workspace
-cmssy publish hero --workspace 507f1f77bcf86cd799439011
-cmssy publish --all --workspace
-cmssy publish pricing --workspace --minor
+# Publish to the workspace from .env
+cmssy publish-block hero
 
-# Specific packages
-cmssy publish hero pricing --workspace abc123
+# Override workspace
+cmssy publish-block hero -w 507f1f77bcf86cd799439011
 
-# Dry run
-cmssy publish --all --workspace --dry-run
+# See what would be sent without uploading
+cmssy publish-block hero --dry-run
 ```
 
-**Notes:**
+**Limits:** 200 files / 10 MB total per block. Build polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
 
-- Must specify `--workspace` flag
-- Workspace ID can be provided via flag or `CMSSY_WORKSPACE_ID` in `.env`
-- Version bumping updates `package.json` before publishing
-- Published instantly (no review required)
+The legacy `cmssy publish` command + ZIP packaging flow were removed in CMS-606 - all publishing now goes through the sandbox build pipeline.
 
 ---
 
-### Package into ZIP Files
+### Publish a Template
 
 ```bash
-cmssy package [packages...] [options]
+cmssy publish-template <name> [options]
 ```
 
-Package blocks/templates into ZIP files for distribution or upload.
+Publish a single template (page tree + content) to a workspace. Templates are declarative - no sandbox build. The CLI reads `template/config.ts` + `pages.json` and uploads via GraphQL.
 
 **Options:**
 
-- `--all` - Package all blocks and templates
-- `-o, --output <dir>` - Output directory. Default: packages
+- `-w, --workspace [id]` - Workspace id (defaults to `CMSSY_WORKSPACE_ID`)
+- `--patch` / `--minor` / `--major` / `--no-bump` - Version bump strategy
+- `--dry-run` - Print the plan without uploading
+- `--overwrite-content` - Overwrite existing page content on republish (default: preserve)
 
 **Example:**
 
 ```bash
-# Package single block
-cmssy package hero
+# Publish from the workspace in .env
+cmssy publish-template marketing-site
 
-# Package multiple blocks
-cmssy package hero pricing
-
-# Package all blocks and templates
-cmssy package --all
-
-# Custom output directory
-cmssy package --all --output dist/packages
+# Override workspace + minor bump
+cmssy publish-template blog -w 65f... --minor
 ```
 
-**What gets packaged:**
-
-- Source files (`src/`)
-- Configuration (`package.json`, `config.ts`)
-- Preview data (`preview.json`)
-- Built files (from `public/` if exists)
-- README.md (if exists)
-
-**Output:** `packages/<name>-<version>.zip` (e.g., `hero-1.0.0.zip`)
-
----
-
-### Upload Packages to Workspace
-
-```bash
-cmssy upload [files...] [options]
-```
-
-Upload packaged ZIP files directly to your Cmssy workspace.
-
-**Options:**
-
-- `-w, --workspace <id>` - Workspace ID to upload to
-- `--all` - Upload all packages from packages directory
-
-**Example:**
-
-```bash
-# Upload single package
-cmssy upload hero-1.0.0.zip
-
-# Upload multiple packages (with or without .zip extension)
-cmssy upload hero-1.0.0 pricing-2.1.0
-
-# Upload all packages
-cmssy upload --all
-
-# Specify workspace ID
-cmssy upload --all --workspace 507f1f77bcf86cd799439011
-```
-
-**Requirements:**
-
-- Packages must exist in `packages/` directory (run `cmssy package` first)
-- API token must be configured in `.env`
-- Workspace ID via `--workspace` flag or `CMSSY_WORKSPACE_ID` in `.env`
-
-**Typical workflow:**
-
-```bash
-cmssy package --all
-cmssy upload --all
-```
+Required blocks listed in the template must already exist in the workspace - publish them via `cmssy publish-block` first.
 
 ---
 
@@ -599,9 +536,6 @@ my-blocks/
 │           ├── index.tsx  # Block component
 │           └── index.css  # Block styles
 ├── templates/             # Your page templates
-├── packages/              # ZIP packages (created by cmssy package)
-│   ├── hero-1.0.0.zip
-│   └── pricing-2.1.0.zip
 ├── public/                # Build output
 │   └── @vendor/package-name/version/
 │       ├── index.js
@@ -646,11 +580,12 @@ Each block requires a `cmssy` section in its `package.json`:
 For teams with their own block libraries:
 
 ```bash
-# 1. Build your blocks
+# 1. Build your blocks locally (optional sanity check)
 cmssy build
 
-# 2. Publish to workspace
-cmssy publish --all --workspace 507f1f77bcf86cd799439011 --patch
+# 2. Publish each block via the sandbox build pipeline
+cmssy publish-block header -w 507f1f77bcf86cd799439011
+cmssy publish-block footer -w 507f1f77bcf86cd799439011
 
 # 3. Instantly available in your workspace
 ```
@@ -665,41 +600,17 @@ cmssy publish --all --workspace 507f1f77bcf86cd799439011 --patch
 
 - API token with `blocks:write` scope
 - Workspace ID
-- Published instantly
-
----
-
-### ZIP Package Workflow (Manual Upload)
-
-For manual distribution or custom upload:
-
-```bash
-# 1. Package blocks into ZIP files
-cmssy package --all
-
-# 2. Option A: Upload via CLI
-cmssy upload --all --workspace 507f1f77bcf86cd799439011
-
-# 2. Option B: Upload manually
-# - Go to http://localhost:3000/workspace/cmssy/resources/add-external
-# - Upload the ZIP files from packages/ directory
-```
-
-**Use cases:**
-
-- Manual review before upload
-- Offline distribution
-- Custom deployment pipelines
+- Published instantly via the sandbox build pipeline (CMS-576)
 
 ---
 
 ## Environment Variables Reference
 
-| Variable             | Required                 | Description                             | Example                        |
-| -------------------- | ------------------------ | --------------------------------------- | ------------------------------ |
-| `CMSSY_API_URL`      | Yes (for publish/upload) | Cmssy API GraphQL endpoint              | `https://api.cmssy.io/graphql` |
-| `CMSSY_API_TOKEN`    | Yes (for publish/upload) | API authentication token                | `cmssy_abc123...`              |
-| `CMSSY_WORKSPACE_ID` | No                       | Default workspace ID (MongoDB ObjectId) | `507f1f77bcf86cd799439011`     |
+| Variable             | Required             | Description                             | Example                        |
+| -------------------- | -------------------- | --------------------------------------- | ------------------------------ |
+| `CMSSY_API_URL`      | Yes (for publishing) | Cmssy API GraphQL endpoint              | `https://api.cmssy.io/graphql` |
+| `CMSSY_API_TOKEN`    | Yes (for publishing) | API authentication token                | `cmssy_abc123...`              |
+| `CMSSY_WORKSPACE_ID` | No                   | Default workspace ID (MongoDB ObjectId) | `507f1f77bcf86cd799439011`     |
 
 ## Requirements
 
@@ -729,25 +640,11 @@ cmssy doctor
 # Develop and test
 cmssy dev
 
-# Build and publish all to workspace
+# Build (sanity check) and publish each block
 cmssy build
-cmssy publish --all --workspace
-```
-
----
-
-### Example 2: ZIP Distribution
-
-```bash
-# Package blocks
-cmssy package --all
-
-# Distribute ZIP files
-# - Upload manually to Cmssy workspace UI
-# - Or use upload command:
-cmssy upload --all --workspace 507f1f77bcf86cd799439011
-
-# Or share packages/hero-1.0.0.zip with team
+cmssy publish-block header
+cmssy publish-block footer
+cmssy publish-block cta
 ```
 
 ---

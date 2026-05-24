@@ -15,6 +15,7 @@ cmssy doctor               # all-in-one health check
 ```
 
 `cmssy doctor` is the canonical precheck. It verifies:
+
 - Node >= 18, npm, Next.js, React versions
 - `cmssy.config.js` exists
 - `.env` with `CMSSY_API_URL`, `CMSSY_API_TOKEN`, `CMSSY_WORKSPACE_ID`
@@ -95,27 +96,22 @@ cmssy build --framework react            # override
 
 Outputs `public/@<vendor>/blocks.<name>/<version>/{index.js,index.css,package.json}`. Run before publish if you want to preview the bundle.
 
-### 1.8 `cmssy publish` - upload to workspace
+### 1.8 `cmssy publish-block` - upload to workspace via the sandbox build pipeline
 
 ```bash
-cmssy publish <name> --patch                      # single, patch bump
-cmssy publish --all --patch                       # everything
-cmssy publish <name> -w <workspaceId> --patch     # explicit workspace (otherwise .env)
-cmssy publish <name> --patch --dry-run            # preview only, upload nothing
-cmssy publish <name> --patch --with-source        # include source for AI Block Builder
-cmssy publish <name> --patch --zip                # package and upload ZIP instead of GraphQL
+cmssy publish-block <name>                        # publish to workspace from .env
+cmssy publish-block <name> -w <workspaceId>       # explicit workspace
+cmssy publish-block <name> --dry-run              # collect files + print plan, no upload
+cmssy publish-block <name> --entry src/main.tsx   # override default src/index.tsx entry
 ```
 
-**Exactly one bump flag:** `--patch` | `--minor` | `--major` | `--no-bump`.
+**Flow:** CLI tar.gz's the block source tree, uploads to the backend, which enqueues an Inngest job that bundles in a Vercel Sandbox and writes artifacts to Blob. CLI polls `publishJobStatus` until `SUCCEEDED` or `FAILED`.
 
-**Bump semantics:**
-- `--patch` - bug fix, copy tweak, style-only change. No schema change.
-- `--minor` - added optional fields, new variants. Non-breaking schema additions.
-- `--major` - renamed/removed fields, changed field types, breaking component contract.
+**Limits:** 200 files / 10 MB total per block. Polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
 
-**Content preservation:** republishing preserves `defaultContent` and `schemaFields` on the workspace by default. Pass `--overwrite-content` only when the user explicitly wants to reset them from `config.ts` / `preview.json`.
+**Content preservation:** republishing preserves the workspace's `defaultContent` overrides by default. There is no `--overwrite-content` flag - that knob lives on `cmssy publish-template` only.
 
-**Breaking changes** trigger a confirmation prompt; pass `--force` only with explicit user approval.
+The legacy `cmssy publish` command + its flags (`--patch`, `--minor`, `--major`, `--zip`, `--with-source`, `--force`, `--all`) were removed in CMS-606. Versioning is handled by the build pipeline; there is no per-publish bump prompt anymore.
 
 ### 1.9 `cmssy sync` - pull blocks down from a workspace
 
@@ -143,6 +139,7 @@ blocks/<name>/
 ```
 
 **Naming (hard rules):**
+
 - Directory + package `name` suffix: `kebab-case` (`blog-post-hero`).
 - Component file and default export: `PascalCase` matching the directory (`BlogPostHero.tsx`).
 - Package name: `@<projectName>/blocks.<kebab-name>` where `projectName` comes from `cmssy.config.js`.
@@ -152,21 +149,21 @@ blocks/<name>/
 
 Import from `@cmssy/cli/config`. Available field types:
 
-| type | Use for |
-| --- | --- |
-| `singleLine` | Short text (heading, label, badge). |
-| `multiLine` | Paragraph without formatting. |
-| `richText` | HTML body copy. |
-| `link` | URL. |
-| `media` | Image or video (returns URL string). |
-| `boolean` | Toggle. |
-| `numeric` | Number. |
-| `date` | ISO date string. |
-| `color` | Hex color picker. |
-| `select` | Enum with `options: [{ label, value }]`. |
-| `repeater` | Array of sub-objects with nested `schema`. |
-| `form` | Reference to a form-builder form. |
-| `pageSelector` | Pick a page from the workspace. |
+| type           | Use for                                    |
+| -------------- | ------------------------------------------ |
+| `singleLine`   | Short text (heading, label, badge).        |
+| `multiLine`    | Paragraph without formatting.              |
+| `richText`     | HTML body copy.                            |
+| `link`         | URL.                                       |
+| `media`        | Image or video (returns URL string).       |
+| `boolean`      | Toggle.                                    |
+| `numeric`      | Number.                                    |
+| `date`         | ISO date string.                           |
+| `color`        | Hex color picker.                          |
+| `select`       | Enum with `options: [{ label, value }]`.   |
+| `repeater`     | Array of sub-objects with nested `schema`. |
+| `form`         | Reference to a form-builder form.          |
+| `pageSelector` | Pick a page from the workspace.            |
 
 **Field options:** `label` (required), `defaultValue`, `placeholder`, `required`, `group` (groups fields in the editor UI).
 
@@ -279,7 +276,7 @@ export default defineTemplate({
 });
 ```
 
-Publish templates the same way as blocks: `cmssy publish <template-name> --patch`.
+Publish templates via the dedicated command: `cmssy publish-template <template-name>`. Templates are declarative (no sandbox build) - the CLI accepts `--patch` / `--minor` / `--major` / `--no-bump` and `--overwrite-content` here.
 
 ## 7. Standard workflows
 
@@ -301,8 +298,8 @@ cmssy create block testimonials -c marketing -t "marketing,social-proof" -y
 cmssy dev                                  # visual check
 pnpm typecheck && pnpm lint
 cmssy test --block testimonials            # if tests exist
-cmssy publish testimonials --patch --dry-run
-cmssy publish testimonials --patch
+cmssy publish-block testimonials --dry-run
+cmssy publish-block testimonials
 ```
 
 ### Extend an existing block with an optional field
@@ -310,12 +307,12 @@ cmssy publish testimonials --patch
 1. Add `field({...})` to `config.ts`. Don't set `required: true` - that's breaking.
 2. Update the component to read and render it with a default.
 3. Update `preview.json`.
-4. `cmssy publish <block> --minor`.
+4. `cmssy publish-block <block>`.
 
 ### Copy-only fix
 
 1. Edit default strings or JSX in the component.
-2. `cmssy publish <block> --patch`.
+2. `cmssy publish-block <block>`.
 
 ### Pull a block from the design library
 
@@ -327,8 +324,7 @@ cmssy sync @cmssy/blocks.hero
 
 - Run `cmssy doctor` before publishing.
 - Never fabricate a workspace ID. Use `cmssy workspaces` and confirm with the user.
-- Never pass `--force` without explicit user approval (skips breaking-change confirmation).
-- Never pass `--overwrite-content` without explicit user approval (wipes editor content).
+- Never pass `cmssy publish-template --overwrite-content` without explicit user approval (wipes editor content on the affected pages).
 - Use `--dry-run` first when unsure what will change.
 - Confirm with the user before publishing from a branch other than `develop` or `main`.
 - Commit local changes before publishing - publish uploads the working tree.
@@ -336,10 +332,10 @@ cmssy sync @cmssy/blocks.hero
 
 ## 9. Troubleshooting
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| `doctor` says token invalid | Revoked/expired token | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
-| Publish says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env` |
-| Schema diff prompts blocking publish | Breaking field change | Bump `--major`, or revert to non-breaking, or `--force` with user approval |
-| `block.d.ts` shows wrong fields | Stale generation | Restart `cmssy dev`, or run `cmssy build` to regenerate |
-| Dev server shows a blank block | `preview.json` missing keys | Match keys to `config.ts` field names |
+| Symptom                                 | Likely cause                          | Fix                                                                         |
+| --------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
+| `doctor` says token invalid             | Revoked/expired token                 | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
+| Publish says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env`                                           |
+| Sandbox build fails with bundling error | Missing import or > 10 MB source tree | Inspect the polled `publishJobStatus` log; trim deps or fix the import path |
+| `block.d.ts` shows wrong fields         | Stale generation                      | Restart `cmssy dev`, or run `cmssy build` to regenerate                     |
+| Dev server shows a blank block          | `preview.json` missing keys           | Match keys to `config.ts` field names                                       |
