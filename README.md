@@ -344,7 +344,7 @@ Send a single block to your workspace via the sandbox build pipeline (Vercel San
 **Example:**
 
 ```bash
-# Publish to the workspace from .env
+# Publish to the workspace configured in .env
 cmssy publish-block hero
 
 # Override workspace
@@ -366,7 +366,7 @@ The legacy `cmssy publish` command + ZIP packaging flow were removed in CMS-606 
 cmssy publish-template <name> [options]
 ```
 
-Publish a single template (page tree + content) to a workspace. Templates are declarative - no sandbox build. The CLI reads `template/config.ts` + `pages.json` and uploads via GraphQL.
+Publish a single template (page tree + content) to a workspace. Templates are declarative - no sandbox build. The CLI reads `templates/<name>/config.ts` + `pages.json` and uploads via GraphQL.
 
 **Options:**
 
@@ -378,7 +378,7 @@ Publish a single template (page tree + content) to a workspace. Templates are de
 **Example:**
 
 ```bash
-# Publish from the workspace in .env
+# Publish to the workspace configured in .env
 cmssy publish-template marketing-site
 
 # Override workspace + minor bump

@@ -264,7 +264,12 @@ function mergeCmssyScripts(projectPath: string): void {
   if (!pkg.scripts["cmssy:build"]) {
     pkg.scripts["cmssy:build"] = "cmssy build";
   }
-  delete pkg.scripts["cmssy:publish"];
+  if (
+    typeof pkg.scripts["cmssy:publish"] === "string" &&
+    /^cmssy publish(\s|$)/.test(pkg.scripts["cmssy:publish"])
+  ) {
+    delete pkg.scripts["cmssy:publish"];
+  }
 
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 }
