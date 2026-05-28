@@ -122,11 +122,11 @@ export async function collectBlockSources(
   function addFile(absPath: string, relPath: string, buf: Buffer): void {
     let content = buf;
     if (relPath.toLowerCase().endsWith(".css")) {
-      // Strip bare-specifier `@import "tailwindcss"` style at-rules
-      // - they target postcss/Tailwind processing, esbuild cannot
-      // resolve them, and the consumer site re-processes utility
-      // classes via its own Tailwind pipeline at render time.
-      // Preserve:
+      // Strip unresolvable bare-specifier `@import` at-rules that no
+      // pipeline consumes. Preserve:
+      // - `tailwindcss` (and `tailwindcss/...`) - the build sandbox
+      //   compiles block CSS through @tailwindcss/postcss, which needs
+      //   this import to emit the utility/theme/base layers
       // - relative imports (`./`, `../`) - block-local CSS
       // - root-relative URLs (`/theme.css`) - consumer site asset
       // - absolute URLs (`http(s)://`, protocol-relative `//`) - web
@@ -143,6 +143,8 @@ export async function collectBlockSources(
         /@import\s+(?:url\(\s*)?["']([^"']+)["'](?:\s*\))?[^;]*;[ \t]*\n?/g,
         (match, spec: string) => {
           if (/^(?:\.\.?\/|\/|https?:\/\/)/.test(spec)) return match;
+          if (spec === "tailwindcss" || spec.startsWith("tailwindcss/"))
+            return match;
           if (specMatchesAnyAlias(spec, tsconfig.paths)) return match;
           return "";
         },
