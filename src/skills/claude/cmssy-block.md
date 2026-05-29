@@ -5,7 +5,7 @@ description: "Run the full cmssy CLI lifecycle - init, link, scaffold/edit block
 
 # cmssy-block
 
-Operates the full cmssy CLI workflow for blocks and templates in a project like `cmssy-marketing`. Covers every command the CLI exposes: `init`, `link`, `create`, `dev`, `test`, `build`, `publish`, `sync`, `doctor`, `workspaces`.
+Operates the full cmssy CLI workflow for blocks and templates in a project like `cmssy-marketing`. Covers every command the CLI exposes: `init`, `link`, `workspaces`, `create`, `dev`, `test`, `build`, `publish-block`, `publish-template`, `sync`, `lib`, `skills`, `doctor`. (`configure`, `migrate`, `codegen` exist but are hidden/legacy - don't use them.)
 
 ## 0. Orientation
 
@@ -109,6 +109,8 @@ cmssy publish-block <name> --entry src/main.tsx   # override default src/index.t
 
 **Limits:** 200 files / 10 MB total per block. Polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
 
+**SSR smoke test (can fail an otherwise-valid publish):** after bundling, the sandbox renders your block with `renderToString` using `defaultContent` derived from `config.ts`. When `defaultContent` is non-empty the test **demands non-empty HTML** - a block that renders nothing on its default content fails with `SSR_FAILURE: renderToString returned empty output despite realistic content`, and no artifacts are stored. The two recurring causes are an early `return null` on an empty repeater (see §4) and a repeater with no top-level `defaultValue` (see §3). Fix the block, bump the version, republish.
+
 **Content preservation:** republishing preserves the workspace's `defaultContent` overrides by default. There is no `--overwrite-content` flag - that knob lives on `cmssy publish-template` only.
 
 The legacy `cmssy publish` command + its flags (`--patch`, `--minor`, `--major`, `--zip`, `--with-source`, `--force`, `--all`) were removed in CMS-606. Versioning is handled by the build pipeline; there is no per-publish bump prompt anymore.
@@ -121,6 +123,31 @@ cmssy sync --workspace <id>                      # everything from a workspace
 ```
 
 Use when cloning a project's block set to a new repo, or when a block has drifted from its published version.
+
+### 1.10 `cmssy lib` - manage the workspace npm dependency manifest
+
+```bash
+cmssy lib install <pkg...>            # install locally + push manifest to workspace
+cmssy lib install lodash zod@^4
+cmssy lib install <pkg> --skip-install # only sync from package.json, no local install
+cmssy lib install <pkg> --dry-run      # print manifest, don't push
+cmssy lib sync                         # push current package.json deps to the manifest
+```
+
+When a block imports an npm package, the sandbox build needs it in the workspace's dependency manifest. `lib install` adds the dep locally and registers it so the build pipeline can resolve it. `--package-manager <npm|pnpm|yarn|bun>` forces the PM; both subcommands take `-w` and `--dry-run`.
+
+### 1.11 `cmssy skills` - install AI-assistant skills
+
+```bash
+cmssy skills list                      # show available skills
+cmssy skills install block             # this skill (CLI + block dev workflow)
+cmssy skills install mcp-content       # content editing via @cmssy/mcp-server
+cmssy skills install --all             # all skills
+cmssy skills install block --local     # into ./.claude/skills (default: ~/.claude/skills)
+cmssy skills install block --force     # overwrite existing
+```
+
+Positional arg is the skill name (`block`, `mcp-content`); use `--target` for the editor (default `claude`).
 
 ## 2. Block anatomy (non-negotiable)
 
@@ -149,23 +176,26 @@ blocks/<name>/
 
 Import from `@cmssy/cli/config`. Available field types:
 
-| type           | Use for                                    |
-| -------------- | ------------------------------------------ |
-| `singleLine`   | Short text (heading, label, badge).        |
-| `multiLine`    | Paragraph without formatting.              |
-| `richText`     | HTML body copy.                            |
-| `link`         | URL.                                       |
-| `media`        | Image or video (returns URL string).       |
-| `boolean`      | Toggle.                                    |
-| `numeric`      | Number.                                    |
-| `date`         | ISO date string.                           |
-| `color`        | Hex color picker.                          |
-| `select`       | Enum with `options: [{ label, value }]`.   |
-| `repeater`     | Array of sub-objects with nested `schema`. |
-| `form`         | Reference to a form-builder form.          |
-| `pageSelector` | Pick a page from the workspace.            |
+| type           | Use for                                              |
+| -------------- | ---------------------------------------------------- |
+| `singleLine`   | Short text (heading, label, badge).                  |
+| `multiLine`    | Paragraph without formatting.                        |
+| `richText`     | HTML body copy.                                      |
+| `link`         | URL.                                                 |
+| `media`        | Image or video (returns URL string).                 |
+| `boolean`      | Toggle.                                              |
+| `numeric`      | Number.                                              |
+| `date`         | ISO date string.                                     |
+| `color`        | Hex color picker.                                    |
+| `select`       | Enum with `options: [{ label, value }]`.             |
+| `multiselect`  | Multiple values from `options` (returns `string[]`). |
+| `repeater`     | Array of sub-objects with nested `schema`.           |
+| `form`         | Reference to a form-builder form.                    |
+| `pageSelector` | Pick a page (`multiple: true` for several).          |
 
-**Field options:** `label` (required), `defaultValue`, `placeholder`, `required`, `group` (groups fields in the editor UI).
+**Common field options** (all forwarded to the backend on publish): `label` (required), `required`, `placeholder`, `defaultValue`, `helperText` (helper text under the field; `helpText` is a deprecated alias), `group` (groups fields in the editor UI), `showWhen` (conditional visibility - `{ field, equals | notEquals | notEmpty | isEmpty }`), `validation` (`{ minLength, maxLength, min, max, pattern, message }`).
+
+**Per-type options:** `options: [{ label, value }]` (select/multiselect), `minItems` / `maxItems` / `schema` (repeater), `multiple` (pageSelector). Media's `acceptedTypes` / `accept` / `maxSize` are **not** forwarded by the publish pipeline - don't rely on them.
 
 ```ts
 import { defineBlock, field } from "@cmssy/cli/config";
@@ -201,7 +231,65 @@ export default defineBlock({
 });
 ```
 
+**Repeaters and the SSR smoke test (critical):** `defaultContent` is built by `extractDefaultContent`, which only reads a field's **top-level** `defaultValue`. For a `repeater` it does **not** synthesize a sample row from the nested fields' `defaultValue`s - a repeater without its own top-level `defaultValue` becomes an empty array `[]`. If your component renders nothing when that array is empty (e.g. `if (items.length === 0) return null`), publish fails the SSR smoke test. Seed the repeater with a top-level `defaultValue` holding at least one realistic row:
+
+```ts
+items: field({
+  type: "repeater",
+  label: "Items",
+  defaultValue: [{ title: "Example", description: "Sample row" }],
+  schema: {
+    title: field({ type: "singleLine", label: "Title", required: true }),
+    description: field({ type: "multiLine", label: "Description" }),
+  },
+}),
+```
+
 After editing `config.ts`, `block.d.ts` regenerates on the next `cmssy dev` or `cmssy build`. Never hand-edit it.
+
+### Block-level config keys (`defineBlock`)
+
+Beyond `name`, `description`, `category`, `tags`, `schema`, `defineBlock` accepts:
+
+| key               | Type                                                                             | Purpose                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `longDescription` | `string`                                                                         | Long copy for the design-library listing.                                                                                           |
+| `layoutPosition`  | `"header" \| "footer" \| "sidebar_left" \| "sidebar_right" \| "top" \| "bottom"` | Makes this a **layout block** rendered into that slot instead of the content area.                                                  |
+| `useClient`       | `boolean` (default `false`)                                                      | `false` = server-rendered HTML only (no JS shipped). `true` = hydrate the block on the client (interactivity, hooks, browser APIs). |
+| `requires`        | `BlockRequires`                                                                  | Capability metadata: `{ auth?, language?, workspace?, modules?, permissions?, features? }`.                                         |
+
+`requires` modules: `pim`, `crm`, `forms`, `analytics`, `newsletter`, `ecommerce`. `requires` features: `ai-generation`, `ai-translation`, `a-b-testing`. **`requires` is metadata** (editor/library filtering + auth-aware rendering hints) - it does **not** gate the runtime `context`, which is always populated. Always guard for missing data in the component regardless of what you declare.
+
+(`groups` appears in some legacy block configs but is **not** forwarded by the publish pipeline - use the per-field `group` string for editor grouping instead.)
+
+### Layout blocks (header / footer / sidebar)
+
+A layout block is an ordinary block with a `layoutPosition`. It renders into a template slot via `LayoutPositionRenderer` and is excluded from the content-block drawer. Header/footer/nav blocks are almost always interactive, so set `useClient: true` and declare what they read:
+
+```ts
+export default defineBlock({
+  name: "Header Navigation",
+  description: "Responsive header with logo, nav, and CTA",
+  category: "layout",
+  layoutPosition: "header",
+  useClient: true,
+  requires: { auth: true, language: true },
+  schema: {
+    logo: field({ type: "media", label: "Logo" }),
+    links: field({
+      type: "repeater",
+      label: "Nav links",
+      defaultValue: [{ label: "Home", href: "/" }],
+      schema: {
+        label: field({ type: "singleLine", label: "Label", required: true }),
+        href: field({ type: "link", label: "URL", required: true }),
+      },
+    }),
+  },
+});
+```
+
+The same SSR-smoke and repeater-seeding rules apply (§3 above, §1.8). Publish with `cmssy publish-block <name>` like any other block.
 
 ## 4. Writing the component
 
@@ -229,7 +317,7 @@ export default function FeatureGrid({ content }: { content: BlockContent }) {
 }
 ```
 
-Blocks that read platform data (auth, i18n) accept a second prop:
+Blocks that read platform data accept a second `context` prop (`PlatformContext`). It is **always** passed and fully populated - `requires` does not gate it - so guard every field defensively:
 
 ```tsx
 export default function Header({ content, context }: {
@@ -238,7 +326,16 @@ export default function Header({ content, context }: {
 }) { ... }
 ```
 
-Components that use hooks or browser APIs: `"use client";` at the top.
+`PlatformContext` top-level keys: `locale` (always present - `{ current, default, enabled }`), `auth`, `workspace`, `site`, `branding`, `primaryDomain`, `pages`, `media`, `members`, `forms`, `formDefinitions`, `models`, `cart` / `canUseCart`, `isPreview`, `isDraftMode`, and `graphql(query, variables?)` for public queries. Collection sources (`pages`, `media`, `forms`, ...) are injected from the block's `dataDeclarations` and auto-detected references (e.g. a `formId` in content), so they may be empty if not declared.
+
+**Two different "client" knobs - don't confuse them:**
+
+- `useClient: true` in **`config.ts`** opts the block into client hydration. Without it the block is server-rendered only and ships no JS, so `useState`/`onClick`/effects won't run in production no matter what the component file says.
+- `"use client";` at the top of the **component file** is the Next-style compile pragma for files that use hooks or browser APIs.
+
+An interactive block needs **both**: `useClient: true` in config and `"use client";` in the component.
+
+**Empty-state guards vs the SSR smoke test:** an early `return null` (or rendering nothing) when a repeater is empty is a legitimate pattern, but it makes the block fail the publish-time SSR smoke test unless that repeater is seeded with a top-level `defaultValue` (see §3). Either seed the repeater, or render a non-empty wrapper (heading/section) even with zero rows.
 
 ## 5. `preview.json`
 
@@ -302,6 +399,19 @@ cmssy publish-block testimonials --dry-run
 cmssy publish-block testimonials
 ```
 
+### Add a layout block (header / footer / sidebar)
+
+```bash
+cmssy create block site-header -c layout -y
+# in config.ts add: layoutPosition: "header", useClient: true, requires: { auth, language }
+# seed any repeater (nav links) with a top-level defaultValue
+cmssy dev
+pnpm typecheck && pnpm lint
+cmssy publish-block site-header
+```
+
+`cmssy create` does not set `layoutPosition` - add it (and `useClient`) to `config.ts` by hand. See §3 "Layout blocks".
+
 ### Extend an existing block with an optional field
 
 1. Add `field({...})` to `config.ts`. Don't set `required: true` - that's breaking.
@@ -332,10 +442,11 @@ cmssy sync @cmssy/blocks.hero
 
 ## 9. Troubleshooting
 
-| Symptom                                 | Likely cause                          | Fix                                                                         |
-| --------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
-| `doctor` says token invalid             | Revoked/expired token                 | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
-| Publish says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env`                                           |
-| Sandbox build fails with bundling error | Missing import or > 10 MB source tree | Inspect the polled `publishJobStatus` log; trim deps or fix the import path |
-| `block.d.ts` shows wrong fields         | Stale generation                      | Restart `cmssy dev`, or run `cmssy build` to regenerate                     |
-| Dev server shows a blank block          | `preview.json` missing keys           | Match keys to `config.ts` field names                                       |
+| Symptom                                                                | Likely cause                                                                                                                    | Fix                                                                                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `doctor` says token invalid                                            | Revoked/expired token                                                                                                           | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens                                                |
+| Publish says "workspace not accessible"                                | Wrong `CMSSY_WORKSPACE_ID` or no role                                                                                           | `cmssy workspaces`, update `.env`                                                                                          |
+| Sandbox build fails with bundling error                                | Missing import or > 10 MB source tree                                                                                           | Inspect the polled `publishJobStatus` log; trim deps or fix the import path                                                |
+| `block.d.ts` shows wrong fields                                        | Stale generation                                                                                                                | Restart `cmssy dev`, or run `cmssy build` to regenerate                                                                    |
+| Dev server shows a blank block                                         | `preview.json` missing keys                                                                                                     | Match keys to `config.ts` field names                                                                                      |
+| Publish fails `SSR_FAILURE` / "empty output despite realistic content" | Block renders nothing on its `defaultContent` - usually `return null` on an empty repeater that has no top-level `defaultValue` | Seed the repeater's top-level `defaultValue` with ≥1 row (§3), or render a non-empty wrapper (§4); bump version; republish |

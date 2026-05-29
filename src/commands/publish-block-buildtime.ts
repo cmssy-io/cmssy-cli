@@ -13,11 +13,11 @@ import {
   collectBlockSources,
   type CollectResult,
 } from "../utils/source-collector.js";
+import { loadBlockConfig } from "../utils/block-config.js";
 import {
+  convertSchemaToFields,
   extractDefaultContent,
-  loadBlockConfig,
-} from "../utils/block-config.js";
-import { convertSchemaToFields } from "../utils/publish-helpers.js";
+} from "../utils/publish-helpers.js";
 import type { FieldConfig } from "@cmssy/types";
 import {
   resolveWorkspaceId,
