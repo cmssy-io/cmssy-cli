@@ -317,7 +317,7 @@ export default function FeatureGrid({ content }: { content: BlockContent }) {
 }
 ```
 
-Blocks that read platform data accept a second `context` prop (`PlatformContext`). It is **always** passed and fully populated - `requires` does not gate it - so guard every field defensively:
+Blocks that read platform data accept a second `context` prop. The SSR render path populates it in full (and `requires` does **not** gate which fields you get), but type it **optional** (`context?: PlatformContext`) - that is the convention across all blocks, since non-SSR paths (editor CSR preview, fallbacks) may not pass it. Always guard every field defensively:
 
 ```tsx
 export default function Header({ content, context }: {
