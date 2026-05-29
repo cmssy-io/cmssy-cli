@@ -45,7 +45,7 @@ export async function configureCommand(options: ConfigureOptions) {
   console.log(chalk.cyan("Next steps:\n"));
   console.log(
     chalk.white(
-      "  cmssy publish --all --workspace      # Publish to workspace",
+      "  cmssy publish-block <name> -w <id>   # Publish a block to workspace",
     ),
   );
   console.log(

@@ -54,6 +54,23 @@ describe("collectBlockSources", () => {
     );
   });
 
+  it("preserves the tailwindcss @import but strips other bare imports", async () => {
+    const dir = await makeBlock({
+      "package.json": '{"name":"hero","version":"0.1.0"}',
+      "src/index.tsx":
+        'import "./index.css";\nexport const Block = () => null;',
+      "src/index.css":
+        '@import "tailwindcss";\n@import "some-bare-pkg";\n@import "./local.css";\nh1 { color: red; }',
+      "src/local.css": "h1 { color: red; }",
+    });
+    const result = await collectBlockSources({ blockDir: dir });
+    const css = result.files.find((f) => f.relPath === "src/index.css")!;
+    const text = Buffer.from(css.contentBase64, "base64").toString("utf8");
+    expect(text).toContain('@import "tailwindcss";');
+    expect(text).toContain('@import "./local.css";');
+    expect(text).not.toContain("some-bare-pkg");
+  });
+
   it("skips ignored directories like node_modules and dist", async () => {
     const dir = await makeBlock({
       "package.json": '{"name":"hero","version":"0.1.0"}',
