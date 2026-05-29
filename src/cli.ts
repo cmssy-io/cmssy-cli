@@ -212,7 +212,7 @@ program
     `
 Examples:
   $ cmssy link                                    Interactive setup
-  $ cmssy link --token bf_xxx --workspace abc123   Non-interactive (CI)
+  $ cmssy link --token cs_xxx --workspace abc123   Non-interactive (CI)
 
 Saves credentials and workspace ID to .env file.
 Get your API token at: https://cmssy.io/settings/tokens
