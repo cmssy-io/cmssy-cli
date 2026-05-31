@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
-import { GraphQLClient } from "graphql-request";
+import { buildClient } from "./graphql.js";
 import { hasConfig, loadConfig } from "./config.js";
 
 export interface FieldTypeDefinition {
@@ -141,11 +141,7 @@ export async function getFieldTypes(): Promise<FieldTypeDefinition[]> {
   if (hasConfig()) {
     try {
       const config = loadConfig();
-      const client = new GraphQLClient(config.apiUrl, {
-        headers: config.apiToken
-          ? { Authorization: `Bearer ${config.apiToken}` }
-          : {},
-      });
+      const client = buildClient(config.apiUrl, config.apiToken);
 
       const query = `
         query GetFieldTypes {

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { GraphQLClient } from "graphql-request";
+import { buildClient } from "../utils/graphql.js";
 import inquirer from "inquirer";
 import ora from "ora";
 import { loadConfig, saveConfig } from "../utils/config.js";
@@ -65,12 +65,7 @@ export async function linkCommand(options: LinkOptions) {
 
   let workspaces: Workspace[];
   try {
-    const client = new GraphQLClient(apiUrl, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken}`,
-      },
-    });
+    const client = buildClient(apiUrl, apiToken);
 
     const data: any = await client.request(MY_WORKSPACES_QUERY);
     workspaces = data.myWorkspaces || [];
