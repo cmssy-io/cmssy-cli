@@ -76,7 +76,9 @@ All block content MUST be keyed by the workspace's enabled language codes (see R
 
 Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`. They use the same `update_block_content` tool and the same language-keyed content structure - with the exact same language codes from `enabledLanguages`.
 
-### Header translatable fields
+> **Field names are NOT universal - they depend on the workspace's actual header/footer block.** Always inspect the real block with `get_page` before editing. The lists below are the **default cmssy theme**; a custom layout block may use entirely different keys (e.g. `brand`, `links[].label`, `phones[].number`, `email` instead of `navigation[]`/`ctaLabel`/`linkColumns[]`).
+
+### Header translatable fields (default theme - verify with `get_page`)
 
 - `navigation[].label` - top-level nav labels
 - `navigation[].children[].label` - submenu item labels
@@ -85,7 +87,7 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 - `announcementText` - announcement bar text
 - `logoutButtonText` - logout button
 
-### Footer translatable fields
+### Footer translatable fields (default theme - verify with `get_page`)
 
 - `tagline` - site tagline
 - `linkColumns[].title` - column headings
@@ -127,7 +129,8 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 ## Rule 5: Publishing workflow
 
 - `update_block_content` creates unpublished changes (draft)
-- Use `publish_page` to make changes live
+- `patch_block_content` does the same via surgical HTML edits (insert_before/insert_after/replace_section) - prefer it for large docs-style content bodies (~10x cheaper, rejects ambiguous/missing markers). Only works on language-keyed content (`content[locale]`); flat content must be restructured with `update_block_content` first.
+- Use `publish_page` to make changes live - it publishes **both content and layout axes** (split per-axis since CMS-628). `hasUnpublishedContentChanges` and `hasUnpublishedLayoutChanges` track the two axes separately.
 - Use `revert_to_published` to discard draft changes
 - Always inform the user about unpublished state after edits
 
@@ -135,31 +138,32 @@ Layout blocks (header, footer) live in `layoutBlocks` on a page, not in `blocks`
 
 ## Rule 6: Available MCP tools quick reference
 
-| Tool                                    | Use for                                         |
-| --------------------------------------- | ----------------------------------------------- |
-| `get_site_config`                       | **Languages**, site name, features              |
-| `get_workspace_info`                    | Plan, limits, usage                             |
-| `list_pages`                            | Browse/search pages                             |
-| `get_page`                              | Full page with blocks and content               |
-| `create_page`                           | New page                                        |
-| `update_page_settings`                  | SEO, displayName, description                   |
-| `update_block_content`                  | Edit block content (page or layout)             |
-| `add_block_to_page`                     | Add new block                                   |
-| `remove_block_from_page`                | Remove block                                    |
-| `update_page_blocks`                    | Reorder blocks                                  |
-| `update_page_layout`                    | Change layout blocks                            |
-| `publish_page` / `unpublish_page`       | Publishing                                      |
-| `list_block_types` / `get_block_schema` | Discover available blocks                       |
-| `list_media`                            | Browse uploaded media                           |
-| `list_forms`                            | Browse forms (filter by status)                 |
-| `get_form`                              | Full form with fields, settings, i18n           |
-| `create_form`                           | New form with fields and settings               |
-| `update_form`                           | Edit form name, fields, settings, status        |
-| `delete_form`                           | Delete form and all submissions                 |
-| `list_form_submissions`                 | Browse submissions (filter by form/status)      |
-| `get_form_submission`                   | Full submission details                         |
-| `update_form_submission_status`         | Change status (pending/processed/spam/archived) |
-| `delete_form_submission`                | Delete a submission                             |
+| Tool                                    | Use for                                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------- |
+| `get_site_config`                       | **Languages**, site name, features                                         |
+| `get_workspace_info`                    | Plan, limits, usage                                                        |
+| `list_pages`                            | Browse/search pages                                                        |
+| `get_page`                              | Full page with blocks and content                                          |
+| `create_page`                           | New page                                                                   |
+| `update_page_settings`                  | SEO, displayName, description                                              |
+| `update_block_content`                  | Edit block content (page or layout)                                        |
+| `patch_block_content`                   | Surgical HTML edits to a localized content body (insert/replace by marker) |
+| `add_block_to_page`                     | Add new block                                                              |
+| `remove_block_from_page`                | Remove block                                                               |
+| `update_page_blocks`                    | Reorder blocks                                                             |
+| `update_page_layout`                    | Change layout blocks                                                       |
+| `publish_page` / `unpublish_page`       | Publishing                                                                 |
+| `list_block_types` / `get_block_schema` | Discover available blocks                                                  |
+| `list_media`                            | Browse uploaded media                                                      |
+| `list_forms`                            | Browse forms (filter by status)                                            |
+| `get_form`                              | Full form with fields, settings, i18n                                      |
+| `create_form`                           | New form with fields and settings                                          |
+| `update_form`                           | Edit form name, fields, settings, status                                   |
+| `delete_form`                           | Delete form and all submissions                                            |
+| `list_form_submissions`                 | Browse submissions (filter by form/status)                                 |
+| `get_form_submission`                   | Full submission details                                                    |
+| `update_form_submission_status`         | Change status (pending/processed/spam/archived)                            |
+| `delete_form_submission`                | Delete a submission                                                        |
 
 ---
 
