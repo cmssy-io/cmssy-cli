@@ -37,12 +37,16 @@ export function isVersionSkewError(error: unknown): boolean {
  */
 export function friendlyApiError(error: unknown): Error {
   if (!isVersionSkewError(error)) {
-    return error instanceof Error ? error : new Error(String(error));
+    if (error instanceof Error) return error;
+    // Preserve the raw throwable on `cause` even when normalizing to an Error.
+    return new Error(String(error), { cause: error });
   }
   const original =
     (error as any)?.response?.errors?.[0]?.message ??
     (error as any)?.message ??
     "GraphQL validation error";
+  // `cause` keeps the original throwable (stack / response.errors) for debugging
+  // and stack-aware loggers, while the message stays human-friendly.
   return new Error(
     `The Cmssy API rejected a request this CLI sent (GraphQL validation error).\n` +
       `  @cmssy/cli (v${CLI_VERSION}) and the Cmssy API are incompatible -\n` +
@@ -52,5 +56,6 @@ export function friendlyApiError(error: unknown): Error {
       `  If you are already on the latest CLI, the API may be older than this CLI\n` +
       `  expects (e.g. a self-hosted or staging backend) - check the API version.\n` +
       `  Original error: ${original}`,
+    { cause: error },
   );
 }

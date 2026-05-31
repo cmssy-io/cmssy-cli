@@ -35,12 +35,15 @@ describe("isVersionSkewError", () => {
 
 describe("friendlyApiError", () => {
   it("rewrites a skew error into an actionable upgrade message", () => {
-    const out = friendlyApiError(gqlError('Unknown type "ImportBlockInput".'));
+    const input = gqlError('Unknown type "ImportBlockInput".');
+    const out = friendlyApiError(input);
     expect(out).toBeInstanceOf(Error);
     expect(out.message).toMatch(/incompatible/);
     expect(out.message).toMatch(/@cmssy\/cli@latest/);
     // keeps the original for debugging
     expect(out.message).toMatch(/ImportBlockInput/);
+    // and preserves the original throwable on `cause`
+    expect(out.cause).toBe(input);
   });
 
   it("passes non-skew errors through unchanged", () => {
