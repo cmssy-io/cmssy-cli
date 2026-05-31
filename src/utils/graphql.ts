@@ -1,5 +1,7 @@
 import { GraphQLClient } from "graphql-request";
 import { loadConfig } from "./config.js";
+import { clientHeaders } from "./version.js";
+import { friendlyApiError } from "./api-error.js";
 
 export function createClient(): GraphQLClient {
   const config = loadConfig();
@@ -8,12 +10,30 @@ export function createClient(): GraphQLClient {
     throw new Error("CMSSY_API_TOKEN not configured. Run: cmssy link");
   }
 
-  return new GraphQLClient(config.apiUrl, {
+  const client = new GraphQLClient(config.apiUrl, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiToken}`,
+      // Identify the client so the API can detect/observe version drift.
+      ...clientHeaders(),
     },
   });
+
+  // Centralize version-skew handling: rewrite cryptic GraphQL validation
+  // errors ("Unknown type ...", "Cannot query field ...") into an actionable
+  // "upgrade the CLI" message instead of leaking schema internals to users.
+  const originalRequest = client.request.bind(client);
+  (client as { request: unknown }).request = async (...args: unknown[]) => {
+    try {
+      return await (originalRequest as (...a: unknown[]) => Promise<unknown>)(
+        ...args,
+      );
+    } catch (err) {
+      throw friendlyApiError(err);
+    }
+  };
+
+  return client;
 }
 
 // GraphQL Mutations

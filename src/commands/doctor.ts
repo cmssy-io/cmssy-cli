@@ -4,6 +4,8 @@ import fs from "fs-extra";
 import { GraphQLClient } from "graphql-request";
 import path from "path";
 import { loadConfig } from "../utils/config.js";
+import { CLI_VERSION, clientHeaders } from "../utils/version.js";
+import { friendlyApiError } from "../utils/api-error.js";
 
 function getVersion(cmd: string): string | null {
   try {
@@ -134,15 +136,19 @@ export async function doctorCommand() {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${config.apiToken}`,
+          ...clientHeaders(),
         },
       });
 
       const data: any = await client.request(`
-        query { myWorkspaces { id name } }
+        query { version myWorkspaces { id name } }
       `);
 
       pass("API reachable");
       pass("Token valid");
+
+      const apiVersion = data.version ?? "unknown";
+      pass(`Compatibility (CLI v${CLI_VERSION} ↔ API v${apiVersion})`);
 
       const workspaces = data.myWorkspaces || [];
       if (config.workspaceId) {
@@ -156,7 +162,12 @@ export async function doctorCommand() {
         skip("Workspace check (no CMSSY_WORKSPACE_ID)");
       }
     } catch (error: any) {
-      if (error.response?.errors) {
+      const friendly = friendlyApiError(error);
+      if (friendly !== error && friendly.message !== error.message) {
+        // Version drift between this CLI and the API.
+        fail("CLI/API version mismatch");
+        console.log(chalk.yellow(`    ${friendly.message.split("\n").join("\n    ")}`));
+      } else if (error.response?.errors) {
         fail("API reachable but token invalid");
       } else {
         fail(`API unreachable: ${error.message}`);
