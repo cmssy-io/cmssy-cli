@@ -30,9 +30,10 @@ export function isVersionSkewError(error: unknown): boolean {
 }
 
 /**
- * Turn a cryptic GraphQL validation error into an actionable "your CLI is out of
- * date with the API" message. Non-skew errors are returned unchanged so normal
- * failures keep their original message.
+ * Turn a cryptic GraphQL validation error into an actionable CLI/API
+ * incompatibility message. Non-skew `Error` instances are returned unchanged;
+ * non-skew non-Error throwables are normalized to an `Error` so callers always
+ * receive an `Error`.
  */
 export function friendlyApiError(error: unknown): Error {
   if (!isVersionSkewError(error)) {
@@ -44,10 +45,12 @@ export function friendlyApiError(error: unknown): Error {
     "GraphQL validation error";
   return new Error(
     `The Cmssy API rejected a request this CLI sent (GraphQL validation error).\n` +
-      `  This almost always means @cmssy/cli (v${CLI_VERSION}) is out of date with the API.\n` +
-      `  Upgrade and retry:\n` +
+      `  @cmssy/cli (v${CLI_VERSION}) and the Cmssy API are incompatible -\n` +
+      `  most often the CLI is out of date. Try upgrading first:\n` +
       `    npm i -g @cmssy/cli@latest        # if installed globally\n` +
       `    # or bump the @cmssy/cli devDependency in your project\n` +
+      `  If you are already on the latest CLI, the API may be older than this CLI\n` +
+      `  expects (e.g. a self-hosted or staging backend) - check the API version.\n` +
       `  Original error: ${original}`,
   );
 }

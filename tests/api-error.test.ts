@@ -37,7 +37,7 @@ describe("friendlyApiError", () => {
   it("rewrites a skew error into an actionable upgrade message", () => {
     const out = friendlyApiError(gqlError('Unknown type "ImportBlockInput".'));
     expect(out).toBeInstanceOf(Error);
-    expect(out.message).toMatch(/out of date with the API/);
+    expect(out.message).toMatch(/incompatible/);
     expect(out.message).toMatch(/@cmssy\/cli@latest/);
     // keeps the original for debugging
     expect(out.message).toMatch(/ImportBlockInput/);

@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import fs from "fs-extra";
-import { GraphQLClient } from "graphql-request";
 import path from "path";
 import semver from "semver";
 import { hasConfig, loadConfig } from "../utils/config.js";
 import {
+  buildClient,
   IMPORT_TEMPLATE_MUTATION,
   type ImportTemplateResponse,
 } from "../utils/graphql.js";
@@ -439,12 +439,8 @@ async function uploadTemplate(args: {
   templateName: string;
   nextVersion: string;
 }): Promise<void> {
-  const client = new GraphQLClient(args.apiUrl, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${args.apiToken}`,
-      "X-Workspace-ID": args.workspaceId,
-    },
+  const client = buildClient(args.apiUrl, args.apiToken, {
+    extraHeaders: { "X-Workspace-ID": args.workspaceId },
   });
 
   // AbortController + signal so the request is actually cancelled on
