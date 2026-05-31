@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { loadConfig } from "../utils/config.js";
-import { GraphQLClient } from "graphql-request";
+import { buildClient } from "../utils/graphql.js";
 
 interface WorkspaceRole {
   name: string;
@@ -40,12 +40,7 @@ export async function workspacesCommand() {
   }
 
   try {
-    const client = new GraphQLClient(config.apiUrl, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiToken}`,
-      },
-    });
+    const client = buildClient(config.apiUrl, config.apiToken);
 
     const data: any = await client.request(MY_WORKSPACES_QUERY);
 
