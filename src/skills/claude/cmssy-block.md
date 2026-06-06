@@ -5,7 +5,7 @@ description: "Run the full cmssy CLI lifecycle - init, link, scaffold/edit block
 
 # cmssy-block
 
-Operates the full cmssy CLI workflow for blocks and templates in a project like `cmssy-marketing`. Covers every command the CLI exposes: `init`, `link`, `workspaces`, `create`, `dev`, `test`, `build`, `publish-block`, `publish-template`, `sync`, `lib`, `skills`, `doctor`. (`configure`, `migrate`, `codegen` exist but are hidden/legacy - don't use them.)
+Operates the full cmssy CLI workflow for blocks and templates in a project like `cmssy-marketing`. Covers every command the CLI exposes: `init`, `link`, `workspaces`, `create`, `dev`, `test`, `build`, `publish-template`, `sync`, `lib`, `skills`, `doctor`. (`configure`, `migrate`, `codegen` exist but are hidden/legacy - don't use them.)
 
 ## 0. Orientation
 
@@ -94,26 +94,11 @@ cmssy build --block hero pricing         # subset
 cmssy build --framework react            # override
 ```
 
-Outputs `public/@<vendor>/blocks.<name>/<version>/{index.js,index.css,package.json}`. Run before `cmssy publish-block` if you want to preview the bundle locally - publishing itself bundles again in the sandbox.
+Outputs `public/@<vendor>/blocks.<name>/<version>/{index.js,index.css,package.json}`. This bundle is what the headless consumer app vendors - there is no separate publish step.
 
-### 1.8 `cmssy publish-block` - upload to workspace via the sandbox build pipeline
+### 1.8 Shipping a block (headless)
 
-```bash
-cmssy publish-block <name>                        # publish to workspace from .env
-cmssy publish-block <name> -w <workspaceId>       # explicit workspace
-cmssy publish-block <name> --dry-run              # collect files + print plan, no upload
-cmssy publish-block <name> --entry src/main.tsx   # override default src/index.tsx entry
-```
-
-**Flow:** CLI collects the source files and POSTs them base64-encoded via the `publishBlock` GraphQL mutation. The backend packs the bundle into `tar.gz`, uploads it to Vercel Blob, and enqueues an Inngest job that builds in a Vercel Sandbox and writes artifacts back to Blob. CLI polls `publishJobStatus` until status is `completed` or `failed`.
-
-**Limits:** 200 files / 10 MB total per block. Polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
-
-**SSR smoke test (can fail an otherwise-valid publish):** after bundling, the sandbox renders your block with `renderToString` using `defaultContent` derived from `config.ts`. When `defaultContent` is non-empty the test **demands non-empty HTML** - a block that renders nothing on its default content fails with `SSR_FAILURE: renderToString returned empty output despite realistic content`, and no artifacts are stored. The two recurring causes are an early `return null` on an empty repeater (see §4) and a repeater with no top-level `defaultValue` (see §3). Fix the block, bump the version, republish.
-
-**Content preservation:** republishing preserves the workspace's `defaultContent` overrides by default. There is no `--overwrite-content` flag - that knob lives on `cmssy publish-template` only.
-
-The legacy `cmssy publish` command + its flags (`--patch`, `--minor`, `--major`, `--zip`, `--with-source`, `--force`, `--all`) were removed in CMS-606. Versioning is handled by the build pipeline; there is no per-publish bump prompt anymore.
+`cmssy publish-block` (the sandbox/Inngest build pipeline) was **removed** - cmssy is headless: blocks are not published to a server-side workspace catalog. A block ships by building it (`cmssy build`, §1.7) and vendoring the resulting bundle into the consumer app, which renders it and harvests its schema via the editor bridge.
 
 ### 1.9 `cmssy sync` - pull blocks down from a workspace
 
@@ -134,7 +119,7 @@ cmssy lib install <pkg> --dry-run      # print manifest, don't push
 cmssy lib sync                         # push current package.json deps to the manifest
 ```
 
-When a block imports an npm package, the sandbox build needs it in the workspace's dependency manifest. `lib install` adds the dep locally and registers it so the build pipeline can resolve it. `--package-manager <npm|pnpm|yarn|bun>` forces the PM; both subcommands take `-w` and `--dry-run`.
+When a block imports an npm package, `lib install` adds the dep locally and registers it in the project's lib manifest. `--package-manager <npm|pnpm|yarn|bun>` forces the PM; both subcommands take `-w` and `--dry-run`.
 
 ### 1.11 `cmssy skills` - install AI-assistant skills
 
@@ -289,7 +274,7 @@ export default defineBlock({
 });
 ```
 
-The same SSR-smoke and repeater-seeding rules apply (§3 above, §1.8). Publish with `cmssy publish-block <name>` like any other block.
+The same SSR-smoke and repeater-seeding rules apply (§3 above). Build it with `cmssy build` (§1.7) like any other block.
 
 ## 4. Writing the component
 
@@ -397,8 +382,7 @@ cmssy create block testimonials -c marketing -t "marketing,social-proof" -y
 cmssy dev                                  # visual check
 pnpm typecheck && pnpm lint
 cmssy test --block testimonials            # if tests exist
-cmssy publish-block testimonials --dry-run
-cmssy publish-block testimonials
+cmssy build --block testimonials           # bundle for the consumer app to vendor
 ```
 
 ### Add a layout block (header / footer / sidebar)
@@ -409,7 +393,7 @@ cmssy create block site-header -c layout -y
 # seed any repeater (nav links) with a top-level defaultValue
 cmssy dev
 pnpm typecheck && pnpm lint
-cmssy publish-block site-header
+cmssy build --block site-header
 ```
 
 `cmssy create` does not set `layoutPosition` - add it (and `useClient`) to `config.ts` by hand. See §3 "Layout blocks".
@@ -419,12 +403,12 @@ cmssy publish-block site-header
 1. Add `field({...})` to `config.ts`. Don't set `required: true` - that's breaking.
 2. Update the component to read and render it with a default.
 3. Update `preview.json`.
-4. `cmssy publish-block <block>`.
+4. `cmssy build --block <block>`.
 
 ### Copy-only fix
 
 1. Edit default strings or JSX in the component.
-2. `cmssy publish-block <block>`.
+2. `cmssy build --block <block>`.
 
 ### Pull a block from the design library
 
@@ -444,11 +428,9 @@ cmssy sync @cmssy/blocks.hero
 
 ## 9. Troubleshooting
 
-| Symptom                                                                | Likely cause                                                                                                                    | Fix                                                                                                                        |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `doctor` says token invalid                                            | Revoked/expired token                                                                                                           | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens                                                |
-| Publish says "workspace not accessible"                                | Wrong `CMSSY_WORKSPACE_ID` or no role                                                                                           | `cmssy workspaces`, update `.env`                                                                                          |
-| Sandbox build fails with bundling error                                | Missing import or > 10 MB source tree                                                                                           | Inspect the polled `publishJobStatus` log; trim deps or fix the import path                                                |
-| `block.d.ts` shows wrong fields                                        | Stale generation                                                                                                                | Restart `cmssy dev`, or run `cmssy build` to regenerate                                                                    |
-| Dev server shows a blank block                                         | `preview.json` missing keys                                                                                                     | Match keys to `config.ts` field names                                                                                      |
-| Publish fails `SSR_FAILURE` / "empty output despite realistic content" | Block renders nothing on its `defaultContent` - usually `return null` on an empty repeater that has no top-level `defaultValue` | Seed the repeater's top-level `defaultValue` with ≥1 row (§3), or render a non-empty wrapper (§4); bump version; republish |
+| Symptom                                 | Likely cause                          | Fix                                                                         |
+| --------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
+| `doctor` says token invalid             | Revoked/expired token                 | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
+| Publish says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env`                                           |
+| `block.d.ts` shows wrong fields         | Stale generation                      | Restart `cmssy dev`, or run `cmssy build` to regenerate                     |
+| Dev server shows a blank block          | `preview.json` missing keys           | Match keys to `config.ts` field names                                       |

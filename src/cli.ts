@@ -13,7 +13,6 @@ import { initCommand } from "./commands/init.js";
 import { testCommand } from "./commands/test.js";
 import { syncCommand } from "./commands/sync.js";
 import { migrateCommand } from "./commands/migrate.js";
-import { publishBlockBuildtimeCommand } from "./commands/publish-block-buildtime.js";
 import { publishTemplateCommand } from "./commands/publish-template.js";
 import { libInstallCommand, libSyncCommand } from "./commands/lib.js";
 import { skillsInstallCommand, skillsListCommand } from "./commands/skills.js";
@@ -45,7 +44,6 @@ Examples:
   $ cmssy create block hero        Add a new block to your project
   $ cmssy dev                      Start dev server with hot reload
   $ cmssy build                    Build all blocks for production
-  $ cmssy publish-block hero -w abc Publish a single block to workspace
 
 Workflow:
   1. init          → Create project with example block
@@ -54,7 +52,6 @@ Workflow:
   4. dev           → Develop with live preview
   5. test          → Run block tests
   6. build         → Bundle for production
-  7. publish-block → Deploy a block via the sandbox build pipeline
 
 Documentation: https://cmssy.io/docs/cli
 `,
@@ -255,35 +252,6 @@ Runs diagnostic checks:
   )
   .action(doctorCommand);
 
-program
-  .command("publish-block")
-  .description(
-    "Publish a single block via the build pipeline (Vercel Sandbox + Inngest).\n\n" +
-      "  Sends the block source tree to the backend, which packs it as tar.gz,\n" +
-      "  uploads to Vercel Blob, then enqueues an Inngest job that bundles in\n" +
-      "  a sandbox and stores artifacts back to Blob.",
-  )
-  .argument("<name>", "Block directory name under blocks/")
-  .option("-w, --workspace [id]", "Workspace id (defaults to .env)")
-  .option(
-    "--entry <path>",
-    "Entry path inside block dir (default: src/index.tsx)",
-  )
-  .option("--dry-run", "Collect files and print plan without uploading")
-  .addHelpText(
-    "after",
-    `
-Examples:
-  $ cmssy publish-block hero                   Publish blocks/hero
-  $ cmssy publish-block hero --dry-run         Show what would be sent
-  $ cmssy publish-block faq -w 65f...          Override workspace
-
-Limits per block: 200 files, 10 MB total.
-Build polling: 1.5s interval, 10 minute cap, gives up after 5 consecutive errors.
-`,
-  )
-  .action((name, options) => publishBlockBuildtimeCommand(name, options));
-
 // cmssy publish-template
 program
   .command("publish-template")
@@ -311,9 +279,6 @@ Examples:
   $ cmssy publish-template marketing-site               Publish templates/marketing-site
   $ cmssy publish-template marketing-site --dry-run     Show the plan
   $ cmssy publish-template blog -w 65f... --minor       Override workspace + minor bump
-
-Required blocks listed in the template must already exist in the workspace
-(publish them via \`cmssy publish-block\` first).
 `,
   )
   .action((name, options) => publishTemplateCommand(name, options));
@@ -390,7 +355,6 @@ program
     "after",
     `
 Use workspace IDs with:
-  $ cmssy publish-block <name> --workspace <id>
   $ cmssy publish-template <name> --workspace <id>
   $ cmssy sync --workspace <id>
 `,

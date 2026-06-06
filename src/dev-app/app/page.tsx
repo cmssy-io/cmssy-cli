@@ -27,23 +27,6 @@ interface WorkspaceInfo {
     myRole?: { name: string };
   };
   workspaces?: any[];
-  publishedBlocks?: Array<{ blockType: string; name: string; version: string }>;
-}
-
-type SyncStatus = "local-only" | "published" | "outdated";
-
-function getSyncStatus(
-  blockName: string,
-  localVersion: string,
-  wsInfo: WorkspaceInfo | null,
-): SyncStatus {
-  if (!wsInfo?.connected || !wsInfo.publishedBlocks) return "local-only";
-  const remote = wsInfo.publishedBlocks.find(
-    (b) => b.blockType === blockName || b.name === blockName,
-  );
-  if (!remote) return "local-only";
-  if (remote.version === localVersion) return "published";
-  return "outdated";
 }
 
 const VIEWPORT_STORAGE_KEY = "cmssy-dev-viewport";
@@ -724,53 +707,6 @@ export default function DevHome() {
                 <div style={{ fontSize: "14px", fontWeight: 500 }}>
                   {b.displayName}
                 </div>
-                {wsInfo?.connected &&
-                  (() => {
-                    const status = getSyncStatus(b.name, b.version, wsInfo);
-                    const colors: Record<
-                      SyncStatus,
-                      { bg: string; text: string; label: string }
-                    > = {
-                      published: {
-                        bg:
-                          selected?.name === b.name
-                            ? "rgba(255,255,255,0.2)"
-                            : "#dcfce7",
-                        text: selected?.name === b.name ? "#fff" : "#166534",
-                        label: "\u2713",
-                      },
-                      outdated: {
-                        bg:
-                          selected?.name === b.name
-                            ? "rgba(255,255,255,0.2)"
-                            : "#fef3c7",
-                        text: selected?.name === b.name ? "#fff" : "#92400e",
-                        label: "\u2191",
-                      },
-                      "local-only": {
-                        bg: "transparent",
-                        text: "transparent",
-                        label: "",
-                      },
-                    };
-                    const c = colors[status];
-                    if (status === "local-only") return null;
-                    return (
-                      <span
-                        title={status}
-                        style={{
-                          fontSize: "10px",
-                          padding: "1px 6px",
-                          borderRadius: "4px",
-                          background: c.bg,
-                          color: c.text,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {c.label}
-                      </span>
-                    );
-                  })()}
               </div>
               <div style={{ fontSize: "12px", opacity: 0.7 }}>
                 {b.type} &middot; v{b.version}
