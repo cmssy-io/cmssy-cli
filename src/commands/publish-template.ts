@@ -88,9 +88,6 @@ function normalizeLayoutPositions(raw: unknown): {
  * `templates/<name>/config.ts` + `pages.json` and uploads via
  * `IMPORT_TEMPLATE_MUTATION`, which triggers cache revalidation
  * backend-side (CMS-604/CMS-843).
- *
- * Mirrors `publish-block` UX (same option flags, same workspace
- * resolution) so users can mentally swap `block` ↔ `template`.
  */
 export async function publishTemplateCommand(
   templateName: string,

@@ -39,17 +39,6 @@ const MY_WORKSPACES_QUERY = `
   }
 `;
 
-const WORKSPACE_BLOCKS_QUERY = `
-  query GetWorkspaceBlocks {
-    workspaceBlocks {
-      id
-      blockType
-      name
-      version
-    }
-  }
-`;
-
 export async function GET() {
   const config = loadEnvConfig();
 
@@ -90,29 +79,10 @@ export async function GET() {
       targetWorkspace = workspaces[0];
     }
 
-    let publishedBlocks: any[] = [];
-    if (targetWorkspace) {
-      const blocksRes = await fetch(config.apiUrl, {
-        method: "POST",
-        headers: {
-          ...headers,
-          "x-workspace-id": targetWorkspace.id,
-        },
-        body: JSON.stringify({ query: WORKSPACE_BLOCKS_QUERY }),
-      });
-      const blocksData = await blocksRes.json();
-      publishedBlocks = blocksData.data?.workspaceBlocks || [];
-    }
-
     return NextResponse.json({
       connected: true,
       workspace: targetWorkspace,
       workspaces,
-      publishedBlocks: publishedBlocks.map((b: any) => ({
-        blockType: b.blockType,
-        name: b.name,
-        version: b.version || "1.0.0",
-      })),
     });
   } catch (error: any) {
     return NextResponse.json({

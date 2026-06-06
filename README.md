@@ -33,14 +33,8 @@ cmssy create block my-block
 # 7. Test your blocks
 cmssy test
 
-# 8. Build for production
+# 8. Build for production - the bundle is vendored by the headless consumer app
 cmssy build
-
-# 9. Publish a block to your workspace via the sandbox build pipeline
-#    (relies on CMSSY_WORKSPACE_ID from .env, or override with -w)
-cmssy publish-block my-block
-# or, override the workspace explicitly:
-cmssy publish-block my-block -w <id>
 ```
 
 ## Environment Configuration
@@ -327,36 +321,9 @@ cmssy codegen --workspace my-workspace-slug
 
 ---
 
-### Publish a Block
+### Ship a Block (headless)
 
-```bash
-cmssy publish-block <name> [options]
-```
-
-Send a single block to your workspace via the sandbox build pipeline (Vercel Sandbox + Inngest). The CLI collects the block source tree, uploads it to the backend, and polls the build job until it finishes.
-
-**Options:**
-
-- `-w, --workspace [id]` - Workspace id (defaults to `CMSSY_WORKSPACE_ID`)
-- `--entry <path>` - Entry path inside the block dir (default: `src/index.tsx`)
-- `--dry-run` - Collect files and print the plan without uploading
-
-**Example:**
-
-```bash
-# Publish to the workspace configured in .env
-cmssy publish-block hero
-
-# Override workspace
-cmssy publish-block hero -w 507f1f77bcf86cd799439011
-
-# See what would be sent without uploading
-cmssy publish-block hero --dry-run
-```
-
-**Limits:** 200 files / 10 MB total per block. Build polling: 1.5 s interval, 10 min cap, gives up after 5 consecutive errors.
-
-The legacy `cmssy publish` command + ZIP packaging flow were removed in CMS-606 - all publishing now goes through the sandbox build pipeline.
+`cmssy publish-block` (the sandbox/Inngest build pipeline) was removed - cmssy is headless. Blocks are not published to a server-side workspace catalog; a block ships by building it (`cmssy build`) and vendoring the resulting `public/@<vendor>/blocks.<name>/...` bundle into the consumer app, which renders it and harvests its schema via the editor bridge.
 
 ---
 
@@ -385,7 +352,7 @@ cmssy publish-template marketing-site
 cmssy publish-template blog -w 65f... --minor
 ```
 
-Required blocks listed in the template must already exist in the workspace - publish them via `cmssy publish-block` first.
+Required blocks listed in the template must be available in the consumer app.
 
 ---
 
@@ -580,14 +547,8 @@ Each block requires a `cmssy` section in its `package.json`:
 For teams with their own block libraries:
 
 ```bash
-# 1. Build your blocks locally (optional sanity check)
+# 1. Build your blocks - the bundles are vendored by the consumer app
 cmssy build
-
-# 2. Publish each block via the sandbox build pipeline
-cmssy publish-block header -w 507f1f77bcf86cd799439011
-cmssy publish-block footer -w 507f1f77bcf86cd799439011
-
-# 3. Instantly available in your workspace
 ```
 
 **Use cases:**
@@ -606,11 +567,11 @@ cmssy publish-block footer -w 507f1f77bcf86cd799439011
 
 ## Environment Variables Reference
 
-| Variable             | Required                                                                                                 | Description                                                                       | Example                        |
-| -------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------ |
-| `CMSSY_API_URL`      | No (defaults to `https://api.cmssy.io/graphql`)                                                          | Cmssy API GraphQL endpoint - override only when targeting a local/staging backend | `https://api.cmssy.io/graphql` |
-| `CMSSY_API_TOKEN`    | Yes (any command that hits the API: `publish-block`, `publish-template`, `sync`, `workspaces`, `doctor`) | API authentication token                                                          | `cmssy_abc123...`              |
-| `CMSSY_WORKSPACE_ID` | No (commands that take `-w` fall back to this)                                                           | Default workspace ID (MongoDB ObjectId)                                           | `507f1f77bcf86cd799439011`     |
+| Variable             | Required                                                                                | Description                                                                       | Example                        |
+| -------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------ |
+| `CMSSY_API_URL`      | No (defaults to `https://api.cmssy.io/graphql`)                                         | Cmssy API GraphQL endpoint - override only when targeting a local/staging backend | `https://api.cmssy.io/graphql` |
+| `CMSSY_API_TOKEN`    | Yes (any command that hits the API: `publish-template`, `sync`, `workspaces`, `doctor`) | API authentication token                                                          | `cmssy_abc123...`              |
+| `CMSSY_WORKSPACE_ID` | No (commands that take `-w` fall back to this)                                          | Default workspace ID (MongoDB ObjectId)                                           | `507f1f77bcf86cd799439011`     |
 
 ## Requirements
 
@@ -640,11 +601,8 @@ cmssy doctor
 # Develop and test
 cmssy dev
 
-# Build (sanity check) and publish each block
+# Build all blocks for the consumer app to vendor
 cmssy build
-cmssy publish-block header
-cmssy publish-block footer
-cmssy publish-block cta
 ```
 
 ---
