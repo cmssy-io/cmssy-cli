@@ -31,9 +31,7 @@ const program = new Command();
 
 program
   .name("cmssy")
-  .description(
-    "Unified CLI for building and publishing blocks to Cmssy design library",
-  )
+  .description("Unified CLI for building Cmssy blocks and templates")
   .version(packageJson.version)
   .addHelpText(
     "after",

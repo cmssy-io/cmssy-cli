@@ -216,7 +216,7 @@ export default defineBlock({
 });
 ```
 
-**Repeaters and the SSR smoke test (critical):** `defaultContent` is built by `extractDefaultContent`, which only reads a field's **top-level** `defaultValue`. For a `repeater` it does **not** synthesize a sample row from the nested fields' `defaultValue`s - a repeater without its own top-level `defaultValue` becomes an empty array `[]`. If your component renders nothing when that array is empty (e.g. `if (items.length === 0) return null`), publish fails the SSR smoke test. Seed the repeater with a top-level `defaultValue` holding at least one realistic row:
+**Repeaters and SSR (critical):** `defaultContent` is built by `extractDefaultContent`, which only reads a field's **top-level** `defaultValue`. For a `repeater` it does **not** synthesize a sample row from the nested fields' `defaultValue`s - a repeater without its own top-level `defaultValue` becomes an empty array `[]`. If your component renders nothing when that array is empty (e.g. `if (items.length === 0) return null`), the block server-renders empty in the consumer app. Seed the repeater with a top-level `defaultValue` holding at least one realistic row:
 
 ```ts
 items: field({
@@ -274,7 +274,7 @@ export default defineBlock({
 });
 ```
 
-The same SSR-smoke and repeater-seeding rules apply (§3 above). Build it with `cmssy build` (§1.7) like any other block.
+The same SSR and repeater-seeding rules apply (§3 above). Build it with `cmssy build` (§1.7) like any other block.
 
 ## 4. Writing the component
 
@@ -322,7 +322,7 @@ An interactive block needs **both**: `useClient: true` in config and `"use clien
 
 **Entrance/scroll animations gate VISIBILITY, not just interactivity - they REQUIRE `useClient: true`.** If your block (or any component it imports, e.g. a shared `Reveal`) uses framer-motion `whileInView` / `initial={{ opacity: 0 }}` / IntersectionObserver to fade content in, the server-rendered HTML carries `opacity:0`. With `useClient: false` there is no hydration, so the JS that animates opacity to 1 never runs and **the content is permanently invisible in production** - not merely non-interactive. This is a trap because the **editor canvas renders blocks pure-CSR**, so the animation always plays there and the block looks fine while editing; the bug only appears on the public/preview SSR path (symptom: "structure and background show but the text is missing"). Any block with reveal-on-scroll/entrance animation must set `useClient: true` and be republished. Don't "fix" it by rewriting the animation to CSS - the platform hydrates client blocks on purpose; `useClient: true` is the intended path.
 
-**Empty-state guards vs the SSR smoke test:** an early `return null` (or rendering nothing) when a repeater is empty is a legitimate pattern, but it makes the block fail the publish-time SSR smoke test unless that repeater is seeded with a top-level `defaultValue` (see §3). Either seed the repeater, or render a non-empty wrapper (heading/section) even with zero rows.
+**Empty-state guards vs SSR:** an early `return null` (or rendering nothing) when a repeater is empty is a legitimate pattern, but it makes the block server-render empty in the consumer app unless that repeater is seeded with a top-level `defaultValue` (see §3). Either seed the repeater, or render a non-empty wrapper (heading/section) even with zero rows.
 
 ## 5. `preview.json`
 
@@ -428,9 +428,9 @@ cmssy sync @cmssy/blocks.hero
 
 ## 9. Troubleshooting
 
-| Symptom                                 | Likely cause                          | Fix                                                                         |
-| --------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
-| `doctor` says token invalid             | Revoked/expired token                 | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
-| Publish says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env`                                           |
-| `block.d.ts` shows wrong fields         | Stale generation                      | Restart `cmssy dev`, or run `cmssy build` to regenerate                     |
-| Dev server shows a blank block          | `preview.json` missing keys           | Match keys to `config.ts` field names                                       |
+| Symptom                                                   | Likely cause                          | Fix                                                                         |
+| --------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
+| `doctor` says token invalid                               | Revoked/expired token                 | `cmssy link` again with a fresh token from https://cmssy.io/settings/tokens |
+| `publish-template`/`sync` says "workspace not accessible" | Wrong `CMSSY_WORKSPACE_ID` or no role | `cmssy workspaces`, update `.env`                                           |
+| `block.d.ts` shows wrong fields                           | Stale generation                      | Restart `cmssy dev`, or run `cmssy build` to regenerate                     |
+| Dev server shows a blank block                            | `preview.json` missing keys           | Match keys to `config.ts` field names                                       |

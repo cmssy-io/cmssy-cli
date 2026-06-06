@@ -1,7 +1,7 @@
 {
   "name": "@cmssy/cli",
   "version": "0.23.0",
-  "description": "Unified CLI for building and publishing blocks to Cmssy design library",
+  "description": "Unified CLI for building Cmssy blocks and templates",
   "type": "module",
   "bin": {
     "cmssy": "./dist/cli.js"
