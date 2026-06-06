@@ -119,7 +119,7 @@ cmssy lib install <pkg> --dry-run      # print manifest, don't push
 cmssy lib sync                         # push current package.json deps to the manifest
 ```
 
-When a block imports an npm package, `lib install` adds the dep locally and registers it in the project's lib manifest. `--package-manager <npm|pnpm|yarn|bun>` forces the PM; both subcommands take `-w` and `--dry-run`.
+When a block imports an npm package, `lib install` adds the dep locally and registers it on the workspace (`updateWorkspaceLibs`). `--package-manager <npm|pnpm|yarn|bun>` forces the PM; both subcommands take `-w` and `--dry-run`.
 
 ### 1.11 `cmssy skills` - install AI-assistant skills
 

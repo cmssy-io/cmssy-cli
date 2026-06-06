@@ -158,6 +158,6 @@ export async function linkCommand(options: LinkOptions) {
   console.log(chalk.cyan("\nNext steps:\n"));
   console.log(chalk.white("  cmssy dev                  Start developing"));
   console.log(
-    chalk.white("  cmssy publish-block <name>  Publish a block to workspace\n"),
+    chalk.white("  cmssy build                Bundle blocks for production\n"),
   );
 }
