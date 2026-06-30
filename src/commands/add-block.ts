@@ -66,10 +66,12 @@ export async function addBlockCommand(args: ParsedArgs): Promise<void> {
     log.warn(
       `Block "${names.type}" already exists - left existing files alone.`,
     );
-  } else {
+  } else if (results.includes("written")) {
     log.success(
       `Created blocks/${names.type}/ (block.ts + ${names.Pascal}.tsx + ${names.Pascal}.module.css)`,
     );
+  } else {
+    log.info(`Block "${names.type}" already up to date.`);
   }
 
   const registered = await registerBlock(blocksFile, names.camel, names.type);

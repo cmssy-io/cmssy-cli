@@ -40,4 +40,19 @@ describe("blockNames", () => {
       expect(() => blockNames(input)).toThrow(/start with a letter/);
     },
   );
+
+  it("strips punctuation so identifiers stay valid", () => {
+    expect(blockNames("feature-grid!")).toEqual({
+      type: "feature-grid",
+      camel: "featureGrid",
+      Pascal: "FeatureGrid",
+      Label: "Feature Grid",
+    });
+    expect(blockNames("hero (v2)")).toEqual({
+      type: "hero-v2",
+      camel: "heroV2",
+      Pascal: "HeroV2",
+      Label: "Hero V2",
+    });
+  });
 });

@@ -9,7 +9,7 @@ function words(input: string): string[] {
   return input
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .split(/[\s_-]+/)
-    .map((w) => w.trim().toLowerCase())
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, "").toLowerCase())
     .filter(Boolean);
 }
 
