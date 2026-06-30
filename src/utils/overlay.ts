@@ -3,14 +3,9 @@ import { join } from "node:path";
 import { writeFileSafe, type WriteResult } from "./files.js";
 import { collectFiles } from "./templates.js";
 
-/**
- * Project-config files the cmssy overlay owns on a fresh scaffold but must not
- * clobber in an existing project (the user already configured them).
- */
-export const OVERLAY_CONFIG_FILES = new Set([
+export const FRESH_ONLY_FILES = new Set([
   "app/layout.tsx",
   "styles/globals.css",
-  "next.config.mjs",
   "postcss.config.mjs",
 ]);
 
@@ -24,6 +19,7 @@ export interface OverlayReport {
   written: string[];
   skipped: string[];
   unchanged: string[];
+  omitted: string[];
 }
 
 function destFor(rel: string): string {
@@ -35,11 +31,20 @@ export async function applyOverlay(
   mode: "fresh" | "existing",
   srcDir = false,
 ): Promise<OverlayReport> {
-  const report: OverlayReport = { written: [], skipped: [], unchanged: [] };
+  const report: OverlayReport = {
+    written: [],
+    skipped: [],
+    unchanged: [],
+    omitted: [],
+  };
   const force = mode === "fresh";
 
   for (const file of collectFiles("init")) {
     const dest = destFor(file.rel);
+    if (mode === "existing" && FRESH_ONLY_FILES.has(dest)) {
+      report.omitted.push(dest);
+      continue;
+    }
     const content = readFileSync(file.abs, "utf8");
     const full =
       srcDir && !ROOT_ONLY.has(dest)

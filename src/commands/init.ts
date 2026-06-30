@@ -3,8 +3,8 @@ import { rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { intro, log, note, outro } from "@clack/prompts";
 import type { ParsedArgs } from "../utils/args.js";
-import { CMSSY_DEPS, DOCS_URL, TAILWIND_DEPS } from "../utils/constants.js";
-import { applyOverlay, OVERLAY_CONFIG_FILES } from "../utils/overlay.js";
+import { CMSSY_DEPS, DOCS_URL } from "../utils/constants.js";
+import { applyOverlay } from "../utils/overlay.js";
 import { detectProject } from "../utils/project.js";
 import {
   detectPackageManager,
@@ -107,17 +107,11 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
   if (report.written.length) {
     log.success(`Added ${report.written.length} file(s)`);
   }
-  const skippedConfig = report.skipped.filter((f) =>
-    OVERLAY_CONFIG_FILES.has(f),
-  );
   if (report.skipped.length) {
     log.warn(`Skipped existing: ${report.skipped.join(", ")}`);
   }
 
-  const added = await ensureDependencies(targetDir, {
-    ...CMSSY_DEPS,
-    ...TAILWIND_DEPS,
-  });
+  const added = await ensureDependencies(targetDir, CMSSY_DEPS);
   if (added.length) log.success(`Added deps: ${added.join(", ")}`);
 
   if (!flags["no-link"]) {
@@ -136,10 +130,17 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
     `${pm === "npm" ? "npm run" : pm} dev`,
     "Open the site in the cmssy editor to edit visually.",
   ];
-  if (skippedConfig.length) {
+  if (report.skipped.includes("next.config.mjs")) {
     steps.push(
       pc.yellow(
-        `Review skipped config (${skippedConfig.join(", ")}): ensure images.remotePatterns and that your layout imports the cmssy globals.`,
+        "Add images.remotePatterns for assets.cmssy.io to your next.config so cmssy media renders.",
+      ),
+    );
+  }
+  if (report.omitted.length) {
+    steps.push(
+      pc.dim(
+        "cmssy does not manage styling - the example block uses Tailwind classes; style it for your own setup.",
       ),
     );
   }

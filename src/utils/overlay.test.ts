@@ -29,6 +29,22 @@ describe("applyOverlay", () => {
     expect(report.written).toContain("cmssy.config.ts");
   });
 
+  it("does not introduce styling files into an existing project", async () => {
+    const dir = await tmpDir();
+    const report = await applyOverlay(dir, "existing");
+    expect(report.omitted).toEqual(
+      expect.arrayContaining([
+        "styles/globals.css",
+        "postcss.config.mjs",
+        "app/layout.tsx",
+      ]),
+    );
+    expect(existsSync(join(dir, "styles", "globals.css"))).toBe(false);
+    expect(existsSync(join(dir, "postcss.config.mjs"))).toBe(false);
+    expect(report.written).toContain("cmssy.config.ts");
+    expect(report.written).toContain("blocks/hero/block.ts");
+  });
+
   it("places overlay under src/ for a src-dir project, configs at root", async () => {
     const dir = await tmpDir();
     await applyOverlay(dir, "fresh", true);

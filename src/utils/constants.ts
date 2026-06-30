@@ -4,10 +4,5 @@ export const CMSSY_DEPS: Record<string, string> = {
   "@cmssy/react": "^0.5.6",
 };
 
-export const TAILWIND_DEPS: Record<string, string> = {
-  tailwindcss: "^4.1.18",
-  "@tailwindcss/postcss": "^4.1.18",
-};
-
 export const DOCS_URL = "https://www.cmssy.com/docs";
 export const HEADLESS_SETTINGS_HINT = "cmssy dashboard -> Settings -> Headless";
