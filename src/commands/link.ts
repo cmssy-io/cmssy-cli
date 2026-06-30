@@ -1,163 +1,83 @@
-import chalk from "chalk";
-import { buildClient } from "../utils/graphql.js";
-import inquirer from "inquirer";
-import ora from "ora";
-import { loadConfig, saveConfig } from "../utils/config.js";
+import { join } from "node:path";
+import { cancel, isCancel, log, password, spinner, text } from "@clack/prompts";
+import type { ParsedArgs } from "../utils/args.js";
+import { resolveWorkspace } from "../utils/delivery.js";
+import { setEnvVars } from "../utils/env.js";
+import { pathExists } from "../utils/files.js";
+import { HEADLESS_SETTINGS_HINT } from "../utils/constants.js";
+import { pc } from "../utils/ui.js";
 
-interface LinkOptions {
-  apiUrl?: string;
-  token?: string;
-  workspace?: string;
+function flagString(value: string | boolean | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
-interface Workspace {
-  id: string;
-  slug: string;
-  name: string;
-  myRole: { name: string; slug: string } | null;
+function bail(): never {
+  cancel("Cancelled.");
+  process.exit(0);
 }
 
-const MY_WORKSPACES_QUERY = `
-  query MyWorkspaces {
-    myWorkspaces {
-      id
-      slug
-      name
-      myRole {
-        name
-        slug
-      }
-    }
-  }
-`;
-
-export async function linkCommand(options: LinkOptions) {
-  console.log(chalk.blue.bold("\n🔗 Cmssy - Link Workspace\n"));
-
-  const existingConfig = loadConfig();
-
-  // Step 1: Get API URL
-  const apiUrl =
-    options.apiUrl || existingConfig.apiUrl || "https://api.cmssy.io/graphql";
-
-  // Step 2: Get API token
-  let apiToken = options.token || existingConfig.apiToken || null;
-
-  if (!apiToken) {
-    const answer = await inquirer.prompt([
-      {
-        type: "password",
-        name: "apiToken",
-        message: "API Token (from Settings > API Tokens):",
-        validate: (input) => {
-          if (!input || input.length < 10) {
-            return "Please enter a valid API token";
-          }
-          return true;
-        },
-      },
-    ]);
-    apiToken = answer.apiToken;
+/** Prompt for + persist workspace credentials. Shared by `link` and `init`. */
+export async function runLink(
+  cwd: string,
+  flags: ParsedArgs["flags"],
+): Promise<void> {
+  let slug = flagString(flags.slug);
+  if (!slug) {
+    const answer = await text({
+      message: "Workspace slug",
+      placeholder: "my-workspace",
+      validate: (v) => (v?.trim() ? undefined : "Required"),
+    });
+    if (isCancel(answer)) bail();
+    slug = answer.trim();
   }
 
-  // Step 3: Validate token and fetch workspaces
-  const spinner = ora("Connecting to Cmssy...").start();
-
-  let workspaces: Workspace[];
-  try {
-    const client = buildClient(apiUrl, apiToken);
-
-    const data: any = await client.request(MY_WORKSPACES_QUERY);
-    workspaces = data.myWorkspaces || [];
-    spinner.succeed("Connected");
-  } catch (error: any) {
-    spinner.fail("Connection failed");
-
-    if (
-      error.response?.errors?.some(
-        (e: any) =>
-          e.extensions?.code === "UNAUTHORIZED" ||
-          e.extensions?.code === "UNAUTHENTICATED",
-      )
-    ) {
-      console.error(
-        chalk.red(
-          "\n✖ Invalid token. Get a new one from Settings > API Tokens\n",
-        ),
-      );
-    } else {
-      console.error(chalk.red(`\n✖ ${error.message}\n`));
-    }
-    process.exit(1);
+  let secret = flagString(flags.secret);
+  if (!secret) {
+    const answer = await password({
+      message: `Draft secret (${HEADLESS_SETTINGS_HINT})`,
+      validate: (v) => (v?.trim() ? undefined : "Required"),
+    });
+    if (isCancel(answer)) bail();
+    secret = answer.trim();
   }
 
-  if (workspaces.length === 0) {
-    console.error(
-      chalk.yellow("\n⚠ No workspaces found. Create one at https://cmssy.io\n"),
-    );
-    process.exit(1);
-  }
-
-  // Step 4: Select workspace
-  let selectedWorkspace: Workspace;
-
-  if (options.workspace) {
-    // Non-interactive mode (CI)
-    const found = workspaces.find(
-      (w) => w.id === options.workspace || w.slug === options.workspace,
-    );
-    if (!found) {
-      console.error(
-        chalk.red(`\n✖ Workspace "${options.workspace}" not found\n`),
-      );
-      console.log(chalk.gray("Available workspaces:"));
-      workspaces.forEach((w) =>
-        console.log(chalk.gray(`  ${w.name} (${w.id})`)),
-      );
-      process.exit(1);
-    }
-    selectedWorkspace = found;
-  } else if (workspaces.length === 1) {
-    // Auto-select if only one workspace
-    selectedWorkspace = workspaces[0];
-    console.log(
-      chalk.gray(
-        `\nAuto-selected: ${selectedWorkspace.name} (only workspace)\n`,
-      ),
-    );
+  const apiUrl = flagString(flags["api-url"]);
+  const s = spinner();
+  s.start("Checking workspace");
+  const lookup = await resolveWorkspace(slug, apiUrl);
+  if (lookup.status === "found") {
+    s.stop(`Workspace found${lookup.siteName ? `: ${lookup.siteName}` : ""}`);
+  } else if (lookup.status === "not-found") {
+    s.stop(pc.yellow(`No published workspace "${slug}" yet - saving anyway`));
   } else {
-    // Interactive picker
-    const answer = await inquirer.prompt([
-      {
-        type: "list",
-        name: "workspaceId",
-        message: "Select workspace:",
-        choices: workspaces.map((w) => {
-          const role = w.myRole?.name || "member";
-          return {
-            name: `${w.name} ${chalk.gray(`(${w.slug})`)} ${chalk.dim(`- ${role}`)}`,
-            value: w.id,
-          };
-        }),
-      },
-    ]);
-    selectedWorkspace = workspaces.find((w) => w.id === answer.workspaceId)!;
+    s.stop(pc.yellow(`Could not verify workspace (${lookup.message})`));
   }
 
-  // Step 5: Save everything to .env
-  saveConfig({
-    apiUrl,
-    apiToken,
-    workspaceId: selectedWorkspace.id,
-  });
-
-  console.log(chalk.green.bold("\n✓ Linked to workspace\n"));
-  console.log(chalk.white(`  Name: ${selectedWorkspace.name}`));
-  console.log(chalk.white(`  Slug: ${selectedWorkspace.slug}`));
-  console.log(chalk.white(`  ID:   ${selectedWorkspace.id}`));
-  console.log(chalk.cyan("\nNext steps:\n"));
-  console.log(chalk.white("  cmssy dev                  Start developing"));
-  console.log(
-    chalk.white("  cmssy build                Bundle blocks for production\n"),
+  await setEnvVars(
+    join(cwd, ".env"),
+    { CMSSY_WORKSPACE_SLUG: slug, CMSSY_DRAFT_SECRET: secret },
+    { overwrite: true },
   );
+  await setEnvVars(
+    join(cwd, ".env.example"),
+    { CMSSY_WORKSPACE_SLUG: "", CMSSY_DRAFT_SECRET: "" },
+    { overwrite: false },
+  );
+
+  log.success("Wrote .env");
+}
+
+export async function linkCommand(args: ParsedArgs): Promise<void> {
+  const cwd = process.cwd();
+  const hasConfig =
+    pathExists(join(cwd, "cmssy.config.ts")) ||
+    pathExists(join(cwd, "src", "cmssy.config.ts"));
+  if (!hasConfig) {
+    log.warn("No cmssy.config.ts here - run `cmssy init` first.");
+  }
+  const { intro, outro } = await import("@clack/prompts");
+  intro(pc.bold("cmssy link"));
+  await runLink(cwd, args.flags);
+  outro("Linked.");
 }

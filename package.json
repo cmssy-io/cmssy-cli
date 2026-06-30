@@ -1,29 +1,31 @@
 {
   "name": "@cmssy/cli",
-  "version": "0.23.0",
-  "description": "Unified CLI for building Cmssy blocks and templates",
+  "version": "1.0.0",
+  "description": "CLI for wiring a Next.js app to a headless cmssy workspace",
   "type": "module",
   "bin": {
     "cmssy": "./dist/cli.js"
   },
-  "exports": {
-    ".": "./dist/cli.js",
-    "./config": "./config.js",
-    "./test": "./test.js"
-  },
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc && tsc config.ts --module esnext --target esnext --moduleResolution bundler && tsc config.ts --declaration --emitDeclarationOnly --module esnext --target esnext --moduleResolution bundler && node scripts/copy-assets.mjs",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "prepare": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "cmssy",
-    "design-library",
     "cli",
-    "cms"
+    "headless",
+    "cms",
+    "nextjs"
   ],
   "author": "Cmssy Team",
   "license": "MIT",
@@ -35,68 +37,20 @@
   "bugs": {
     "url": "https://github.com/cmssy-io/cmssy-cli/issues"
   },
-  "files": [
-    "dist",
-    "src/dev-app",
-    "config.js",
-    "config.d.ts",
-    "test.js",
-    "test.d.ts",
-    "README.md",
-    "LICENSE"
-  ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.18.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@cmssy/types": "^0.14.0",
-    "@tailwindcss/postcss": "^4.1.18",
-    "archiver": "^7.0.1",
-    "chalk": "^5.3.0",
-    "chokidar": "^4.0.1",
-    "commander": "^12.1.0",
-    "dotenv": "^16.4.7",
-    "esbuild": "^0.24.0",
-    "form-data": "^4.0.1",
-    "fs-extra": "^11.2.0",
-    "glob": "^11.0.0",
-    "graphql": "^16.9.0",
-    "graphql-request": "^7.1.2",
-    "inquirer": "^10.0.0",
-    "node-fetch": "^3.3.2",
-    "ora": "^8.0.1",
-    "postcss": "^8.4.49",
-    "postcss-import": "^16.1.1",
-    "semver": "^7.6.3",
-    "tsx": "^4.21.0"
-  },
-  "peerDependencies": {
-    "next": ">=15.0.0",
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
-  },
-  "peerDependenciesMeta": {
-    "next": {
-      "optional": true
-    }
+    "@clack/prompts": "^1.6.0",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "@testing-library/react": "^16",
-    "@types/archiver": "^7.0.0",
-    "@types/form-data": "^2.5.2",
-    "@types/fs-extra": "^11.0.4",
-    "@types/inquirer": "^9.0.7",
-    "@types/node": "^22.10.2",
-    "@types/node-fetch": "^2.6.13",
-    "@types/postcss-import": "^14.0.3",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@types/semver": "^7.7.1",
-    "@vitest/coverage-v8": "^3.2.4",
-    "typescript": "^5.7.2",
-    "vitest": "^3.2.4"
+    "@types/node": "^26.0.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }
