@@ -33,4 +33,11 @@ describe("blockNames", () => {
   it("throws on empty input", () => {
     expect(() => blockNames("   ")).toThrow();
   });
+
+  it.each(["123", "2cool", "3d-grid"])(
+    "throws when the name starts with a digit (%s)",
+    (input) => {
+      expect(() => blockNames(input)).toThrow(/start with a letter/);
+    },
+  );
 });

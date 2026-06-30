@@ -1,14 +1,23 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 
 export function getVersion(): string {
   try {
-    const url = new URL("../package.json", import.meta.url);
-    const pkg = JSON.parse(readFileSync(url, "utf8")) as { version?: string };
-    return pkg.version ?? "0.0.0";
+    let dir = dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 6; i++) {
+      const p = join(dir, "package.json");
+      if (existsSync(p)) {
+        const pkg = JSON.parse(readFileSync(p, "utf8")) as { version?: string };
+        return pkg.version ?? "0.0.0";
+      }
+      dir = dirname(dir);
+    }
   } catch {
-    return "0.0.0";
+    // fall through
   }
+  return "0.0.0";
 }
 
 export const ui = {

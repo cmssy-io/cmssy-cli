@@ -13,6 +13,15 @@ export async function registerBlock(
   const token = `${camel}Block`;
   if (new RegExp(`\\b${token}\\b`).test(content)) return false;
 
+  // Verify the array exists before writing anything, so we never leave a
+  // dangling import that isn't actually registered.
+  const arrayRe = /export const blocks\s*=\s*\[([\s\S]*?)\]/;
+  if (!arrayRe.test(content)) {
+    throw new Error(
+      `Could not find \`export const blocks = [...]\` in ${blocksFile} - add ${token} manually.`,
+    );
+  }
+
   const importLine = `import { ${token} } from "@/blocks/${type}/block";`;
   const lines = content.split("\n");
   let lastImport = -1;
@@ -22,17 +31,14 @@ export async function registerBlock(
   lines.splice(lastImport + 1, 0, importLine);
   content = lines.join("\n");
 
-  content = content.replace(
-    /export const blocks = \[([\s\S]*?)\]/,
-    (_match, inner: string) => {
-      const items = inner
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      items.push(token);
-      return `export const blocks = [${items.join(", ")}]`;
-    },
-  );
+  content = content.replace(arrayRe, (_match, inner: string) => {
+    const items = inner
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    items.push(token);
+    return `export const blocks = [${items.join(", ")}]`;
+  });
 
   await writeFile(blocksFile, content, "utf8");
   return true;

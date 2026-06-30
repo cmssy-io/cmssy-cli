@@ -18,6 +18,11 @@ export function blockNames(input: string): BlockNames {
   if (parts.length === 0) {
     throw new Error("Block name must contain at least one letter or digit.");
   }
+  if (!/^[a-z]/.test(parts[0]!)) {
+    throw new Error(
+      "Block name must start with a letter (it becomes a TypeScript identifier).",
+    );
+  }
   const type = parts.join("-");
   const Pascal = parts.map((w) => w[0]!.toUpperCase() + w.slice(1)).join("");
   const camel = Pascal[0]!.toLowerCase() + Pascal.slice(1);

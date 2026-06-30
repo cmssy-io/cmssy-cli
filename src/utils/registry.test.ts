@@ -36,4 +36,25 @@ describe("registerBlock", () => {
     const out = await readFile(f, "utf8");
     expect(out.match(/featureGridBlock/g)?.length).toBe(2);
   });
+
+  it("tolerates whitespace variations in the array declaration", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cmssy-reg-"));
+    const f = join(dir, "blocks.ts");
+    await writeFile(f, "export const blocks=[\n  heroBlock,\n];\n");
+    expect(await registerBlock(f, "featureGrid", "feature-grid")).toBe(true);
+    expect(await readFile(f, "utf8")).toContain(
+      "[heroBlock, featureGridBlock]",
+    );
+  });
+
+  it("throws (without writing) when the blocks array is missing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cmssy-reg-"));
+    const f = join(dir, "blocks.ts");
+    const original = "export const other = [];\n";
+    await writeFile(f, original);
+    await expect(
+      registerBlock(f, "featureGrid", "feature-grid"),
+    ).rejects.toThrow();
+    expect(await readFile(f, "utf8")).toBe(original);
+  });
 });
