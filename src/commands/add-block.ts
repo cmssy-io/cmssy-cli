@@ -51,20 +51,24 @@ export async function addBlockCommand(args: ParsedArgs): Promise<void> {
     readTemplate("block", "Component.tsx.tpl"),
     vars,
   );
-
-  const r1 = await writeFileSafe(join(dir, "block.ts"), blockTs);
-  const r2 = await writeFileSafe(
-    join(dir, `${names.Pascal}.tsx`),
-    componentTsx,
+  const componentCss = renderTemplate(
+    readTemplate("block", "Component.module.css.tpl"),
+    vars,
   );
 
-  if (r1 === "skipped" || r2 === "skipped") {
+  const results = [
+    await writeFileSafe(join(dir, "block.ts"), blockTs),
+    await writeFileSafe(join(dir, `${names.Pascal}.tsx`), componentTsx),
+    await writeFileSafe(join(dir, `${names.Pascal}.module.css`), componentCss),
+  ];
+
+  if (results.includes("skipped")) {
     log.warn(
       `Block "${names.type}" already exists - left existing files alone.`,
     );
   } else {
     log.success(
-      `Created blocks/${names.type}/ (block.ts + ${names.Pascal}.tsx)`,
+      `Created blocks/${names.type}/ (block.ts + ${names.Pascal}.tsx + ${names.Pascal}.module.css)`,
     );
   }
 

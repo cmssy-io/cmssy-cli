@@ -1,32 +1,31 @@
 # @cmssy/cli
 
-The `cmssy` CLI wires a [Next.js](https://nextjs.org) (App Router) app to a headless
-[cmssy](https://www.cmssy.com) workspace - and helps you grow it with blocks.
+The `cmssy` CLI wires cmssy into your existing [Next.js](https://nextjs.org) (App Router) app
+and helps you grow it with blocks. It does not scaffold a Next app - bring your own
+(`npx create-next-app@latest`).
 
 ```bash
-npx @cmssy/cli init
+npx create-next-app@latest my-site   # your app, your way
+cd my-site
+npx @cmssy/cli init                  # add cmssy
 ```
 
-Requires **Node 18.18+** and, for existing projects, the **Next.js App Router**.
+Requires **Node 18.18+** and an existing **Next.js App Router** project.
 
 ## Commands
 
 ### `cmssy init [dir]`
 
-Scaffold a new app or wire cmssy into an existing one, then link it to a workspace.
+Add the cmssy wiring to an existing Next.js App Router app, then link it to a workspace.
+Idempotent - it never overwrites a file you already have; skipped files are reported.
 
-- **Empty directory** - creates a fresh Next.js App Router app with `create-next-app@latest`
-  (so you always get the latest Next), then applies the cmssy wiring.
-- **Existing App Router project** - adds only the wiring, idempotently. It never overwrites a
-  file you already have; skipped files are reported.
-
-It writes a zero-config setup: `cmssy.config.ts`, a catch-all `app/[[...path]]/page.tsx`, the
-draft route, `proxy.ts` (edit-mode + CSP), the block registry, the lazy editor, and one example
-`hero` block. Then it runs the link flow and installs dependencies.
+It writes: `cmssy.config.ts`, a catch-all `app/[[...path]]/page.tsx`, the draft route,
+`proxy.ts` (edit-mode + CSP), the block registry, the lazy editor, and one self-styled example
+`hero` block (a CSS Module - cmssy does not impose a styling system). `next.config.mjs` is added
+only if you don't already have one. Then it links and installs dependencies.
 
 ```bash
 cmssy init                 # wire the current directory
-cmssy init my-site         # scaffold a fresh app in ./my-site
 cmssy init --pm pnpm       # choose the package manager (npm | pnpm | yarn | bun)
 cmssy init --skip-install  # write files, install later
 cmssy init --no-link       # skip the workspace prompt
@@ -50,7 +49,8 @@ kebab-case, a PascalCase component, a camelCase registry export.
 
 ```bash
 cmssy add block "Feature Grid"
-# -> blocks/feature-grid/block.ts + FeatureGrid.tsx, registered as featureGridBlock
+# -> blocks/feature-grid/{block.ts, FeatureGrid.tsx, FeatureGrid.module.css}
+#    registered as featureGridBlock
 ```
 
 ### `cmssy doctor`

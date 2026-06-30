@@ -12,7 +12,7 @@ ${pc.bold("Usage")}
   cmssy <command> [options]
 
 ${pc.bold("Commands")}
-  init                 Scaffold or wire a Next.js App Router app to cmssy
+  init                 Add cmssy wiring to an existing Next.js App Router app
   link                 Connect an initialized project to a workspace
   add block <name>     Scaffold a new block and register it
   doctor               Diagnose a cmssy project's setup

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { CmssyLink } from "@cmssy/next/client";
+import styles from "./Hero.module.css";
 
 type HeroContent = {
   badgeText?: string;
@@ -31,39 +32,28 @@ export default function Hero({ content }: { content: HeroContent }) {
   if (!heading && !headingHighlight) return null;
 
   return (
-    <section className="relative overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-linear-to-br from-muted via-background to-muted" />
-      <div className="mx-auto max-w-3xl px-6 py-24 text-center sm:py-32">
-        {badgeText && (
-          <span className="mb-6 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-            {badgeText}
-          </span>
-        )}
+    <section className={styles.hero}>
+      <div className={styles.inner}>
+        {badgeText && <span className={styles.badge}>{badgeText}</span>}
 
-        <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
+        <h1 className={styles.title}>
           {heading}
           {headingHighlight && (
             <>
               {heading ? " " : ""}
-              <span className="bg-linear-to-r from-primary to-foreground bg-clip-text text-transparent">
-                {headingHighlight}
-              </span>
+              <span className={styles.highlight}>{headingHighlight}</span>
             </>
           )}
         </h1>
 
-        {subheading && (
-          <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
-            {subheading}
-          </p>
-        )}
+        {subheading && <p className={styles.subheading}>{subheading}</p>}
 
         {(primaryButtonText || secondaryButtonText) && (
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className={styles.actions}>
             {primaryButtonText && (
               <CmssyLink
                 href={primaryButtonUrl}
-                className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-base font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                className={styles.buttonPrimary}
               >
                 {primaryButtonText}
               </CmssyLink>
@@ -71,7 +61,7 @@ export default function Hero({ content }: { content: HeroContent }) {
             {secondaryButtonText && (
               <CmssyLink
                 href={secondaryButtonUrl}
-                className="inline-flex h-12 items-center justify-center rounded-md border border-border px-8 text-base font-medium transition-colors hover:bg-muted"
+                className={styles.buttonSecondary}
               >
                 {secondaryButtonText}
               </CmssyLink>
@@ -80,8 +70,8 @@ export default function Hero({ content }: { content: HeroContent }) {
         )}
 
         {media && (
-          <div className="mt-16 overflow-hidden rounded-xl border border-border shadow-2xl">
-            <div className="relative aspect-video">
+          <div className={styles.media}>
+            <div className={styles.mediaFrame}>
               {isVideo(media) ? (
                 <video
                   src={media}
@@ -89,7 +79,7 @@ export default function Hero({ content }: { content: HeroContent }) {
                   muted
                   loop
                   playsInline
-                  className="h-full w-full object-cover"
+                  className={styles.video}
                 />
               ) : (
                 <Image
@@ -97,7 +87,7 @@ export default function Hero({ content }: { content: HeroContent }) {
                   alt={heading ?? ""}
                   fill
                   sizes="(max-width: 768px) 100vw, 768px"
-                  className="object-cover"
+                  style={{ objectFit: "cover" }}
                   priority
                 />
               )}

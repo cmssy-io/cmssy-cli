@@ -10,44 +10,45 @@ async function tmpDir(): Promise<string> {
 }
 
 describe("applyOverlay", () => {
-  it("writes the full overlay on a fresh target", async () => {
+  it("writes the cmssy wiring + self-styled example block", async () => {
     const dir = await tmpDir();
-    const report = await applyOverlay(dir, "fresh");
+    const report = await applyOverlay(dir);
     expect(report.written).toContain("cmssy.config.ts");
     expect(report.written).toContain("blocks/hero/block.ts");
+    expect(report.written).toContain("blocks/hero/Hero.module.css");
     expect(report.written).toContain(".env.example");
     expect(existsSync(join(dir, "app", "[[...path]]", "page.tsx"))).toBe(true);
     expect(report.skipped).toHaveLength(0);
   });
 
-  it("never clobbers an existing file in existing mode", async () => {
+  it("never introduces styling files into the host project", async () => {
+    const dir = await tmpDir();
+    await applyOverlay(dir);
+    expect(existsSync(join(dir, "styles", "globals.css"))).toBe(false);
+    expect(existsSync(join(dir, "postcss.config.mjs"))).toBe(false);
+    expect(existsSync(join(dir, "app", "layout.tsx"))).toBe(false);
+  });
+
+  it("skips next.config.mjs when another next.config.* exists", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "next.config.ts"), "export default {};\n");
+    const report = await applyOverlay(dir);
+    expect(report.skipped).toContain("next.config.mjs");
+    expect(existsSync(join(dir, "next.config.mjs"))).toBe(false);
+  });
+
+  it("never clobbers an existing file", async () => {
     const dir = await tmpDir();
     await mkdir(join(dir, "cmssy"), { recursive: true });
     await writeFile(join(dir, "cmssy", "blocks.ts"), "// mine\n");
-    const report = await applyOverlay(dir, "existing");
+    const report = await applyOverlay(dir);
     expect(report.skipped).toContain("cmssy/blocks.ts");
     expect(report.written).toContain("cmssy.config.ts");
   });
 
-  it("does not introduce styling files into an existing project", async () => {
+  it("places overlay under src/ for a src-dir project, config files at root", async () => {
     const dir = await tmpDir();
-    const report = await applyOverlay(dir, "existing");
-    expect(report.omitted).toEqual(
-      expect.arrayContaining([
-        "styles/globals.css",
-        "postcss.config.mjs",
-        "app/layout.tsx",
-      ]),
-    );
-    expect(existsSync(join(dir, "styles", "globals.css"))).toBe(false);
-    expect(existsSync(join(dir, "postcss.config.mjs"))).toBe(false);
-    expect(report.written).toContain("cmssy.config.ts");
-    expect(report.written).toContain("blocks/hero/block.ts");
-  });
-
-  it("places overlay under src/ for a src-dir project, configs at root", async () => {
-    const dir = await tmpDir();
-    await applyOverlay(dir, "fresh", true);
+    await applyOverlay(dir, true);
     expect(existsSync(join(dir, "src", "cmssy.config.ts"))).toBe(true);
     expect(existsSync(join(dir, "src", "cmssy", "blocks.ts"))).toBe(true);
     expect(existsSync(join(dir, "src", "app", "[[...path]]", "page.tsx"))).toBe(

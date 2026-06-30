@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { intro, log, note, outro } from "@clack/prompts";
 import type { ParsedArgs } from "../utils/args.js";
@@ -27,48 +25,6 @@ function choosePm(
   return detectPackageManager(targetDir);
 }
 
-async function removeIfExists(...paths: string[]): Promise<void> {
-  for (const p of paths) {
-    if (existsSync(p)) await rm(p, { recursive: true, force: true });
-  }
-}
-
-async function scaffoldFresh(
-  targetDir: string,
-  cwd: string,
-  dirArg: string | undefined,
-  pm: PackageManager,
-): Promise<void> {
-  log.step("Creating a fresh Next.js App Router app");
-  await run(
-    "npx",
-    [
-      "--yes",
-      "create-next-app@latest",
-      dirArg ?? ".",
-      "--yes",
-      "--ts",
-      "--tailwind",
-      "--eslint",
-      "--app",
-      "--no-src-dir",
-      "--import-alias",
-      "@/*",
-      "--skip-install",
-      `--use-${pm}`,
-    ],
-    cwd,
-  );
-
-  // The default index page collides with our optional-catch-all route, and a
-  // create-next-app next.config.ts would duplicate our .mjs - drop both.
-  await removeIfExists(
-    join(targetDir, "app", "page.tsx"),
-    join(targetDir, "next.config.ts"),
-    join(targetDir, "next.config.js"),
-  );
-}
-
 export async function initCommand(args: ParsedArgs): Promise<void> {
   const cwd = process.cwd();
   const dirArg = args.positionals[0];
@@ -78,32 +34,22 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
   intro(pc.bold("cmssy init"));
 
   const info = detectProject(targetDir);
-  const pm = choosePm(flags, targetDir);
-
-  let mode: "fresh" | "existing";
-  if (info.isNextAppRouter) {
-    mode = "existing";
-    log.info("Detected a Next.js App Router project - adding cmssy wiring.");
-  } else if (!info.hasPackageJson) {
-    mode = "fresh";
-  } else {
-    log.error(
-      "This directory has a package.json but isn't a Next.js App Router project.",
-    );
+  if (!info.isNextAppRouter) {
+    log.error("No Next.js App Router project found here.");
     ui.dim(
-      "cmssy init v1 supports the Next.js App Router. Start from an empty directory or an App Router app.",
+      "cmssy init wires an existing Next.js App Router app. Create one first:",
     );
+    ui.dim("  npx create-next-app@latest");
+    ui.dim("then run cmssy init inside it.");
     process.exitCode = 1;
     return;
   }
 
-  if (mode === "fresh") {
-    await scaffoldFresh(targetDir, cwd, dirArg, pm);
-  }
+  log.info("Adding cmssy wiring to your Next.js app.");
+  const pm = choosePm(flags, targetDir);
+  const srcDir = info.appDir === join(targetDir, "src", "app");
 
-  const srcDir =
-    mode === "existing" && info.appDir === join(targetDir, "src", "app");
-  const report = await applyOverlay(targetDir, mode, srcDir);
+  const report = await applyOverlay(targetDir, srcDir);
   if (report.written.length) {
     log.success(`Added ${report.written.length} file(s)`);
   }
@@ -125,7 +71,7 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
   }
 
   const steps = [
-    `cd ${dirArg ?? "."}`,
+    ...(dirArg ? [`cd ${dirArg}`] : []),
     ...(skipInstall ? [`${pm} install`] : []),
     `${pm === "npm" ? "npm run" : pm} dev`,
     "Open the site in the cmssy editor to edit visually.",
@@ -134,13 +80,6 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
     steps.push(
       pc.yellow(
         "Add images.remotePatterns for assets.cmssy.io to your next.config so cmssy media renders.",
-      ),
-    );
-  }
-  if (report.omitted.length) {
-    steps.push(
-      pc.dim(
-        "cmssy does not manage styling - the example block uses Tailwind classes; style it for your own setup.",
       ),
     );
   }
