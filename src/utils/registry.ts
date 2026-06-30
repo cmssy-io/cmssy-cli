@@ -32,12 +32,9 @@ export async function registerBlock(
   content = lines.join("\n");
 
   content = content.replace(arrayRe, (_match, inner: string) => {
-    const items = inner
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    items.push(token);
-    return `export const blocks = [${items.join(", ")}]`;
+    const body = inner.replace(/\s+$/, "").replace(/,\s*$/, "");
+    const next = body.trim() ? `${body}, ${token}` : token;
+    return `export const blocks = [${next}]`;
   });
 
   await writeFile(blocksFile, content, "utf8");

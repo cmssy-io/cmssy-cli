@@ -42,9 +42,21 @@ describe("registerBlock", () => {
     const f = join(dir, "blocks.ts");
     await writeFile(f, "export const blocks=[\n  heroBlock,\n];\n");
     expect(await registerBlock(f, "featureGrid", "feature-grid")).toBe(true);
-    expect(await readFile(f, "utf8")).toContain(
-      "[heroBlock, featureGridBlock]",
+    const out = await readFile(f, "utf8");
+    expect(out).toContain("heroBlock, featureGridBlock");
+    expect(out).toContain(
+      'import { featureGridBlock } from "@/blocks/feature-grid/block";',
     );
+  });
+
+  it("preserves comments inside the array", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cmssy-reg-"));
+    const f = join(dir, "blocks.ts");
+    await writeFile(f, "export const blocks = [heroBlock /* keep me */];\n");
+    expect(await registerBlock(f, "featureGrid", "feature-grid")).toBe(true);
+    const out = await readFile(f, "utf8");
+    expect(out).toContain("/* keep me */");
+    expect(out).toContain("featureGridBlock");
   });
 
   it("throws (without writing) when the blocks array is missing", async () => {

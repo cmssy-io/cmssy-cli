@@ -14,6 +14,12 @@ export const OVERLAY_CONFIG_FILES = new Set([
   "postcss.config.mjs",
 ]);
 
+const ROOT_ONLY = new Set([
+  ".env.example",
+  "next.config.mjs",
+  "postcss.config.mjs",
+]);
+
 export interface OverlayReport {
   written: string[];
   skipped: string[];
@@ -27,6 +33,7 @@ function destFor(rel: string): string {
 export async function applyOverlay(
   targetDir: string,
   mode: "fresh" | "existing",
+  srcDir = false,
 ): Promise<OverlayReport> {
   const report: OverlayReport = { written: [], skipped: [], unchanged: [] };
   const force = mode === "fresh";
@@ -34,11 +41,11 @@ export async function applyOverlay(
   for (const file of collectFiles("init")) {
     const dest = destFor(file.rel);
     const content = readFileSync(file.abs, "utf8");
-    const result: WriteResult = await writeFileSafe(
-      join(targetDir, dest),
-      content,
-      { force },
-    );
+    const full =
+      srcDir && !ROOT_ONLY.has(dest)
+        ? join(targetDir, "src", dest)
+        : join(targetDir, dest);
+    const result: WriteResult = await writeFileSafe(full, content, { force });
     report[result].push(dest);
   }
 

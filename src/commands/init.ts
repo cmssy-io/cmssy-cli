@@ -101,7 +101,9 @@ export async function initCommand(args: ParsedArgs): Promise<void> {
     await scaffoldFresh(targetDir, cwd, dirArg, pm);
   }
 
-  const report = await applyOverlay(targetDir, mode);
+  const srcDir =
+    mode === "existing" && info.appDir === join(targetDir, "src", "app");
+  const report = await applyOverlay(targetDir, mode, srcDir);
   if (report.written.length) {
     log.success(`Added ${report.written.length} file(s)`);
   }

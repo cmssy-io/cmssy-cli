@@ -28,4 +28,17 @@ describe("applyOverlay", () => {
     expect(report.skipped).toContain("cmssy/blocks.ts");
     expect(report.written).toContain("cmssy.config.ts");
   });
+
+  it("places overlay under src/ for a src-dir project, configs at root", async () => {
+    const dir = await tmpDir();
+    await applyOverlay(dir, "fresh", true);
+    expect(existsSync(join(dir, "src", "cmssy.config.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "cmssy", "blocks.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "app", "[[...path]]", "page.tsx"))).toBe(
+      true,
+    );
+    expect(existsSync(join(dir, "next.config.mjs"))).toBe(true);
+    expect(existsSync(join(dir, ".env.example"))).toBe(true);
+    expect(existsSync(join(dir, "src", "next.config.mjs"))).toBe(false);
+  });
 });
