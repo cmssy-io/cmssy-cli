@@ -11,25 +11,31 @@ export async function registerBlock(
 ): Promise<boolean> {
   let content = await readFile(blocksFile, "utf8");
   const token = `${camel}Block`;
-  if (new RegExp(`\\b${token}\\b`).test(content)) return false;
+  const tokenRe = new RegExp(`\\b${token}\\b`);
 
-  // Verify the array exists before writing anything, so we never leave a
-  // dangling import that isn't actually registered.
   const arrayRe = /export const blocks\s*=\s*\[([\s\S]*?)\]/;
-  if (!arrayRe.test(content)) {
+  const arrayMatch = arrayRe.exec(content);
+  if (!arrayMatch) {
     throw new Error(
       `Could not find \`export const blocks = [...]\` in ${blocksFile} - add ${token} manually.`,
     );
   }
 
-  const importLine = `import { ${token} } from "@/blocks/${type}/block";`;
+  if (tokenRe.test(arrayMatch[1]!)) return false;
+
   const lines = content.split("\n");
-  let lastImport = -1;
-  lines.forEach((line, i) => {
-    if (line.startsWith("import ")) lastImport = i;
-  });
-  lines.splice(lastImport + 1, 0, importLine);
-  content = lines.join("\n");
+  const alreadyImported = lines.some(
+    (line) => line.startsWith("import ") && tokenRe.test(line),
+  );
+  if (!alreadyImported) {
+    const importLine = `import { ${token} } from "@/blocks/${type}/block";`;
+    let lastImport = -1;
+    lines.forEach((line, i) => {
+      if (line.startsWith("import ")) lastImport = i;
+    });
+    lines.splice(lastImport + 1, 0, importLine);
+    content = lines.join("\n");
+  }
 
   content = content.replace(arrayRe, (_match, inner: string) => {
     const body = inner.replace(/\s+$/, "").replace(/,\s*$/, "");

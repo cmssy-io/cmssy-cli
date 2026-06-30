@@ -23,9 +23,11 @@ export async function setEnvVars(
     const key = m[1]!;
     if (!(key in vars)) return line;
     remaining.delete(key);
-    const hadValue = m[2]!.trim().length > 0;
-    if (hadValue && !opts.overwrite) return line;
-    return `${key}=${vars[key]}`;
+    const raw = m[2]!;
+    const comment = /\s+#.*$/.exec(raw);
+    const value = comment ? raw.slice(0, comment.index) : raw;
+    if (value.trim().length > 0 && !opts.overwrite) return line;
+    return `${key}=${vars[key]}${comment ? comment[0] : ""}`;
   });
 
   for (const key of remaining) {

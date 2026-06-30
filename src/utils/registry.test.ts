@@ -59,6 +59,19 @@ describe("registerBlock", () => {
     expect(out).toContain("featureGridBlock");
   });
 
+  it("registers in the array when the import already exists, without duplicating it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cmssy-reg-"));
+    const f = join(dir, "blocks.ts");
+    await writeFile(
+      f,
+      'import { heroBlock } from "@/blocks/hero/block";\nimport { featureGridBlock } from "@/blocks/feature-grid/block";\n\nexport const blocks = [heroBlock];\n',
+    );
+    expect(await registerBlock(f, "featureGrid", "feature-grid")).toBe(true);
+    const out = await readFile(f, "utf8");
+    expect(out.match(/import \{ featureGridBlock \}/g)?.length).toBe(1);
+    expect(out).toContain("[heroBlock, featureGridBlock]");
+  });
+
   it("throws (without writing) when the blocks array is missing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "cmssy-reg-"));
     const f = join(dir, "blocks.ts");

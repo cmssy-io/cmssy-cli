@@ -41,4 +41,11 @@ describe("setEnvVars", () => {
     await setEnvVars(f, { K: "v" });
     expect(await readFile(f, "utf8")).toBe("K=v\n");
   });
+
+  it("treats an inline-comment-only value as empty and keeps the comment", async () => {
+    const f = await tmp();
+    await writeFile(f, "K= # from settings\n");
+    await setEnvVars(f, { K: "v" });
+    expect(await readFile(f, "utf8")).toBe("K=v # from settings\n");
+  });
 });
