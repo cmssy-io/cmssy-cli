@@ -70,7 +70,10 @@ export async function runLink(
 
 export async function linkCommand(args: ParsedArgs): Promise<void> {
   const cwd = process.cwd();
-  if (!pathExists(join(cwd, "cmssy.config.ts"))) {
+  const hasConfig =
+    pathExists(join(cwd, "cmssy.config.ts")) ||
+    pathExists(join(cwd, "src", "cmssy.config.ts"));
+  if (!hasConfig) {
     log.warn("No cmssy.config.ts here - run `cmssy init` first.");
   }
   const { intro, outro } = await import("@clack/prompts");
